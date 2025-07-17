@@ -8,7 +8,10 @@ Find the Weights and Biases project here: [LLM4KMU W&B](https://wandb.ai/llm4kmu
 
 ## Setup
 
-``pip install -r requirements.txt``
+```shell
+$python3.10
+pip install -r requirements.txt
+```
 
 ## Trainer
 
