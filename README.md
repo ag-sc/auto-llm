@@ -5,6 +5,8 @@
 Find the Weights and Biases project here: [LLM4KMU W&B](https://wandb.ai/llm4kmu/projects).
 
 
+## Setup
+
 ``sh
 pip install -r requirements.txt
 ``
