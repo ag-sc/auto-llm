@@ -1,6 +1,6 @@
 import setuptools
 
-from autollm.version import __version__
+from auto_llm.version import __version__
 
 setuptools.setup(
     name="AutoLLM",

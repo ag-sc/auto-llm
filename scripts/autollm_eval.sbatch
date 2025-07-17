@@ -14,5 +14,5 @@ CONFIG_PATH="config_files/evaluator_configs/test.yaml"  # relative to the root o
 
 
 source $VENV_PATH/bin/activate
-python -m autollm.evaluator.run --config_path $CONFIG_PATH
+python -m auto_llm.evaluator.run --config_path $CONFIG_PATH
 
