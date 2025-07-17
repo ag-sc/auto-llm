@@ -1,6 +1,7 @@
 # Auto-LLM
 
-...
+TODO: some description of the package/project. :)
+
 
 Find the Weights and Biases project here: [LLM4KMU W&B](https://wandb.ai/llm4kmu/projects).
 
