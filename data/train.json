@@ -1,0 +1,47 @@
+[
+  {
+    "instruction": "some instruction text",
+    "input": "some input text",
+    "expected_output": "some output text"
+  },
+  {
+    "instruction": "some instruction text",
+    "input": "some input text",
+    "expected_output": "some output text"
+  },
+  {
+    "instruction": "some instruction text",
+    "input": "some input text",
+    "expected_output": "some output text"
+  },
+  {
+    "instruction": "some instruction text",
+    "input": "some input text",
+    "expected_output": "some output text"
+  },
+  {
+    "instruction": "some instruction text",
+    "input": "some input text",
+    "expected_output": "some output text"
+  },
+  {
+    "instruction": "some instruction text",
+    "input": "some input text",
+    "expected_output": "some output text"
+  },
+  {
+    "instruction": "some instruction text",
+    "input": "some input text",
+    "expected_output": "some output text"
+  },
+  {
+    "instruction": "some instruction text",
+    "input": "some input text",
+    "expected_output": "some output text"
+  },
+  {
+    "instruction": "some instruction text",
+    "input": "some input text",
+    "expected_output": "some output text"
+  }
+]

@@ -2,4 +2,4 @@ setuptools~=65.5.1
 git+https://github.com/EleutherAI/lm-evaluation-harness.git@v0.4.9
 wandb==0.21.0
 PyYAML~=6.0.2
-# lm_eval~=0.4.9
+datasets==4.0.0
