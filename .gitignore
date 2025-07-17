@@ -9,3 +9,5 @@ dist
 LLMS.egg-info
 *.env*
 models
+*.out
+wandb/*
