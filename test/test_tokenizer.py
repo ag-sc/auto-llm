@@ -2,9 +2,11 @@ import os
 from typing import Dict, List
 
 import pytest
+import transformers.utils
 from transformers import AutoTokenizer
 
-from auto_llm.builder.sft_data_builder import preprocess_fn
+from auto_llm.builder.custom_tokenizer import FullSequenceAsLabelsTokenizer
+from auto_llm.builder.sft_data_builder import preprocess_fn, SftDataBuilder
 
 
 @pytest.fixture
@@ -175,3 +177,60 @@ def test_tokenize_instruct_model(examples):
     assert encoded_inputs["labels"][0].tolist() == [-100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -100, 4328]
     assert encoded_inputs["attention_mask"][0].tolist() == [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
     # fmt: on
+
+
+def test_model(examples):
+    tokenizer = AutoTokenizer.from_pretrained(
+        pretrained_model_name_or_path="google/gemma-2-2b-it",
+        token=os.getenv("HF_TOKEN"),
+    )
+    tokenizer.pad_token = tokenizer.eos_token
+
+    chat_template = (
+        "{% for message in messages %}"
+        "{% if message['role'] != 'assistant' %}"
+        "{{ '<|im_start|>' + message['role'] + '\n' + message['content'] + '<|im_end|>\n' }}"
+        "{% elif message['role'] == 'assistant' %}"
+        "{{ '<|im_start|>' + message['role'] + '\n' }}"
+        "{% generation %}"
+        "{{ message['content'] + '<|im_end|>\n' }}"
+        "{% endgeneration %}"
+        "{% endif %}"
+        "{% endfor %}"
+    )
+
+    conversation = [
+        {"role": "system", "content": "You are helpful"},
+        {"role": "user", "content": "What's the capital of France?"},
+        {"role": "assistant", "content": "some content"},
+    ]
+
+    encodings = tokenizer.apply_chat_template(
+        conversation=conversation, return_assistant_tokens_mask=True, return_dict=True
+    )
+
+
+def test_full_sequence_as_labels_processor():
+    tokenizer = AutoTokenizer.from_pretrained(
+        pretrained_model_name_or_path="google/gemma-2-2b-it",
+        token=os.getenv("HF_TOKEN"),
+    )
+    tokenizer.pad_token = tokenizer.eos_token
+
+    # dataset_path = "data/train_base_model.jsonl"
+    dataset_path = "data/train_instruct_model_wo_sys.jsonl"
+    builder = SftDataBuilder(dataset_path=dataset_path)
+    ds = builder.load_dataset()
+    ds_dict = builder.split_dataset(ds)
+
+    processor = FullSequenceAsLabelsTokenizer(tokenizer)
+
+    ds_dict.map(
+        function=processor.preprocess_fn,
+        fn_kwargs=dict(
+            max_length=25,
+            truncation=True,
+            padding=transformers.utils.PaddingStrategy.MAX_LENGTH,
+        ),
+        batched=True,
+    )

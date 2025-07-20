@@ -11,3 +11,4 @@ LLMS.egg-info
 models
 *.out
 wandb/*
+.cache
