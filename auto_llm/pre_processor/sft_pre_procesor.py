@@ -1,6 +1,7 @@
 import copy
 from typing import Dict, List, Tuple
 
+from datasets import DatasetDict
 from transformers import BatchEncoding, PreTrainedTokenizer
 
 from auto_llm.pre_processor.pre_processor import PreProcessor
@@ -86,6 +87,18 @@ class SftPreProcessor(PreProcessor):
         if "prompt" in examples.keys() and "completion" in examples.keys():
             return False
         elif "messages" in examples.keys():
+            return True
+        else:
+            raise Exception(
+                "The passed examples are neither conversational or completion!"
+            )
+
+    @staticmethod
+    def is_dataset_conversational(dataset_dict: DatasetDict) -> bool:
+        ds = dataset_dict["train"]
+        if "prompt" in ds.column_names and "completion" in ds.column_names:
+            return False
+        elif "messages" in ds.column_names:
             return True
         else:
             raise Exception(

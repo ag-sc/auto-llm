@@ -1,0 +1,38 @@
+trainer_type: sft
+model_name: google/gemma-2-2b-it
+truncation: True
+peft_config:
+  r: 16
+  lora_alpha: 32
+  lora_dropout: 0.05
+  # target_modules: []
+dataset_path: data/train_instruct_model_wo_sys.jsonl
+completion_only_loss: False  # True
+
+trainer_args:
+  max_length: 512
+  bf16: True
+  fp16: False
+
+  # bsz related
+  per_device_train_batch_size: 4
+  per_device_eval_batch_size: 4
+  gradient_accumulation_steps: 8
+  auto_find_batch_size: True
+
+  # training related
+  output_dir: .cache/
+  # resume_from_checkpoint: ""
+  gradient_checkpointing: True
+  num_train_epochs: 10
+  learning_rate: 1e-4
+  warmup_steps: 3
+
+  # tracking/logging related
+  report_to: wandb
+  run_name: sft-test-with-yaml
+  logging_steps: 1
+
+  # eval/save related
+  eval_strategy: steps
+  save_strategy: epoch
