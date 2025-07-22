@@ -1,6 +1,13 @@
-# Auto-LLM
+<h1 align="center">
+    AutoLLM
+</h1>
 
-TODO: some description of the package/project. :)
+<p align="center">
+    <strong>Train and Evaluate your LMs effortlessly. 😊</strong>
+</p>
+
+
+**TODO:** some description of the package/project. :)
 
 
 Find the Weights and Biases project here: [LLM4KMU W&B](https://wandb.ai/llm4kmu/projects).
@@ -27,7 +34,7 @@ pip install -r requirements.txt
 Run: ``python -m auto_llm.trainer.run --config_path <config_path>``
 
 ### Running via SLURM
-- Configure the venv and config paths in the slurm script ``scripts/autollm_train.sbatch``.
+- Configure venv and config paths in the slurm script ``scripts/autollm_train.sbatch``.
 - Run the script: ``sbatch scripts/autollm_train.sbatch``.
 
 ## Evaluator
@@ -38,5 +45,5 @@ Run: ``python -m auto_llm.trainer.run --config_path <config_path>``
 Run: ``python -m auto_llm.evaluator.run --config_path <config_path>``
 
 ### Running via SLURM
-- Configure the venv and config paths in the slurm script ``scripts/autollm_eval.sbatch``.
+- Configure venv and config paths in the slurm script ``scripts/autollm_eval.sbatch``.
 - Run the script: ``sbatch scripts/autollm_eval.sbatch``.
