@@ -1,0 +1,14 @@
+.idea
+venv
+.pytest_cache
+__pycache__
+src/outputs
+outputs
+build
+dist
+LLMS.egg-info
+*.env*
+models
+*.out
+wandb/*
+.cache
