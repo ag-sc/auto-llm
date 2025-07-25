@@ -2,8 +2,7 @@ import os
 from typing import Dict, List
 
 import pytest
-import transformers.utils
-from transformers import AutoTokenizer, PreTrainedTokenizerBase, PreTrainedTokenizer
+from transformers import AutoTokenizer, PreTrainedTokenizer
 
 from auto_llm.pre_processor.sft_pre_procesor import SftPreProcessor
 
