@@ -28,6 +28,8 @@ class SftPreProcessor(PreProcessor):
     ) -> BatchEncoding:
         is_conversational = self.is_conversational(examples)
 
+        self.check_dataset_tokenizer_compatibility(is_conversational=is_conversational)
+
         input_sequences, full_sequences = self.collect_sequences(
             examples=examples, is_conversational=is_conversational
         )
@@ -208,3 +210,25 @@ class SftPreProcessor(PreProcessor):
                 encoding = [pad_token_id] * difference + encoding
             padded_encodings.append(encoding)
         return padded_encodings
+
+    def check_dataset_tokenizer_compatibility(self, is_conversational: bool):
+        # A. Conversational DS         + Tokenizer w/ Chat Template    --> Match
+        # B. Conversational DS         + Tokenizer w/o Chat Template   --> Exception - tokenizing system/user tokens differently
+        # C. Non-Conversational DS     + Tokenizer w/ Chat Template    --> Warning
+        # D. Non-Conversational DS     + Tokenizer w/o Chat Template   --> Match
+        # TODO: mostly non-instruct models do not contain a chat template. However, this is not always the case. Any better way to check if or if not chat model?
+
+        if self.tokenizer.chat_template:
+            if not is_conversational:
+                # case C.
+                print(
+                    f"[WARNING] You are using a non-conversational dataset, but with a tokenizer with chat template. "
+                    f"Better usages will be: (i) Conversational DS + Tokenizer w/ Chat Template or (ii) "
+                    f"Non-Conversational DS + Tokenizer w/o Chat Template."
+                )
+        else:
+            if is_conversational:
+                # case B.
+                raise Exception(
+                    f"You are using a conversational dataset, but with a tokenizer without chat template. Please use a tokenizer with a chat template."
+                )
