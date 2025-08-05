@@ -1,46 +1,107 @@
 import json
 import re
 from typing import Dict, Any, List, Union
+from thefuzz import fuzz
 
 
 def process_results(doc: Dict[str, Any], result: List[str]):
     """
     Function to compute the metrics given the input and the generated response.
+    TODO: define evaluation metrics.
+     (1) exact match on list level
+     (2) partial match on list level - exact match on content level
+     (3) partial/fuzzy match on content level
 
     :param doc: this includes the input
     :param result: this is the generated response
     :return: dict of metric key-value pairs
     """
 
-    print("result\n", result)
+    print("Response:\n", result)
 
     expected_entities_dict = doc["entities"]
     predicted_response = result[0]
 
-    predicted_response = extract_from_json_tags(text=predicted_response)
+    predicted_response = extract_from_tags(
+        text=predicted_response, pattern=r"```json\s*(.*?)\s*```"
+    )
+    predicted_response = extract_from_tags(
+        text=predicted_response, pattern=r"```json\s*(.*?)\s*"
+    )
+
     predicted_response_dict = parse_dict(text=predicted_response)
 
     print("expected_entities_dict\n", expected_entities_dict)
     print("predicted_response_dict\n", predicted_response_dict)
 
-    full_match_score = 0
+    exact_match_score = 0
+    partial_match_score = 0
+    fuzzy_match_score = 0
+
     if not isinstance(predicted_response_dict, dict):
-        return {"exact_match": full_match_score}
+        print("Cannot parse response, cannot compute score. Keeping scores 0")
+        print("----------------------------")
+        return {
+            "exact_match": exact_match_score,
+            "partial_match": partial_match_score,
+            "fuzzy_match": fuzzy_match_score,
+        }
 
+    num_entity_keys_with_values = 0
     for key, expected_value in expected_entities_dict.items():
+        if len(expected_value) < 1:
+            continue
+
+        num_entity_keys_with_values += 1
+
         predicted_value = predicted_response_dict[key]
+        print(f"\nKey: {key}, Expected: {expected_value}, Predicted: {predicted_value}")
+        # expected and predicted value -> List[str]
+
+        # exact match
+        # checking for exact match between the Lists
         full_match = set(expected_value) == set(predicted_value)
-        print(
-            f"Key: {key}, Expected: {expected_value}, Predicted: {predicted_value}, Full Match: {full_match}"
-        )
-        full_match_score += full_match
+        exact_match_score += full_match
 
-    full_match_score /= len(expected_entities_dict)
+        # partial match
+        # checking for partial match between the Lists, but exact match between the entities
+        partial_match = 0
+        for item in expected_value:
+            if item in predicted_value:
+                partial_match += 1
+        partial_match /= len(expected_value)
+        partial_match_score += partial_match
 
-    print("full_match_score", full_match_score)
+        # fuzzy ratio
+        # checking for fuzzy match between the entities
+        fuzzy_match = 0
+        for exp_item in expected_value:
+            all_ratios = []
+            for pred_item in predicted_value:
+                all_ratios.append(fuzz.ratio(exp_item, pred_item) / 100)
+            fuzzy_match += max(all_ratios)
+        fuzzy_match /= len(expected_value)
+        fuzzy_match_score += fuzzy_match
+
+        print(f"Exact Match: {full_match}")
+        print(f"Partial Match: {partial_match}")
+        print(f"Fuzzy Match: {fuzzy_match}")
+        print("---------")
+
+    exact_match_score /= num_entity_keys_with_values
+    partial_match_score /= num_entity_keys_with_values
+    fuzzy_match_score /= num_entity_keys_with_values
+
+    print("exact_match_score", exact_match_score)
+    print("partial_match_score", partial_match_score)
+    print("fuzzy_match_score", fuzzy_match_score)
     print("----------------------------")
 
-    return {"exact_match": full_match_score}
+    return {
+        "exact_match": exact_match_score,
+        "partial_match": partial_match_score,
+        "fuzzy_match": fuzzy_match_score,
+    }
 
 
 def parse_dict(text: str) -> Union[Dict | str]:
@@ -52,10 +113,10 @@ def parse_dict(text: str) -> Union[Dict | str]:
         return text
 
 
-def extract_from_json_tags(text: str) -> str:
-    match = re.search(r"```json\s*(.*?)\s*```", text, re.DOTALL)
+def extract_from_tags(text: str, pattern: str) -> str:
+    match = re.search(pattern, text, re.DOTALL)
     if match:
         return match.group(1)
     else:
-        print(f"No content found within ```json---```. Returning oringial text.")
+        print(f"No content found within {pattern}. Returning original text.")
         return text
