@@ -35,8 +35,8 @@ class ADPicoDataBuilder:
         ds_dict = DatasetDict({"train": train_ds, "dev": dev_ds, "test": test_ds})
         return ds_dict
 
-    def save(self, ds: DatasetDict, path: str):
-        ds.save_to_disk(dataset_dict_path=path)
+    def save(self, ds_dict: DatasetDict, path: str):
+        ds_dict.save_to_disk(dataset_dict_path=path)
         print(f"Saved to {path}")
 
     @staticmethod
@@ -107,8 +107,6 @@ if __name__ == "__main__":
     builder = ADPicoDataBuilder(path=path)
     ds_dict = builder.build()
 
-    out_path = (
-        "/homes/vsudhi/llm4kmu_datasets/section_specific_annotation_of_PICO/data/AD/ds"
-    )
-    builder.save(ds=ds_dict, path=out_path)
+    out_path = "/homes/vsudhi/llm4kmu_datasets/section_specific_annotation_of_PICO/data/AD/ds_v2"
+    builder.save(ds_dict=ds_dict, path=out_path)
     ...
