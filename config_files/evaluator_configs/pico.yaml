@@ -4,6 +4,10 @@ model_args: pretrained=google/gemma-2-2b
 wandb_args: project=llm4kmu-eval,name=test-pico
 limit: 5
 
+write_out: True
+log_samples: True
+output_path: eval-results
+
 include_path: config_files/evaluator_configs/tasks
 
 #num_fewshot:
