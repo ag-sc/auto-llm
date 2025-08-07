@@ -39,18 +39,15 @@ Run: ``python -m auto_llm.trainer.run --config_path <config_path>``
 
 ## Evaluator
 
-### Adding new tasks
-
-#### 1. Task Definition
+#### Step 1. Task Definition
+- Follow this step if you want to **add a new task**. If the task already exists, continue from Step 2. Also see the guidelines [here](https://github.com/EleutherAI/lm-evaluation-harness/blob/main/docs/new_task_guide.md).
 - Create a folder under ``config_files/evaluator_configs/tasks``. See ``config_files/evaluator_configs/tasks/ad_covid_19_pico`` for example.
-- Add the **Task Definition Configuration** according to the YAML defined below.
+- Add the **Task Definition Configuration** as defined below:
 
 ```yaml
 # Task Definition Configuration Template
-
 tag:
   - pico
-
 task: # name of the task. This is then used in the task YAMLs.
 
 dataset_path: arrow
@@ -60,7 +57,6 @@ dataset_kwargs:
     validation: # path of the validation ds
 test_split: test
 validation_split: validation
-
 
 # For `doc_to_text` and `doc_to_target`, you can use the keys in the ds for prompt construction. For example: if you have a key "text", use it here as {{text}}
 doc_to_text: # input to the LLM. 
@@ -77,14 +73,12 @@ metric_list:
 metadata:
   version: 1.0
 ```
-- You can also follow the guidelines from `lm-eval-harness` [here](https://github.com/EleutherAI/lm-evaluation-harness/blob/main/docs/new_task_guide.md).
 
-#### 2. Task Execution
-- After defining the task, add the **Task Execution Configuration** as defined below.
+#### Step 2. Task Execution
+- After defining the task, add the **Task Execution Configuration** as defined below:
 
 ```yaml
 # Task Execution Configuration Template
-
 model: hf
 tasks: <task names comma separated>
 model_args: pretrained=<model-path>
