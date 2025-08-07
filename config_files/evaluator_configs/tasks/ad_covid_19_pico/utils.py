@@ -7,14 +7,18 @@ from thefuzz import fuzz
 def process_results(doc: Dict[str, Any], result: List[str]):
     """
     Function to compute the metrics given the input and the generated response.
+
+    :param doc: this includes the input
+    :param result: this is the generated response
+    :return: dict of metric key-value pairs
+
+    TODO: constraint LLM output to JSONs. Use other libraries? https://github.com/1rgs/jsonformer
+
     TODO: define evaluation metrics.
      (1) exact match on list level
      (2) partial match on list level - exact match on content level
      (3) partial/fuzzy match on content level
 
-    :param doc: this includes the input
-    :param result: this is the generated response
-    :return: dict of metric key-value pairs
     """
 
     print("Response:\n", result)

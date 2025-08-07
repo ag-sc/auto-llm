@@ -3,7 +3,12 @@ import os
 from datasets import DatasetDict, Dataset
 
 
-class ADPicoDataBuilder:
+class AdCovidPicoDataBuilder:
+    """
+    Data from https://github.com/BIDS-Xu-Lab/section_specific_annotation_of_PICO/tree/main/data
+    Works both for AD and Covid-19 splits
+    """
+
     def __init__(self, path: str):
         self.path = path
 
@@ -16,6 +21,10 @@ class ADPicoDataBuilder:
             if not len(dirs):
                 for file in files:
                     data_path = os.path.join(subdir, file)
+
+                    # Check only files inside the "foldx" folders. Skip others.
+                    if "fold" not in data_path:
+                        continue
                     print("Checking", data_path)
                     samples = self.construct_pico_data(data_path=data_path)
                     if "train" in file:
@@ -103,10 +112,16 @@ class ADPicoDataBuilder:
 
 
 if __name__ == "__main__":
+    # AD dataset
     path = "/homes/vsudhi/llm4kmu_datasets/section_specific_annotation_of_PICO/data/AD"
-    builder = ADPicoDataBuilder(path=path)
+    builder = AdCovidPicoDataBuilder(path=path)
     ds_dict = builder.build()
-
-    out_path = "/homes/vsudhi/llm4kmu_datasets/section_specific_annotation_of_PICO/data/AD/ds_v2"
+    out_path = "/homes/vsudhi/llm4kmu_datasets/section_specific_annotation_of_PICO/data/AD/processed"
     builder.save(ds_dict=ds_dict, path=out_path)
-    ...
+
+    # Covid-19 dataset
+    path = "/homes/vsudhi/llm4kmu_datasets/section_specific_annotation_of_PICO/data/COVID-19"
+    builder = AdCovidPicoDataBuilder(path=path)
+    ds_dict = builder.build()
+    out_path = "/homes/vsudhi/llm4kmu_datasets/section_specific_annotation_of_PICO/data/COVID-19/processed"
+    builder.save(ds_dict=ds_dict, path=out_path)

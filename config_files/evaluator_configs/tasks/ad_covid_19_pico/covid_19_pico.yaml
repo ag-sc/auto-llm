@@ -1,13 +1,13 @@
 tag:
   - pico
 
-task: ad_pico
+task: covid_19_pico
 
 dataset_path: arrow
 dataset_kwargs:
   data_files:
-    test: /homes/vsudhi/llm4kmu_datasets/section_specific_annotation_of_PICO/data/AD/ds_v2/test/data-00000-of-00001.arrow
-    # validation: /homes/vsudhi/llm4kmu_datasets/section_specific_annotation_of_PICO/data/AD/ds/dev/data-00000-of-00001.arrow
+    test: /homes/vsudhi/llm4kmu_datasets/section_specific_annotation_of_PICO/data/COVID-19/processed/test/data-00000-of-00001.arrow
+    # validation: /homes/vsudhi/llm4kmu_datasets/section_specific_annotation_of_PICO/data/COVID-19/processed/dev/data-00000-of-00001.arrow
 test_split: test
 
 doc_to_text: |
