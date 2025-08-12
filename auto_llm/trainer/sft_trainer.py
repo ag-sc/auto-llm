@@ -4,7 +4,7 @@ from peft import LoraConfig
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from trl import SFTConfig, SFTTrainer
 
-from auto_llm.builder.data_builder import DataBuilder
+from auto_llm.builder.trainer_data_builder.sft_data_builder import DataBuilder
 from auto_llm.dto.trainer_run_config import TrainerRunConfig
 from auto_llm.pre_processor.sft_pre_procesor import SftPreProcessor
 

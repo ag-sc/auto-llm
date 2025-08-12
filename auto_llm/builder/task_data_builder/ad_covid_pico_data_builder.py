@@ -2,51 +2,77 @@ import os
 
 from datasets import DatasetDict, Dataset
 
+from auto_llm.builder.task_data_builder.task_data_builder import TaskDataBuilder
+from auto_llm.builder.utils import TaskDatasetFeatures, DatasetSplit
 
-class AdCovidPicoDataBuilder:
+
+class AdCovidPicoDataBuilder(TaskDataBuilder):
     """
     Data from https://github.com/BIDS-Xu-Lab/section_specific_annotation_of_PICO/tree/main/data
     Works both for AD and Covid-19 splits
     """
 
-    def __init__(self, path: str):
-        self.path = path
+    def __init__(self, raw_data_path: str):
+        self.raw_data_path = raw_data_path
 
     def build(self) -> DatasetDict:
-        train_samples = {"text": [], "entities": []}
-        dev_samples = {"text": [], "entities": []}
-        test_samples = {"text": [], "entities": []}
+        train_samples = {
+            TaskDatasetFeatures.INPUT_TEXT: [],
+            TaskDatasetFeatures.OUTPUT_TEXT: [],
+        }
+        dev_samples = {
+            TaskDatasetFeatures.INPUT_TEXT: [],
+            TaskDatasetFeatures.OUTPUT_TEXT: [],
+        }
+        test_samples = {
+            TaskDatasetFeatures.INPUT_TEXT: [],
+            TaskDatasetFeatures.OUTPUT_TEXT: [],
+        }
 
-        for subdir, dirs, files in os.walk(self.path):
+        for subdir, dirs, files in os.walk(self.raw_data_path):
             if not len(dirs):
                 for file in files:
                     data_path = os.path.join(subdir, file)
 
-                    # Check only files inside the "foldx" folders. Skip others.
+                    # Check only files inside the "fold<x>" folders. Skip others.
                     if "fold" not in data_path:
                         continue
-                    print("Checking", data_path)
+                    self.logger.info(f"Checking {data_path}")
                     samples = self.construct_pico_data(data_path=data_path)
                     if "train" in file:
-                        train_samples["text"].extend(samples["text"])
-                        train_samples["entities"].extend(samples["entities"])
+                        train_samples[TaskDatasetFeatures.INPUT_TEXT].extend(
+                            samples[TaskDatasetFeatures.INPUT_TEXT]
+                        )
+                        train_samples[TaskDatasetFeatures.OUTPUT_TEXT].extend(
+                            samples[TaskDatasetFeatures.OUTPUT_TEXT]
+                        )
                     elif "dev" in file:
-                        dev_samples["text"].extend(samples["text"])
-                        dev_samples["entities"].extend(samples["entities"])
+                        dev_samples[TaskDatasetFeatures.INPUT_TEXT].extend(
+                            samples[TaskDatasetFeatures.INPUT_TEXT]
+                        )
+                        dev_samples[TaskDatasetFeatures.OUTPUT_TEXT].extend(
+                            samples[TaskDatasetFeatures.OUTPUT_TEXT]
+                        )
                     elif "test" in file:
-                        test_samples["text"].extend(samples["text"])
-                        test_samples["entities"].extend(samples["entities"])
+                        test_samples[TaskDatasetFeatures.INPUT_TEXT].extend(
+                            samples[TaskDatasetFeatures.INPUT_TEXT]
+                        )
+                        test_samples[TaskDatasetFeatures.OUTPUT_TEXT].extend(
+                            samples[TaskDatasetFeatures.OUTPUT_TEXT]
+                        )
 
         train_ds = Dataset.from_dict(train_samples)
         dev_ds = Dataset.from_dict(dev_samples)
         test_ds = Dataset.from_dict(test_samples)
 
-        ds_dict = DatasetDict({"train": train_ds, "dev": dev_ds, "test": test_ds})
+        ds_dict = DatasetDict(
+            {
+                DatasetSplit.TRAIN: train_ds,
+                DatasetSplit.VALIDATION: dev_ds,
+                DatasetSplit.TEST: test_ds,
+            }
+        )
         return ds_dict
-
-    def save(self, ds_dict: DatasetDict, path: str):
-        ds_dict.save_to_disk(dataset_dict_path=path)
-        print(f"Saved to {path}")
 
     @staticmethod
     def read_data_file(data_path: str):
@@ -57,16 +83,19 @@ class AdCovidPicoDataBuilder:
 
     def construct_pico_data(self, data_path: str):
         data = self.read_data_file(data_path)
-        samples = {"text": [], "entities": []}
+        samples = {
+            TaskDatasetFeatures.INPUT_TEXT: [],
+            TaskDatasetFeatures.OUTPUT_TEXT: [],
+        }
         texts = []
         entities = []
         for line in data:
             if "-DOCSTART-" in line:
                 if not len(texts) > 1:
                     continue
-                samples["text"].append(" ".join(texts))
+                samples[TaskDatasetFeatures.INPUT_TEXT].append(" ".join(texts))
                 # samples["texts"].append(texts)
-                # samples["entities"].append(entities)
+                # samples[TaskDatasetFeatures.OUTPUT_TEXT].append(entities)
 
                 entities_form = []
                 for idx, entity in enumerate(entities):
@@ -94,7 +123,7 @@ class AdCovidPicoDataBuilder:
                     if entity_text not in extracted_entities[form["entity_key"]]:
                         extracted_entities[form["entity_key"]].append(entity_text)
 
-                samples["entities"].append(extracted_entities)
+                samples[TaskDatasetFeatures.OUTPUT_TEXT].append(extracted_entities)
 
                 texts = []
                 entities = []
@@ -109,19 +138,3 @@ class AdCovidPicoDataBuilder:
                     except IndexError:
                         entities.append("-NA-")
         return samples
-
-
-if __name__ == "__main__":
-    # AD dataset
-    path = "/homes/vsudhi/llm4kmu_datasets/section_specific_annotation_of_PICO/data/AD"
-    builder = AdCovidPicoDataBuilder(path=path)
-    ds_dict = builder.build()
-    out_path = "/homes/vsudhi/llm4kmu_datasets/section_specific_annotation_of_PICO/data/AD/processed"
-    builder.save(ds_dict=ds_dict, path=out_path)
-
-    # Covid-19 dataset
-    path = "/homes/vsudhi/llm4kmu_datasets/section_specific_annotation_of_PICO/data/COVID-19"
-    builder = AdCovidPicoDataBuilder(path=path)
-    ds_dict = builder.build()
-    out_path = "/homes/vsudhi/llm4kmu_datasets/section_specific_annotation_of_PICO/data/COVID-19/processed"
-    builder.save(ds_dict=ds_dict, path=out_path)
