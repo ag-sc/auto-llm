@@ -4,6 +4,8 @@ from pydantic import BaseModel
 from transformers import SchedulerType, IntervalStrategy
 from transformers.trainer_utils import SaveStrategy
 
+from auto_llm.dto.builder_config import TrainerDataBuilderConfig
+
 
 class LoraConfig(BaseModel):
     r: int = 16
@@ -55,6 +57,6 @@ class TrainerRunConfig(BaseModel):
     model_name: str
     truncation: bool
     peft_config: LoraConfig = None
-    dataset_path: str
+    trainer_data_builder_config: TrainerDataBuilderConfig
     completion_only_loss: bool
     trainer_args: TrainerArgs

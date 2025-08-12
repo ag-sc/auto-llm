@@ -4,7 +4,14 @@ from peft import LoraConfig
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from trl import SFTConfig, SFTTrainer
 
-from auto_llm.builder.trainer_data_builder.sft_data_builder import DataBuilder
+from auto_llm.builder.trainer_data_builder.sft_data_builder import (
+    ConversationalSftDataBuilder,
+    PromptCompletionsSftDataBuilder,
+)
+from auto_llm.builder.trainer_data_builder.trainer_data_builder import (
+    TrainerDataBuilder,
+)
+from auto_llm.dto.builder_config import SftDatasetType
 from auto_llm.dto.trainer_run_config import TrainerRunConfig
 from auto_llm.pre_processor.sft_pre_procesor import SftPreProcessor
 
@@ -25,7 +32,7 @@ class SftTrainerWrapper:
             token=os.getenv("HF_TOKEN"),
         )
 
-        builder = DataBuilder(dataset_path=self.config.dataset_path)
+        builder = self.get_trainer_data_builder(config=self.config)
         ds_dict = builder.build()
 
         pre_processor = SftPreProcessor(
@@ -56,7 +63,7 @@ class SftTrainerWrapper:
         trainer_args = SFTConfig(
             **self.config.trainer_args.model_dump(),
             dataset_kwargs={"skip_prepare_dataset": skip_prepare_dataset},
-            completion_only_loss=completion_only_loss
+            completion_only_loss=completion_only_loss,
         )
 
         if self.config.trainer_args.report_to == "wandb":
@@ -84,3 +91,26 @@ class SftTrainerWrapper:
 
         trainer.save_model(self.config.trainer_args.output_dir)
         tokenizer.save_pretrained(self.config.trainer_args.output_dir)
+
+    @staticmethod
+    def get_trainer_data_builder(config: TrainerRunConfig) -> TrainerDataBuilder:
+        if (
+            config.trainer_data_builder_config.dataset_type
+            == SftDatasetType.CONVERSATIONAL
+        ):
+            builder = ConversationalSftDataBuilder(
+                **config.trainer_data_builder_config.model_dump()
+            )
+        elif (
+            config.trainer_data_builder_config.dataset_type
+            == SftDatasetType.PROMPT_COMPLETIONS
+        ):
+            builder = PromptCompletionsSftDataBuilder(
+                **config.trainer_data_builder_config.model_dump()
+            )
+        else:
+            raise Exception(
+                f"Invalid dataset_type: {config.trainer_data_builder_config.dataset_type}"
+            )
+
+        return builder

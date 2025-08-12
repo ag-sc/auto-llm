@@ -3,7 +3,7 @@ import os
 from datasets import DatasetDict, Dataset
 
 from auto_llm.builder.task_data_builder.task_data_builder import TaskDataBuilder
-from auto_llm.builder.utils import TaskDatasetFeatures, DatasetSplit
+from auto_llm.dto.builder_config import TaskDatasetFeatures, DatasetSplit
 
 
 class AdCovidPicoDataBuilder(TaskDataBuilder):

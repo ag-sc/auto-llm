@@ -3,7 +3,7 @@ from typing import Dict, List, Optional
 from datasets import load_dataset, Dataset, DatasetDict
 
 from auto_llm.builder.task_data_builder.task_data_builder import TaskDataBuilder
-from auto_llm.builder.utils import TaskDatasetFeatures
+from auto_llm.dto.builder_config import TaskDatasetFeatures, DatasetSplit
 
 
 class EbmPicoDataBuilder(TaskDataBuilder):

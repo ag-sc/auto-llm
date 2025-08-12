@@ -7,7 +7,7 @@ from datasets import DatasetDict, Dataset, load_from_disk
 from auto_llm.builder.trainer_data_builder.trainer_data_builder import (
     TrainerDataBuilder,
 )
-from auto_llm.builder.utils import (
+from auto_llm.dto.builder_config import (
     SftDatasetType,
     PromptCompletionDatasetFeatures,
     TaskDatasetFeatures,
@@ -47,6 +47,7 @@ class SftDataBuilder(TrainerDataBuilder):
         :param few_shot_examples_split:
         """
         self.dataset_dir = dataset_dir
+        self.dataset_type = dataset_type
 
         self.instruction_template = instruction_template.strip()
         self.input_template = input_template.strip()
@@ -60,7 +61,7 @@ class SftDataBuilder(TrainerDataBuilder):
         self.num_few_shot_examples = num_few_shot_examples
         self.few_shot_examples_split = few_shot_examples_split
 
-        self._sanity_check()
+        self.sanity_check()
 
     def build(self) -> DatasetDict:
         # TODO: refactor. there could be many other options to consider
@@ -83,6 +84,9 @@ class SftDataBuilder(TrainerDataBuilder):
 
         return ds_dict
 
+    def sanity_check(self):
+        raise NotImplementedError
+
     def construct_samples(self, ds_items: Dict[str, List[Any]]) -> Dict[str, List[Any]]:
         raise NotImplementedError
 
@@ -90,24 +94,6 @@ class SftDataBuilder(TrainerDataBuilder):
         self, ds_items: Dict[str, List[Any]], few_shot_split: Dataset
     ) -> Dict[str, List[Any]]:
         raise NotImplementedError
-
-    def _sanity_check(self):
-        if self.num_few_shot_examples >= 1:
-            assert self.few_shot_examples_split is not None
-
-        if self.dataset_type == SftDatasetType.CONVERSATIONAL:
-            assert (
-                self.use_system_message is not None
-            ), f"Please set the parameter `use_system_message`. You have to specify whether to use System message if you want to build a {SftDatasetType.CONVERSATIONAL} dataset."
-            if not self.use_system_message:
-                assert (
-                    self.instruction_input_separator is not None
-                ), f"Please set the parameter `instruction_input_separator`. You have to specify how to separate the instruction and the input if you want to build a {SftDatasetType.CONVERSATIONAL} dataset without a system message."
-
-        if self.dataset_type == SftDatasetType.PROMPT_COMPLETIONS:
-            assert (
-                self.instruction_input_separator is not None
-            ), f"Please set the parameter `instruction_input_separator`. You have to specify how to separate the instruction and the input if you want to build a {SftDatasetType.PROMPT_COMPLETIONS} dataset."
 
     def get_instruction_text(self, text: str) -> str:
         return self.instruction_template.format(
@@ -132,6 +118,14 @@ class SftDataBuilder(TrainerDataBuilder):
 
 
 class PromptCompletionsSftDataBuilder(SftDataBuilder):
+    def sanity_check(self):
+        if self.num_few_shot_examples >= 1:
+            assert self.few_shot_examples_split is not None
+
+        assert (
+            self.instruction_input_separator is not None
+        ), f"Please set the parameter `instruction_input_separator`. You have to specify how to separate the instruction and the input if you want to build a {SftDatasetType.PROMPT_COMPLETIONS} dataset."
+
     def construct_samples(self, ds_items: Dict[str, List[Any]]) -> Dict[str, List[Any]]:
         samples = {
             PromptCompletionDatasetFeatures.PROMPT: [],
@@ -179,6 +173,18 @@ class PromptCompletionsSftDataBuilder(SftDataBuilder):
 
 
 class ConversationalSftDataBuilder(SftDataBuilder):
+    def sanity_check(self):
+        if self.num_few_shot_examples >= 1:
+            assert self.few_shot_examples_split is not None
+
+        assert (
+            self.use_system_message is not None
+        ), f"Please set the parameter `use_system_message`. You have to specify whether to use System message if you want to build a {SftDatasetType.CONVERSATIONAL} dataset."
+        if not self.use_system_message:
+            assert (
+                self.instruction_input_separator is not None
+            ), f"Please set the parameter `instruction_input_separator`. You have to specify how to separate the instruction and the input if you want to build a {SftDatasetType.CONVERSATIONAL} dataset without a system message."
+
     def construct_samples(self, ds_items: Dict[str, List[Any]]) -> Dict[str, List[Any]]:
         samples = {
             ConversationalDatasetFeatures.MESSAGE: [],
