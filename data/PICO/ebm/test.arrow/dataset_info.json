@@ -1,0 +1,35 @@
+{
+  "citation": "",
+  "description": "",
+  "features": {
+    "text": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "entities": {
+      "Intervention": {
+        "feature": {
+          "dtype": "string",
+          "_type": "Value"
+        },
+        "_type": "Sequence"
+      },
+      "Outcome": {
+        "feature": {
+          "dtype": "string",
+          "_type": "Value"
+        },
+        "_type": "Sequence"
+      },
+      "Population": {
+        "feature": {
+          "dtype": "string",
+          "_type": "Value"
+        },
+        "_type": "Sequence"
+      }
+    }
+  },
+  "homepage": "",
+  "license": ""
+}
