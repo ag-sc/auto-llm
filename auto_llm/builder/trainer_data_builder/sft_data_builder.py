@@ -73,7 +73,7 @@ class SftDataBuilder(TrainerDataBuilder):
             load_from_cache_file=False,
         )
 
-        if self.num_few_shot_examples >= 1:
+        if self.num_few_shot_examples and self.num_few_shot_examples >= 1:
             few_shot_split = ds_dict.get(self.few_shot_examples_split)
             ds_dict = ds_dict.map(
                 function=self.add_few_shot_examples,
@@ -119,7 +119,7 @@ class SftDataBuilder(TrainerDataBuilder):
 
 class PromptCompletionsSftDataBuilder(SftDataBuilder):
     def sanity_check(self):
-        if self.num_few_shot_examples >= 1:
+        if self.num_few_shot_examples and self.num_few_shot_examples >= 1:
             assert self.few_shot_examples_split is not None
 
         assert (
@@ -174,7 +174,7 @@ class PromptCompletionsSftDataBuilder(SftDataBuilder):
 
 class ConversationalSftDataBuilder(SftDataBuilder):
     def sanity_check(self):
-        if self.num_few_shot_examples >= 1:
+        if self.num_few_shot_examples and self.num_few_shot_examples >= 1:
             assert self.few_shot_examples_split is not None
 
         assert (

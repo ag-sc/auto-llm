@@ -23,7 +23,7 @@ def process_results(doc: Dict[str, Any], result: List[str]):
 
     print("Response:\n", result)
 
-    expected_entities_dict = doc["entities"]
+    expected_entities_dict = doc["output_text"]
     predicted_response = result[0]
 
     predicted_response = extract_from_tags(

@@ -6,7 +6,7 @@ task: ad_pico
 dataset_path: arrow
 dataset_kwargs:
   data_files:
-    test: /homes/vsudhi/llm4kmu_datasets/section_specific_annotation_of_PICO/data/AD/processed/test/data-00000-of-00001.arrow
+    test: /vol/auto_llm/processed_datasets/pico/AD/test/data-00000-of-00001.arrow
     # validation: /homes/vsudhi/llm4kmu_datasets/section_specific_annotation_of_PICO/data/AD/processed/dev/data-00000-of-00001.arrow
 test_split: test
 
@@ -22,10 +22,10 @@ doc_to_text: |
   }
   ```
 
-  Text: {{text}}
+  Text: {{input_text}}
 
   PICO tags according to the format:
-doc_to_target: "{{entities}}"
+doc_to_target: "{{output_text}}"
 
 process_results: !function utils.process_results
 

@@ -78,6 +78,7 @@ class SftTrainerWrapper:
                 target_modules=self.config.peft_config.target_modules,
             )
 
+        # TODO: SFTTrainer not returning eval loss
         trainer = SFTTrainer(
             model=model,
             processing_class=tokenizer,
