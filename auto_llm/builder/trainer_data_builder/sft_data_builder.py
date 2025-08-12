@@ -129,7 +129,7 @@ class PromptCompletionsSftDataBuilder(SftDataBuilder):
     def construct_samples(self, ds_items: Dict[str, List[Any]]) -> Dict[str, List[Any]]:
         samples = {
             PromptCompletionDatasetFeatures.PROMPT: [],
-            PromptCompletionDatasetFeatures.COMPLETIONS: [],
+            PromptCompletionDatasetFeatures.COMPLETION: [],
             PromptCompletionDatasetFeatures.EXAMPLES: [],
         }
 
@@ -147,7 +147,7 @@ class PromptCompletionsSftDataBuilder(SftDataBuilder):
             example = input_text + "\n" + completion
 
             samples[PromptCompletionDatasetFeatures.PROMPT].append(prompt)
-            samples[PromptCompletionDatasetFeatures.COMPLETIONS].append(completion)
+            samples[PromptCompletionDatasetFeatures.COMPLETION].append(completion)
             samples[PromptCompletionDatasetFeatures.EXAMPLES].append(example)
 
         return samples

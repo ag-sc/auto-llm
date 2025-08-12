@@ -15,7 +15,7 @@ class TaskDatasetFeatures(StrEnum):
 
 class PromptCompletionDatasetFeatures(StrEnum):
     PROMPT = "prompt"
-    COMPLETIONS = "completions"
+    COMPLETION = "completion"
     EXAMPLES = "examples"
 
 

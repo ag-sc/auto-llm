@@ -11,7 +11,7 @@ from auto_llm.builder.trainer_data_builder.sft_data_builder import (
 from auto_llm.builder.trainer_data_builder.trainer_data_builder import (
     TrainerDataBuilder,
 )
-from auto_llm.dto.builder_config import SftDatasetType
+from auto_llm.dto.builder_config import SftDatasetType, DatasetSplit
 from auto_llm.dto.trainer_run_config import TrainerRunConfig
 from auto_llm.pre_processor.sft_pre_procesor import SftPreProcessor
 
@@ -83,8 +83,8 @@ class SftTrainerWrapper:
             processing_class=tokenizer,
             args=trainer_args,
             peft_config=peft_config,
-            train_dataset=ds_dict["train"],
-            eval_dataset=ds_dict["val"],
+            train_dataset=ds_dict[DatasetSplit.TRAIN],
+            eval_dataset=ds_dict[DatasetSplit.VALIDATION],
         )
 
         trainer.train()
