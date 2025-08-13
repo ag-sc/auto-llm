@@ -1,5 +1,5 @@
 from aenum import StrEnum
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class DatasetSplit(StrEnum):
@@ -30,10 +30,22 @@ class SftDatasetType(StrEnum):
 
 
 class TrainerDataBuilderConfig(BaseModel):
-    dataset_dir: str
-    instruction_template: str
-    input_template: str
-    output_template: str
+    dataset_dir: str = Field(
+        title="Dataset Directory",
+        description="The path where the dataset dictionary lies.",
+    )
+    instruction_template: str = Field(
+        title="Instruction Template",
+        description="The template for the instruction. Note keywords to be replaced should be enclosed within {{}} tags.",
+    )
+    input_template: str = Field(
+        title="Input Template",
+        description="The template for the input text. This is the text that goes to the 'user' field in case of an instruction tuned model. Note keywords to be replaced should be enclosed within {{}} tags.",
+    )
+    output_template: str = Field(
+        title="Output Template",
+        description="The template for the output text. This is the template for the expected response from the model. Note keywords to be replaced should be enclosed within {{}} tags.",
+    )
     dataset_type: SftDatasetType
     instruction_input_separator: str = None
     use_system_message: bool = None

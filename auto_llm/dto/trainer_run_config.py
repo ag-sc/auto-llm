@@ -14,6 +14,13 @@ class LoraConfig(BaseModel):
     target_modules: List[str] = None
 
 
+class AutoLlmTrainerArgs(BaseModel):
+    trainer_type: Literal["sft"]
+    model_name: str
+    truncation: bool
+    completion_only_loss: bool
+
+
 class TrainerArgs(BaseModel):
     # The following parameters are a subset of transformers.training_args.TrainingArguments
     # model and tokenizer related
@@ -53,10 +60,7 @@ class TrainerArgs(BaseModel):
 
 
 class TrainerRunConfig(BaseModel):
-    trainer_type: Literal["sft"]
-    model_name: str
-    truncation: bool
-    peft_config: LoraConfig = None
+    auto_llm_trainer_args: AutoLlmTrainerArgs  # specific to AutoLLM
+    trainer_args: TrainerArgs  # from HF / TRL
     trainer_data_builder_config: TrainerDataBuilderConfig
-    completion_only_loss: bool
-    trainer_args: TrainerArgs
+    peft_config: LoraConfig = None

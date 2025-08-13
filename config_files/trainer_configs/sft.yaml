@@ -1,6 +1,9 @@
-trainer_type: sft
-model_name: google/gemma-2-2b-it
-truncation: True
+auto_llm_trainer_args:
+  trainer_type: sft
+  model_name: google/gemma-2-2b-it
+  truncation: True
+  completion_only_loss: False  # True
+
 peft_config:
   r: 16
   lora_alpha: 32
@@ -19,8 +22,6 @@ trainer_data_builder_config:
   parse_output_as_json: True
   # num_few_shot_examples: 5
   few_shot_examples_split: validation
-
-completion_only_loss: False  # True
 
 trainer_args:
   max_length: 512
