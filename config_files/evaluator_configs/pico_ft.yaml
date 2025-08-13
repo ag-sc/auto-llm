@@ -1,7 +1,7 @@
 model: hf
 tasks: ad_pico
-model_args: pretrained=google/gemma-2-2b-it,peft=/homes/vsudhi/auto-llm/.cache/checkpoint-114
-wandb_args: project=llm4kmu-eval,name=test-pico
+model_args: pretrained=google/gemma-2-2b-it,peft=/vol/auto_llm/sft_models/ad_pico_no_few_shot
+wandb_args: project=llm4kmu-eval,name=ad_pico_no_few_shot
 limit: 5
 
 write_out: True
