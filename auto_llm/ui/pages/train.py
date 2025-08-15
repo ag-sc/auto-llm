@@ -16,14 +16,14 @@ def save_trainer_run_config(
     defined_config_path: str,
 ) -> str:
     if uploaded_config:
-        gr.Info(
+        gr.Success(
             f"The config you uploaded from the path: '{uploaded_config_path}' will be used for training!"
         )
         config_path = uploaded_config_path
     elif defined_config:
         with open(defined_config_path, "w+") as f:
             yaml.dump(yaml.safe_load(defined_config), f)
-        gr.Info(
+        gr.Success(
             f"The config you defined is saved to '{defined_config_path}' and will be used for training!"
         )
         config_path = defined_config_path
@@ -142,38 +142,46 @@ with gr.Blocks() as demo:
         fn=set_and_unset_config,
         inputs=[uploaded_config, defined_config],
         outputs=[uploaded_config, defined_config],
+        show_progress="hidden",
     ).then(
         fn=lambda x: x,
         inputs=[],
         outputs=[defined_config_path],
+        show_progress="hidden",
     ).then(
         fn=get_trainer_run_config,
         inputs=[uploaded_config_path],
         outputs=[uploaded_config],
+        show_progress="hidden",
     ).success(
         fn=lambda x: x,
         inputs=[uploaded_config_path],
         outputs=[uploaded_config_path_text],
+        show_progress="hidden",
     )
 
     define_btn.click(
         fn=set_and_unset_config,
         inputs=[defined_config, uploaded_config],
         outputs=[defined_config, uploaded_config],
+        show_progress="hidden",
     ).then(
         fn=lambda x: x,
         inputs=[],
         outputs=[uploaded_config_path_text],
+        show_progress="hidden",
     ).then(
         fn=get_trainer_run_config,
         inputs=[],
         outputs=[defined_config],
+        show_progress="hidden",
     )
 
     btn.click(
         fn=validate_defined_config,
         inputs=[defined_config, defined_config_path],
         outputs=[],
+        show_progress="hidden",
     ).success(
         fn=save_trainer_run_config,
         inputs=[
@@ -183,9 +191,11 @@ with gr.Blocks() as demo:
             defined_config_path,
         ],
         outputs=[config_path],
+        show_progress="hidden",
     ).then(
         fn=start_trainer_run,
         inputs=[config_path, venv_path, env_path],
+        show_progress="hidden",
     )
 
 

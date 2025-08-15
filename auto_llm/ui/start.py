@@ -2,7 +2,7 @@ import gradio as gr
 
 from auto_llm.ui.pages import home, data, train, eval
 
-with gr.Blocks() as demo:
+with gr.Blocks(title="AutoLLM", css_paths="auto_llm/ui/css/app.css") as demo:
     home.demo.render()
 
 # add other pages
