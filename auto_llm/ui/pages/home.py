@@ -20,15 +20,19 @@ with gr.Blocks() as demo:
 
     gr.Markdown(text)
 
-    gr.Image(
-        "auto_llm/ui/images/uni-bielefeld-logo.png",
-        show_label=False,
-        container=False,
-        height=100,
-        width=100,
-        show_download_button=False,
-        show_fullscreen_button=False,
-    )
+    with gr.Row():
+        with gr.Column():
+            gr.Image(
+                "auto_llm/ui/images/uni-bielefeld-logo.png",
+                show_label=False,
+                container=False,
+                height=300,
+                # width=250,
+                show_download_button=False,
+                show_fullscreen_button=False,
+            )
+        with gr.Column(scale=2):
+            ...
 
 if __name__ == "__main__":
-    demo.launch()
+    demo.launch(width="25%")
