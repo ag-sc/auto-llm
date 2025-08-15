@@ -1,73 +1,19 @@
 import json
-import os
 
 import gradio as gr
 import pydantic_core
 import wandb
 import yaml
 
-from auto_llm.dto.builder_config import TrainerDataBuilderConfig
-from auto_llm.dto.trainer_run_config import (
-    TrainerRunConfig,
-    AutoLlmTrainerArgs,
-    TrainerArgs,
-    LoraConfig,
-)
-
-EXAMPLE_TRAINER_RUN_CONFIG = TrainerRunConfig(
-    auto_llm_trainer_args=AutoLlmTrainerArgs(
-        trainer_type="sft",
-        model_name="google/gemma-2-2b-it",
-        truncation=True,
-        completion_only_loss=True,
-    ),
-    trainer_args=TrainerArgs(
-        max_length=1024,
-        bf16=True,
-        fp16=False,
-        per_device_train_batch_size=4,
-        per_device_eval_batch_size=4,
-        gradient_accumulation_steps=True,
-        auto_find_batch_size=False,
-        output_dir="",
-        resume_from_checkpoint=None,
-        gradient_checkpointing=True,
-        num_train_epochs=10,
-        learning_rate=5e-5,
-        weight_decay=0,
-        lr_scheduler_type="linear",
-        warmup_steps=0,
-        report_to="wandb",
-        run_name="some name",
-        logging_steps=0.1,
-        eval_strategy="steps",
-        bf16_full_eval=False,
-        fp16_full_eval=False,
-        save_strategy="steps",
-        save_steps=0.1,
-        save_total_limit=None,
-    ),
-    trainer_data_builder_config=TrainerDataBuilderConfig(
-        dataset_dir="",
-        instruction_template="",
-        input_template="",
-        output_template="",
-        dataset_type="conversational",
-        instruction_input_separator="\n",
-        use_system_message=True,
-        parse_output_as_json=True,
-        num_few_shot_examples=None,
-        few_shot_examples_split="validation",
-    ),
-    peft_config=LoraConfig(),
-)
+from auto_llm.dto.example_dtos import EXAMPLE_TRAINER_RUN_CONFIG
+from auto_llm.dto.trainer_run_config import TrainerRunConfig
 
 
 def save_trainer_run_config(
-    uploaded_config,
-    uploaded_config_path,
-    defined_config,
-    defined_config_path,
+    uploaded_config: str,
+    uploaded_config_path: str,
+    defined_config: str,
+    defined_config_path: str,
 ) -> str:
     if uploaded_config:
         gr.Info(
@@ -75,8 +21,6 @@ def save_trainer_run_config(
         )
         config_path = uploaded_config_path
     elif defined_config:
-        if defined_config_path == "":
-            raise gr.Error(f"Please provide a path to save the defined config file!")
         with open(defined_config_path, "w+") as f:
             yaml.dump(yaml.safe_load(defined_config), f)
         gr.Info(
@@ -93,7 +37,7 @@ def save_trainer_run_config(
 
 def start_trainer_run(config_path: str, venv_path: str, env_path: str):
     cmd = f"sbatch scripts/autollm_train.sbatch {config_path} {venv_path} {env_path}"
-    os.system(cmd)
+    # os.system(cmd)
 
 
 def wandb_report(url):
@@ -103,26 +47,43 @@ def wandb_report(url):
 
 def get_trainer_run_config(config_path: str = None) -> str:
     if config_path:
-        try:
-            with open(config_path, "r") as f:
-                config = yaml.safe_load(f)
-            config = TrainerRunConfig.model_validate(config)
-            gr.Success(f"The YAML you uploaded is validated!")
-        except UnicodeDecodeError as e:
-            raise gr.Error(
-                f"Please check the config file. Your YAML file may be corrupted. Error: {e}"
-            )
-        except pydantic_core._pydantic_core.ValidationError as e:
-            raise gr.Error(
-                f"Please check the config file. Your YAML file is not of the expected configuration format. Error: {e}"
-            )
-
+        config = validate_config(config_path=config_path)
     else:
         config = EXAMPLE_TRAINER_RUN_CONFIG
 
     config = config.model_dump_json()
     config_yaml = yaml.dump(json.loads(config))
     return config_yaml
+
+
+def validate_config(config_path: str = None, config_text: str = None):
+    try:
+        if config_path:
+            with open(config_path, "r") as f:
+                config = yaml.safe_load(f)
+        if config_text:
+            config = yaml.safe_load(config_text)
+
+        config = TrainerRunConfig.model_validate(config)
+    except UnicodeDecodeError as e:
+        raise gr.Error(
+            title="Corrupted YAML",
+            message=f"Please check the config file. Your YAML file may be corrupted. See error below.<br><br>{e}",
+        )
+    except pydantic_core._pydantic_core.ValidationError as e:
+        raise gr.Error(
+            title="Validation Error",
+            message=f"Please check the config file. Your YAML file is not of the expected configuration format. See error below.<br><br>{e}",
+        )
+
+    return config
+
+
+def validate_defined_config(config_text: str, defined_config_path: str):
+    if config_text != "":
+        config = validate_config(config_text=config_text)
+        if defined_config_path == "":
+            raise gr.Error(f"Please provide a path to save the defined config file!")
 
 
 def set_and_unset_config(config_to_set, config_to_unset):
@@ -146,7 +107,7 @@ with gr.Blocks() as demo:
                     lines=10,
                 )
                 uploaded_config_path_text = gr.Textbox(
-                    label="Uploaded file path", interactive=False
+                    label="Uploaded configuration file path", interactive=False
                 )
             with gr.Column():
                 gr.Markdown("**Option 2:** Define the trainer run configuration here.")
@@ -158,7 +119,9 @@ with gr.Blocks() as demo:
                     show_label=False,
                     lines=13,
                 )
-                defined_config_path = gr.Textbox(label="Path to save the config file")
+                defined_config_path = gr.Textbox(
+                    label="Path to save the configuration file"
+                )
 
         btn = gr.Button("Submit")
     with gr.Tab("Train"):
@@ -167,13 +130,22 @@ with gr.Blocks() as demo:
         report = wandb_report(report_url)
 
     config_path = gr.State()
+
+    # TODO: How to handle these? common venv in cluster?
+    #  env.sh should also be set.
     venv_path = gr.State("venv")
     env_path = gr.State("../env.sh")
+
+    uploaded_config_path.click(fn=lambda x: x, inputs=[], outputs=[defined_config_path])
 
     uploaded_config_path.upload(
         fn=set_and_unset_config,
         inputs=[uploaded_config, defined_config],
         outputs=[uploaded_config, defined_config],
+    ).then(
+        fn=lambda x: x,
+        inputs=[],
+        outputs=[defined_config_path],
     ).then(
         fn=get_trainer_run_config,
         inputs=[uploaded_config_path],
@@ -199,6 +171,10 @@ with gr.Blocks() as demo:
     )
 
     btn.click(
+        fn=validate_defined_config,
+        inputs=[defined_config, defined_config_path],
+        outputs=[],
+    ).success(
         fn=save_trainer_run_config,
         inputs=[
             uploaded_config,
