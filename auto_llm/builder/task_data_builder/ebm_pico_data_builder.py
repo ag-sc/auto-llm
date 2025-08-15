@@ -11,7 +11,8 @@ class EbmPicoDataBuilder(TaskDataBuilder):
     Constructs EBM PICO data from HF dataset bigbio/ebm_pico.
     """
 
-    def __init__(self, splits: Optional[List[str]] = None):
+    def __init__(self, val_ratio: float = 0.1, splits: Optional[List[str]] = None):
+        self.val_ratio = val_ratio
         self.splits = splits
 
     def build(self) -> DatasetDict:
@@ -36,64 +37,45 @@ class EbmPicoDataBuilder(TaskDataBuilder):
                 )
 
             new_ds = Dataset.from_dict(processed_dict)
-            processed[split] = new_ds
+
+            if split == DatasetSplit.TRAIN:
+                new_ds = new_ds.shuffle(seed=42)
+                val_size = int(len(new_ds) * self.val_ratio)
+                processed[DatasetSplit.VALIDATION] = new_ds.select(range(val_size))
+                processed[DatasetSplit.TRAIN] = new_ds.select(range(val_size, len(new_ds)))
+            else:
+                processed[split] = new_ds
 
         return DatasetDict(processed)
 
     @staticmethod
-    def _map_label(label: str) -> Optional[str]:
-        if not label:
-            return None
-        l = label.lower()
-        if "participant" in l or "population" in l or "patient" in l:
-            return "Population"
-        if "intervention" in l:
-            return "Intervention"
-        if "outcome" in l:
-            return "Outcome"
-        return None
+    def _extract_entities(entities: List[dict]) -> Dict[str, List[str]]:
+        buckets = {"P": [], "I": [], "O": []}
+        for ent in entities or []:
+            ent_type = ent.get("type", "").lower()
+            ent_text = " ".join(ent.get("text") or []).strip()
+            if not ent_text:
+                continue
 
-    def _extract_from_entities_list(self, ents: List[dict]) -> Dict[str, List[str]]:
-        buckets = {"Population": [], "Intervention": [], "Outcome": []}
-        for ent in ents or []:
-            text = ent.get(TaskDatasetFeatures.INPUT_TEXT) or ""
-            label = ent.get("annotation_type") or ""
-            mapped = self._map_label(label)
-            if mapped and text.strip():
-                buckets[mapped].append(text.strip())
+            if ent_type == "participant":
+                buckets["P"].append(ent_text)
+            elif ent_type == "intervention":
+                buckets["I"].append(ent_text)
+            elif ent_type == "outcome":
+                buckets["O"].append(ent_text)
+
         return buckets
 
-    def _extract_from_fields(self, sample: dict) -> Dict[str, List[str]]:
-        pop = sample.get("population") or []
-        intr = sample.get("intervention") or []
-        out = sample.get("outcome") or []
-        if isinstance(pop, str):
-            pop = [pop]
-        if isinstance(intr, str):
-            intr = [intr]
-        if isinstance(out, str):
-            out = [out]
-        return {
-            "Population": pop,
-            "Intervention": intr,
-            "Outcome": out,
-        }
-
     def _process_sample(self, sample: dict) -> dict:
-        text = (
-            sample.get(TaskDatasetFeatures.INPUT_TEXT) or sample.get("document") or ""
-        )
-        if isinstance(text, list):
-            text = " ".join(text)
-        if TaskDatasetFeatures.OUTPUT_TEXT in sample and isinstance(
-            sample[TaskDatasetFeatures.OUTPUT_TEXT], list
-        ):
-            entities = self._extract_from_entities_list(
-                sample[TaskDatasetFeatures.OUTPUT_TEXT]
-            )
-        else:
-            entities = self._extract_from_fields(sample)
+        passages = sample.get("passages", [])
+        text_parts = []
+        for p in passages:
+            text_parts.extend(p.get("text", []))
+        input_text = " ".join(text_parts).strip()
+
+        entities = self._extract_entities(sample.get("entities", []))
+
         return {
-            TaskDatasetFeatures.INPUT_TEXT: text.strip(),
+            TaskDatasetFeatures.INPUT_TEXT: input_text,
             TaskDatasetFeatures.OUTPUT_TEXT: entities,
         }
