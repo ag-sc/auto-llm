@@ -1,4 +1,5 @@
 import json
+import os
 
 import gradio as gr
 import pydantic_core
@@ -37,7 +38,7 @@ def save_trainer_run_config(
 
 def start_trainer_run(config_path: str, venv_path: str, env_path: str):
     cmd = f"sbatch scripts/autollm_train.sbatch {config_path} {venv_path} {env_path}"
-    # os.system(cmd)
+    os.system(cmd)
 
 
 def wandb_report(url):
