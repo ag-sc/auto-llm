@@ -7,7 +7,7 @@ class TrainerWrapper:
         self.config = config
 
     def run(self):
-        if self.config.trainer_type == "sft":
+        if self.config.auto_llm_trainer_args.trainer_type == "sft":
             trainer = SftTrainerWrapper(config=self.config)
         else:
             raise NotImplementedError

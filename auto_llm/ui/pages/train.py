@@ -1,175 +1,218 @@
+import json
+import os
+
 import gradio as gr
+import pydantic_core
+import wandb
+import yaml
 
-from auto_llm.dto.trainer_run_config import TrainerRunConfig
-from collections import deque
+from auto_llm.dto.builder_config import TrainerDataBuilderConfig
+from auto_llm.dto.trainer_run_config import (
+    TrainerRunConfig,
+    AutoLlmTrainerArgs,
+    TrainerArgs,
+    LoraConfig,
+)
+
+EXAMPLE_TRAINER_RUN_CONFIG = TrainerRunConfig(
+    auto_llm_trainer_args=AutoLlmTrainerArgs(
+        trainer_type="sft",
+        model_name="google/gemma-2-2b-it",
+        truncation=True,
+        completion_only_loss=True,
+    ),
+    trainer_args=TrainerArgs(
+        max_length=1024,
+        bf16=True,
+        fp16=False,
+        per_device_train_batch_size=4,
+        per_device_eval_batch_size=4,
+        gradient_accumulation_steps=True,
+        auto_find_batch_size=False,
+        output_dir="",
+        resume_from_checkpoint=None,
+        gradient_checkpointing=True,
+        num_train_epochs=10,
+        learning_rate=5e-5,
+        weight_decay=0,
+        lr_scheduler_type="linear",
+        warmup_steps=0,
+        report_to="wandb",
+        run_name="some name",
+        logging_steps=0.1,
+        eval_strategy="steps",
+        bf16_full_eval=False,
+        fp16_full_eval=False,
+        save_strategy="steps",
+        save_steps=0.1,
+        save_total_limit=None,
+    ),
+    trainer_data_builder_config=TrainerDataBuilderConfig(
+        dataset_dir="",
+        instruction_template="",
+        input_template="",
+        output_template="",
+        dataset_type="conversational",
+        instruction_input_separator="\n",
+        use_system_message=True,
+        parse_output_as_json=True,
+        num_few_shot_examples=None,
+        few_shot_examples_split="validation",
+    ),
+    peft_config=LoraConfig(),
+)
 
 
-def flatten_json_schema(schema: dict) -> dict:
-    """
-    Iteratively flattens a JSON schema by resolving nested objects and $refs.
+def save_trainer_run_config(
+    uploaded_config,
+    uploaded_config_path,
+    defined_config,
+    defined_config_path,
+) -> str:
+    if uploaded_config:
+        gr.Info(
+            f"The config you uploaded from the path: '{uploaded_config_path}' will be used for training!"
+        )
+        config_path = uploaded_config_path
+    elif defined_config:
+        if defined_config_path == "":
+            raise gr.Error(f"Please provide a path to save the defined config file!")
+        with open(defined_config_path, "w+") as f:
+            yaml.dump(yaml.safe_load(defined_config), f)
+        gr.Info(
+            f"The config you defined is saved to '{defined_config_path}' and will be used for training!"
+        )
+        config_path = defined_config_path
+    else:
+        raise gr.Error(
+            f"Please upload or define a Trainer Run Configuration to proceed!"
+        )
 
-    Args:
-        schema (dict): The original nested JSON schema.
-
-    Returns:
-        dict: A new dictionary representing the flattened schema, where keys
-              are dot-separated paths to the original properties.
-    """
-    # This will hold the final flattened schema
-    flattened_schema = {}
-
-    # We use a deque as a queue for iterative processing
-    # Each item is a tuple: (prefix_key, current_schema_fragment)
-    # The prefix_key tracks the path from the root.
-    queue = deque([("", schema)])
-
-    # Extract the schema definitions for easy lookup
-    schema_defs = schema.get("$defs", {})
-
-    while queue:
-        prefix, current_schema = queue.popleft()
-
-        # Check for a reference and resolve it if it exists
-        if "$ref" in current_schema:
-            ref_path = current_schema["$ref"].split("/")
-            # Look up the definition in the provided schema_defs
-            current_schema = schema_defs.get(ref_path[-1], {})
-
-        # Process the properties of the current schema fragment
-        properties = current_schema.get("properties", {})
-        required_fields = current_schema.get("required", [])
-
-        for key, prop_schema in properties.items():
-            # Construct the new, flattened key
-            new_key = f"{prefix}.{key}" if prefix else key
-
-            # Check if the property is a nested object or has another reference
-            if prop_schema.get("type") == "object" or "$ref" in prop_schema:
-                # Add the nested object to the queue for processing
-                queue.append((new_key, prop_schema))
-            else:
-                # This is a terminal property, add it to our flattened schema
-                # We also add a 'required' flag for form generation
-                prop_schema_copy = prop_schema.copy()
-                prop_schema_copy["required"] = key in required_fields
-                flattened_schema[new_key] = prop_schema_copy
-
-    return flattened_schema
+    return config_path
 
 
-def build_gradio_ui_from_schema(schema: dict, schema_defs: dict, parent_key: str = ""):
-    """
-    Recursively builds a Gradio UI from a JSON schema.
+def start_trainer_run(config_path: str, venv_path: str, env_path: str):
+    cmd = f"sbatch scripts/autollm_train.sbatch {config_path} {venv_path} {env_path}"
+    os.system(cmd)
 
-    Args:
-        schema (dict): The JSON schema fragment to process.
-        schema_defs (dict): The global `$defs` section of the schema for resolving references.
-        parent_key (str): The key of the parent object for nested structures.
 
-    Returns:
-        A list of Gradio components.
-    """
-    components = {}
+def wandb_report(url):
+    iframe = f'<iframe src={url} style="border:none;height:1024px;width:100%">'
+    return gr.HTML(iframe)
 
-    # Check for a reference to a defined schema object
-    if "$ref" in schema:
-        ref_path = schema["$ref"].split("/")
-        # Get the schema definition from the global $defs
-        schema = schema_defs[ref_path[-1]]
 
-    # Process properties of the current schema object
-    properties = schema.get("properties", {})
-    required_fields = schema.get("required", [])
-
-    for key, prop_schema in properties.items():
-        # Get the field title and a descriptive label
-        field_title = prop_schema.get("title", key).replace("_", " ").title()
-        is_required = key in required_fields
-        label = f"{field_title}{' (Required)' if is_required else ''}"
-
-        common_features = {
-            "label": label,
-            "value": prop_schema.get("default"),
-            "interactive": True,
-            "info": prop_schema.get("description"),
-        }
-
-        # Check for a nested object or a reference
-        if prop_schema.get("type") == "object" or "$ref" in prop_schema:
-            with gr.Accordion(f"{field_title}", open=False):
-                # Recursively build the UI for the nested object
-                nested_components = build_gradio_ui_from_schema(
-                    prop_schema, schema_defs, parent_key=key
-                )
-                components[key] = nested_components
-
-        # Check for enum types (dropdowns)
-        elif "enum" in prop_schema:
-            print("enum", label)
-            components[key] = gr.Dropdown(
-                label=label,
-                choices=prop_schema["enum"],
-                value=prop_schema["enum"][0],
-                interactive=True,
+def get_trainer_run_config(config_path: str = None) -> str:
+    if config_path:
+        try:
+            with open(config_path, "r") as f:
+                config = yaml.safe_load(f)
+            config = TrainerRunConfig.model_validate(config)
+            gr.Success(f"The YAML you uploaded is validated!")
+        except UnicodeDecodeError as e:
+            raise gr.Error(
+                f"Please check the config file. Your YAML file may be corrupted. Error: {e}"
+            )
+        except pydantic_core._pydantic_core.ValidationError as e:
+            raise gr.Error(
+                f"Please check the config file. Your YAML file is not of the expected configuration format. Error: {e}"
             )
 
-        # Handle arrays, specifically for `target_modules`
-        elif prop_schema.get("type") == "array":
-            # For arrays of strings, we'll use a Textbox and expect comma-separated values
-            default_value = (
-                ", ".join(prop_schema["default"])
-                if isinstance(prop_schema["default"], list)
-                else ""
-            )
-            components[key] = gr.Textbox(
-                label=f"{label} (comma-separated values)",
-                value=default_value,
-                interactive=True,
-            )
+    else:
+        config = EXAMPLE_TRAINER_RUN_CONFIG
 
-        # Handle boolean types (checkboxes)
-        elif prop_schema.get("type") == "boolean":
-            components[key] = gr.Checkbox(**common_features)
-
-        # Handle integer and number types
-        elif "anyOf" in prop_schema:
-            # This handles cases like `logging_steps` which can be integer or number
-            components[key] = gr.Number(label=label, value=prop_schema.get("default"))
-        elif prop_schema.get("type") in ["integer", "number"]:
-            components[key] = gr.Number(label=label, value=prop_schema.get("default"))
-
-        # Handle string types (textboxes)
-        elif prop_schema.get("type") == "string":
-            components[key] = gr.Textbox(**common_features)
-
-    return components
+    config = config.model_dump_json()
+    config_yaml = yaml.dump(json.loads(config))
+    return config_yaml
 
 
-def load_run_config_json(*components):
-    return components
+def set_and_unset_config(config_to_set, config_to_unset):
+    return config_to_set, ""
 
 
 with gr.Blocks() as demo:
     # build trainer run config
-
     with gr.Tab("Define"):
-        gr.Markdown("Define the trainer run configuration here")
-        schema = TrainerRunConfig.model_json_schema()
-        schema_defs = schema["$defs"]
-        components = build_gradio_ui_from_schema(schema, schema_defs)
+        with gr.Row():
+            with gr.Column():
+                gr.Markdown(
+                    "**Option 1:** Upload a valid trainer run configuration here."
+                )
+                uploaded_config_path = gr.UploadButton(label="Upload ⚙️")
+                uploaded_config = gr.Code(
+                    value="",
+                    language="yaml",
+                    interactive=False,
+                    show_label=False,
+                    lines=10,
+                )
+                uploaded_config_path_text = gr.Textbox(
+                    label="Uploaded file path", interactive=False
+                )
+            with gr.Column():
+                gr.Markdown("**Option 2:** Define the trainer run configuration here.")
+                define_btn = gr.Button(value="Define ⚙️")
+                defined_config = gr.Code(
+                    value="",
+                    language="yaml",
+                    interactive=True,
+                    show_label=False,
+                    lines=13,
+                )
+                defined_config_path = gr.Textbox(label="Path to save the config file")
+
         btn = gr.Button("Submit")
-    with gr.Tab("Validate"):
-        gr.Markdown("## Validation")
-        run_config_json = gr.JSON()
     with gr.Tab("Train"):
         gr.Markdown("## Training")
+        report_url = "https://api.wandb.ai/links/llm4kmu/v9qfir8d"
+        report = wandb_report(report_url)
 
-    # btn.click(
-    #     fn=load_run_config_json,
-    #     inputs=components_state,
-    #     outputs=[run_config_json],
-    # )
+    config_path = gr.State()
+    venv_path = gr.State("venv")
+    env_path = gr.State("../env.sh")
+
+    uploaded_config_path.upload(
+        fn=set_and_unset_config,
+        inputs=[uploaded_config, defined_config],
+        outputs=[uploaded_config, defined_config],
+    ).then(
+        fn=get_trainer_run_config,
+        inputs=[uploaded_config_path],
+        outputs=[uploaded_config],
+    ).success(
+        fn=lambda x: x,
+        inputs=[uploaded_config_path],
+        outputs=[uploaded_config_path_text],
+    )
+
+    define_btn.click(
+        fn=set_and_unset_config,
+        inputs=[defined_config, uploaded_config],
+        outputs=[defined_config, uploaded_config],
+    ).then(
+        fn=lambda x: x,
+        inputs=[],
+        outputs=[uploaded_config_path_text],
+    ).then(
+        fn=get_trainer_run_config,
+        inputs=[],
+        outputs=[defined_config],
+    )
+
+    btn.click(
+        fn=save_trainer_run_config,
+        inputs=[
+            uploaded_config,
+            uploaded_config_path,
+            defined_config,
+            defined_config_path,
+        ],
+        outputs=[config_path],
+    ).then(
+        fn=start_trainer_run,
+        inputs=[config_path, venv_path, env_path],
+    )
 
 
 if __name__ == "__main__":
     demo.launch()
+    demo.integrate(wandb=wandb)

@@ -24,11 +24,11 @@ class SftTrainerWrapper:
 
     def run(self):
         model = AutoModelForCausalLM.from_pretrained(
-            pretrained_model_name_or_path=self.config.model_name,
+            pretrained_model_name_or_path=self.config.auto_llm_trainer_args.model_name,
             token=os.getenv("HF_TOKEN"),
         )
         tokenizer = AutoTokenizer.from_pretrained(
-            pretrained_model_name_or_path=self.config.model_name,
+            pretrained_model_name_or_path=self.config.auto_llm_trainer_args.model_name,
             token=os.getenv("HF_TOKEN"),
         )
 
@@ -36,7 +36,8 @@ class SftTrainerWrapper:
         ds_dict = builder.build()
 
         pre_processor = SftPreProcessor(
-            tokenizer=tokenizer, completion_only_loss=self.config.completion_only_loss
+            tokenizer=tokenizer,
+            completion_only_loss=self.config.auto_llm_trainer_args.completion_only_loss,
         )  # True
 
         # TRL SftTrainer relies on `return_assistant_tokens_mask` in `apply_chat_template` to get the assistant mask
@@ -44,13 +45,13 @@ class SftTrainerWrapper:
         # manually pre-processing dataset if conversational and demands only completion loss.
         skip_prepare_dataset = False
         completion_only_loss = False
-        if self.config.completion_only_loss:
+        if self.config.auto_llm_trainer_args.completion_only_loss:
             if pre_processor.is_dataset_conversational(dataset_dict=ds_dict):
                 ds_dict = ds_dict.map(
                     function=pre_processor.pre_process,
                     fn_kwargs=dict(
                         max_length=self.config.trainer_args.max_length,
-                        truncation=self.config.truncation,
+                        truncation=self.config.auto_llm_trainer_args.truncation,
                     ),
                     batched=True,
                 )

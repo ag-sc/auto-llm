@@ -1,3 +1,5 @@
+from typing import Optional
+
 from aenum import StrEnum
 from pydantic import BaseModel, Field
 
@@ -47,8 +49,8 @@ class TrainerDataBuilderConfig(BaseModel):
         description="The template for the output text. This is the template for the expected response from the model. Note keywords to be replaced should be enclosed within {{}} tags.",
     )
     dataset_type: SftDatasetType
-    instruction_input_separator: str = None
-    use_system_message: bool = None
+    instruction_input_separator: Optional[str] = None
+    use_system_message: Optional[bool] = None
     parse_output_as_json: bool = False
-    num_few_shot_examples: int = None
-    few_shot_examples_split: str = None
+    num_few_shot_examples: Optional[int] = None
+    few_shot_examples_split: Optional[str] = None
