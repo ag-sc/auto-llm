@@ -146,6 +146,7 @@ class TrainerArgs(BaseModel):
         title="Evaluation Strategy",
         default=IntervalStrategy.STEPS,
     )
+    label_names: List[str] = ["labels"]
     bf16_full_eval: bool = Field(
         description="Whether to use full bf16 evaluation instead of 32-bit.",
         title="bf16 Evaluation",

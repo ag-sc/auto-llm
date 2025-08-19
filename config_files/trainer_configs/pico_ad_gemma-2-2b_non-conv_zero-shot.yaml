@@ -1,0 +1,49 @@
+auto_llm_trainer_args:
+  trainer_type: sft
+  model_name: google/gemma-2-2b
+  truncation: True
+  completion_only_loss: True  # True
+
+peft_config:
+  r: 16
+  lora_alpha: 32
+  lora_dropout: 0.05
+  # target_modules: []
+
+trainer_data_builder_config:
+  dataset_dir: /vol/auto_llm/processed_datasets/pico/AD
+  instruction_template: 'Given the text "Text", extract the PICO tags in the JSON format "Format". Do not modify the sentences.\nFormat:\n```json\n{\n  "P": ["value for P"],\n  "I": ["value for I"],\n  "C": ["value for C"],\n  "O": ["value for O"],\n}\n```\n'
+  input_template: "Text: {{text}}\nPICO tags according to the format:\n"
+  output_template: "```json\n{{entities}}\n```"
+  dataset_type: prompt_completions
+  instruction_input_separator: "\n"
+  parse_output_as_json: True
+  few_shot_examples_split: validation
+
+trainer_args:
+  max_length: 512
+  bf16: True
+  fp16: False
+
+  # bsz related
+  per_device_train_batch_size: 4
+  per_device_eval_batch_size: 4
+  gradient_accumulation_steps: 8
+  auto_find_batch_size: True
+
+  # training related
+  output_dir: /vol/auto_llm/sft_models/pico_ad_gemma-2-2b_non-conv_zero-shot_sft-trainer
+  # resume_from_checkpoint: ""
+  gradient_checkpointing: True
+  num_train_epochs: 10
+  learning_rate: 5e-5
+  warmup_steps: 10
+
+  # tracking/logging related
+  report_to: wandb
+  run_name: pico_ad_gemma-2-2b_non-conv_zero-shot
+  logging_steps: 10
+
+  # eval/save related
+  eval_strategy: steps
+  save_strategy: epoch
