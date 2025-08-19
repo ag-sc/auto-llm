@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=autollm_eval
+#SBATCH --job-name=autollm-eval
 #SBATCH --partition=gpu
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=1
