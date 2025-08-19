@@ -12,3 +12,4 @@ models
 *.out
 wandb/*
 .cache
+*.gradio*

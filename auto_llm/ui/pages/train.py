@@ -1,5 +1,5 @@
 import json
-import os
+import subprocess
 
 import gradio as gr
 import pydantic_core
@@ -8,6 +8,10 @@ import yaml
 
 from auto_llm.dto.example_dtos import EXAMPLE_TRAINER_RUN_CONFIG
 from auto_llm.dto.trainer_run_config import TrainerRunConfig
+
+CONFIG_ROOT_PATH = "/vol/auto_llm/config_files/trainer_configs"
+WANDB_TRAIN_REPORT_URL = "https://api.wandb.ai/links/llm4kmu/v9qfir8d"
+TRAIN_SBATCH_SCRIPT = "scripts/autollm_train.sbatch"
 
 
 def save_trainer_run_config(
@@ -37,8 +41,17 @@ def save_trainer_run_config(
 
 
 def start_trainer_run(config_path: str, venv_path: str, env_path: str):
-    cmd = f"sbatch scripts/autollm_train.sbatch {config_path} {venv_path} {env_path}"
-    os.system(cmd)
+    info = subprocess.check_output(
+        [
+            "sbatch",
+            TRAIN_SBATCH_SCRIPT,
+            config_path,
+            venv_path,
+            env_path,
+        ]
+    )
+    info = info.decode("utf-8")
+    gr.Info(info)
 
 
 def wandb_report(url):
