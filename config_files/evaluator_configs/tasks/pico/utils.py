@@ -41,6 +41,7 @@ def process_results(doc: Dict[str, Any], result: List[str]):
     exact_match_score = 0
     partial_match_score = 0
     fuzzy_match_score = 0
+    f1_score = 0
 
     if not isinstance(predicted_response_dict, dict):
         print("Cannot parse response, cannot compute score. Keeping scores 0")
@@ -49,6 +50,7 @@ def process_results(doc: Dict[str, Any], result: List[str]):
             "exact_match": exact_match_score,
             "partial_match": partial_match_score,
             "fuzzy_match": fuzzy_match_score,
+            "f1_score": f1_score,
         }
 
     num_entity_keys_with_values = 0
@@ -87,26 +89,41 @@ def process_results(doc: Dict[str, Any], result: List[str]):
         fuzzy_match /= len(expected_value)
         fuzzy_match_score += fuzzy_match
 
+        # f1 score
+        tp = len(set(expected_value) & set(predicted_value))
+        fp = len(set(predicted_value) - set(expected_value))
+        fn = len(set(expected_value) - set(predicted_value))
+        if tp == 0:
+            f1 = 0.0
+        else:
+            precision = tp / (tp + fp)
+            recall = tp / (tp + fn)
+            f1 = 2 * precision * recall / (precision + recall)
+        f1_score += f1
+
         print(f"Exact Match: {full_match}")
         print(f"Partial Match: {partial_match}")
         print(f"Fuzzy Match: {fuzzy_match}")
+        print(f"F1 Score: {f1}")
         print("---------")
 
     exact_match_score /= num_entity_keys_with_values
     partial_match_score /= num_entity_keys_with_values
     fuzzy_match_score /= num_entity_keys_with_values
+    f1_score /= num_entity_keys_with_values
 
     print("exact_match_score", exact_match_score)
     print("partial_match_score", partial_match_score)
     print("fuzzy_match_score", fuzzy_match_score)
+    print("f1_score", f1_score)
     print("----------------------------")
 
     return {
         "exact_match": exact_match_score,
         "partial_match": partial_match_score,
         "fuzzy_match": fuzzy_match_score,
+        "f1_score": f1_score,
     }
-
 
 def parse_dict(text: str) -> Union[Dict | str]:
     try:
