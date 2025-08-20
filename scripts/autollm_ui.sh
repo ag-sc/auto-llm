@@ -1,0 +1,1 @@
+python -m auto_llm.ui.start
