@@ -3,7 +3,7 @@
 #SBATCH --partition=gpu
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=1
-#SBATCH --time=00:10:00
+#SBATCH --time=01:00:00
 #SBATCH --mail-type=BEGIN,FAIL,END
 #SBATCH --output=/vol/auto_llm/logs/%x-%u-%j.out
 
