@@ -1,6 +1,6 @@
 model: hf
 tasks: ad_pico
-model_args: pretrained=google/gemma-2-2b-it,peft=/vol/auto_llm/sft_models/ad_pico_no_few_shot
+model_args: pretrained=google/gemma-2-2b-it,peft=/vol/auto_llm/sft_models/pico_ad_gemma-2-2b-it_conv_zero-shot_modified
 wandb_args: project=llm4kmu-eval,name=ad_pico_no_few_shot
 limit: 5
 

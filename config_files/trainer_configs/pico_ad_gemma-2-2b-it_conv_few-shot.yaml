@@ -1,6 +1,7 @@
 auto_llm_trainer_args:
   trainer_type: sft
-  model_name: google/gemma-2-2b
+  model_name: google/gemma-2-2b-it
+  attn_implementation: eager # keep eager for gemma
   truncation: True
   completion_only_loss: True
 
@@ -8,14 +9,15 @@ peft_config:
   r: 16
   lora_alpha: 32
   lora_dropout: 0.05
-  # target_modules: []
+  target_modules: "all-linear"
+  task_type: "CAUSAL_LM"
 
 trainer_data_builder_config:
   dataset_dir: /vol/auto_llm/processed_datasets/pico/AD
   instruction_template: 'Given the text "Text", extract the PICO tags in the JSON format "Format". Do not modify the sentences.\nFormat:\n```json\n{\n  "P": ["value for P"],\n  "I": ["value for I"],\n  "C": ["value for C"],\n  "O": ["value for O"],\n}\n```\n'
-  input_template: "{{examples}}Text: {{text}}\nPICO tags according to the format:\n"
-  output_template: "```json\n{{entities}}\n```"
-  dataset_type: prompt_completions
+  input_template: "{{examples}}Text: {{input}}\n\nPICO tags according to the format:\n"
+  output_template: "```json\n{{output}}\n```"
+  dataset_type: conversational
   instruction_input_separator: "\n"
   use_system_message: True
   parse_output_as_json: True

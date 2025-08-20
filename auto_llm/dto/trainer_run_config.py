@@ -1,5 +1,6 @@
-from typing import Literal, List, Optional
+from typing import Literal, List, Optional, Union
 
+from peft import TaskType
 from pydantic import BaseModel, Field
 from transformers import SchedulerType, IntervalStrategy
 from transformers.trainer_utils import SaveStrategy
@@ -21,10 +22,15 @@ class LoraConfig(BaseModel):
         description="The dropout probability for Lora layers.",
         title="lora_dropout",
     )
-    target_modules: Optional[List[str]] = Field(
-        default=None,
+    target_modules: Optional[Union[List[str], str]] = Field(
+        default="all-linear",
         description="The names of the modules to apply the adapter to.",
         title="target_modules",
+    )
+    task_type: Optional[TaskType] = Field(
+        default="CAUSAL_LM",
+        description="The task type for which the model is being fine-tuned (e.g., causal language modeling, sequence classification). Possible values `peft.TaskType`",
+        title="Task Type",
     )
 
 
@@ -38,6 +44,12 @@ class AutoLlmTrainerArgs(BaseModel):
         description="Name of the model to further train",
         title="Model Name",
         examples=["google/gemma-2-2b-it"],
+    )
+    attn_implementation: str = Field(
+        description="Name of the model to further train",
+        title="Model Name",
+        default="eager",
+        examples=["eager", "sdpa", "flash_attention_2", "flash_attention_3"],
     )
     truncation: bool = Field(
         default=True,
@@ -142,11 +154,15 @@ class TrainerArgs(BaseModel):
 
     # eval/save related
     eval_strategy: IntervalStrategy = Field(
-        description="The frequency of performing evaluation on the eval-split",
+        description="The frequency of performing evaluation on the eval-split.",
         title="Evaluation Strategy",
         default=IntervalStrategy.STEPS,
     )
-    label_names: List[str] = ["labels"]
+    label_names: List[str] = Field(
+        description="Name of the column containing labels. Need to be set explicitly while training PEFT models.",
+        title="Label Names",
+        default=["labels"],
+    )
     bf16_full_eval: bool = Field(
         description="Whether to use full bf16 evaluation instead of 32-bit.",
         title="bf16 Evaluation",

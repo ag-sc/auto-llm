@@ -4,7 +4,7 @@ from auto_llm.builder.task_data_builder.ad_covid_pico_data_builder import (
     AdCovidPicoDataBuilder,
 )
 from auto_llm.builder.task_data_builder.ebm_pico_data_builder import EbmPicoDataBuilder
-from auto_llm.builder.utils import DatasetSplit, TaskDatasetFeatures
+from auto_llm.dto.builder_config import DatasetSplit, TaskDatasetFeatures
 
 
 def _generic_task_data_builder_tests(ds_dict: DatasetDict):

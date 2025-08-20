@@ -12,6 +12,7 @@ from auto_llm.dto.builder_config import (
     PromptCompletionDatasetFeatures,
     TaskDatasetFeatures,
     ConversationalDatasetFeatures,
+    PromptPlaceholders,
 )
 
 SEED = 0
@@ -34,18 +35,24 @@ class SftDataBuilder(TrainerDataBuilder):
         num_few_shot_examples: int = None,
         few_shot_examples_split: str = None,
     ):
+        """Initializes the SftDataBuilder with all the necessary parameters for
+        creating a dataset for Supervised Fine-Tuning (SFT).
+
+        :param dataset_dir: The path to the directory containing the Task Dataset files.
+        :param instruction_template: A template string to format the instruction part of the data.
+        :param input_template: A template string to format the input data that accompanies the instruction.
+        :param output_template: A template string to format the expected output or ground truth response for the model to learn from.
+        :param dataset_type: Specifies the type of the dataset. Supported values are defined in `SftDatasetType`.
+        :param instruction_input_separator: An optional string to be used as a separator between the instruction and input parts of the data.
+        :param use_system_message: An optional boolean flag to indicate whether a system message should be included in the formatted data. If True, the instruction is placed in the system message. Otherwise, the instruction is concatenated to the input message.
+        :param parse_output_as_json: A boolean flag indicating whether the output should be treated and parsed as a JSON object.
+        :param num_few_shot_examples: An optional integer specifying the number of few-shot examples to include in the prompt for in-context learning.
+        :param few_shot_examples_split: An optional string indicating which data split (e.g., 'train', 'validation') to pull the few-shot examples from.
+
+        Note: For `instruction_template`, `input_template` and `output_template`, you can use placeholders as defined in `dto.builder_config.PromptPlaceholders`
+
         """
 
-        :param dataset_dir:
-        :param instruction_template:
-        :param input_template:
-        :param output_template:
-        :param instruction_input_separator:
-        :param use_system_message:
-        :param parse_output_as_json:
-        :param num_few_shot_examples:
-        :param few_shot_examples_split:
-        """
         self.dataset_dir = dataset_dir
         self.dataset_type = dataset_type
 
@@ -96,14 +103,15 @@ class SftDataBuilder(TrainerDataBuilder):
         raise NotImplementedError
 
     def get_instruction_text(self, text: str) -> str:
-        return self.instruction_template.format(
-            input_text=text.strip()
-        )  # input_text = TaskDatasetFeatures.INPUT_TEXT
+        text = self.instruction_template.replace(
+            PromptPlaceholders.INPUT_TEXT, text.strip()
+        )
+        return text
 
     def get_input_text(self, text: str) -> str:
-        return self.input_template.format(
-            input_text=text.strip(), examples="{{examples}}"
-        )  # input_text = TaskDatasetFeatures.INPUT_TEXT, examples = PromptCompletionDatasetFeatures.EXAMPLES or ConversationalDatasetFeatures.EXAMPLES
+        text = self.input_template.replace(PromptPlaceholders.INPUT_TEXT, text.strip())
+        # text = text.replace(PromptPlaceholders.EXAMPLES_TEXT, "{{examples}}")
+        return text
 
     def get_prompt(self, instruction_text: str, input_text: str) -> str:
         return instruction_text + self.instruction_input_separator + input_text
@@ -111,13 +119,18 @@ class SftDataBuilder(TrainerDataBuilder):
     def get_completion(self, entities: str) -> str:
         if self.parse_output_as_json:
             entities = json.dumps(entities, indent=4).strip()
-        completion = self.output_template.format(
-            output_text=entities
-        )  # output_text = TaskDatasetFeatures.OUTPUT_TEXT
+
+        completion = self.output_template.replace(
+            PromptPlaceholders.OUTPUT_TEXT, entities
+        )
         return completion
 
 
 class PromptCompletionsSftDataBuilder(SftDataBuilder):
+    """DataBuilder when the dataset is of the type Prompt Completions / Non-Conversational. Use this DatabBuilder for
+    fine-tuning base or non-instruct models.
+    """
+
     def sanity_check(self):
         if self.num_few_shot_examples and self.num_few_shot_examples >= 1:
             assert self.few_shot_examples_split is not None
@@ -173,6 +186,10 @@ class PromptCompletionsSftDataBuilder(SftDataBuilder):
 
 
 class ConversationalSftDataBuilder(SftDataBuilder):
+    """DataBuilder when the dataset is of the type Conversational. Use this DatabBuilder for
+    fine-tuning instruct models.
+    """
+
     def sanity_check(self):
         if self.num_few_shot_examples and self.num_few_shot_examples >= 1:
             assert self.few_shot_examples_split is not None
@@ -187,7 +204,7 @@ class ConversationalSftDataBuilder(SftDataBuilder):
 
     def construct_samples(self, ds_items: Dict[str, List[Any]]) -> Dict[str, List[Any]]:
         samples = {
-            ConversationalDatasetFeatures.MESSAGE: [],
+            ConversationalDatasetFeatures.MESSAGES: [],
             ConversationalDatasetFeatures.EXAMPLES: [],
         }
 
@@ -197,9 +214,6 @@ class ConversationalSftDataBuilder(SftDataBuilder):
         ):
             instruction_text = self.instruction_template
             input_text = self.get_input_text(text=text)
-            prompt = self.get_prompt(
-                instruction_text=instruction_text, input_text=input_text
-            )
             completion = self.get_completion(entities=entities)
             example = input_text + "\n" + completion
 
@@ -210,12 +224,15 @@ class ConversationalSftDataBuilder(SftDataBuilder):
                     {"role": "assistant", "content": completion},
                 ]
             else:
+                prompt = self.get_prompt(
+                    instruction_text=instruction_text, input_text=input_text
+                )
                 messages = [
                     {"role": "user", "content": prompt},
                     {"role": "assistant", "content": completion},
                 ]
 
-            samples[ConversationalDatasetFeatures.MESSAGE].append(messages)
+            samples[ConversationalDatasetFeatures.MESSAGES].append(messages)
             samples[ConversationalDatasetFeatures.EXAMPLES].append(example)
 
         return samples
@@ -224,7 +241,7 @@ class ConversationalSftDataBuilder(SftDataBuilder):
         self, ds_items: Dict[str, List[Any]], few_shot_split: Dataset
     ) -> Dict[str, List[Any]]:
         new_messages = []
-        for messages in ds_items[ConversationalDatasetFeatures.MESSAGE]:
+        for messages in ds_items[ConversationalDatasetFeatures.MESSAGES]:
             examples = random.sample(
                 few_shot_split[ConversationalDatasetFeatures.EXAMPLES],
                 self.num_few_shot_examples,
@@ -243,6 +260,6 @@ class ConversationalSftDataBuilder(SftDataBuilder):
                 _new_messages.append(message)
             new_messages.append(_new_messages)
 
-        ds_items[ConversationalDatasetFeatures.MESSAGE] = new_messages
+        ds_items[ConversationalDatasetFeatures.MESSAGES] = new_messages
 
         return ds_items

@@ -19,21 +19,43 @@ WANDB_TRAIN_PROJECT = "llm4kmu-train"
 
 
 class SftTrainerWrapper:
+    """
+    A wrapper class for the Hugging Face TRL SFTTrainer.
+
+    This class handles the end-to-end training pipeline, including:
+    - Loading the pre-trained model and tokenizer from Hugging Face Hub.
+    - Building and pre-processing the dataset using the custom data builder.
+    - Executing `SFTTrainer` with the prepared model, data, and configurations.
+    - Saving the fine-tuned model and tokenizer to the specified output directory.
+    """
+
     def __init__(self, config: TrainerRunConfig):
         self.config = config
 
     def run(self):
+        # TODO: add attn implementation
         model = AutoModelForCausalLM.from_pretrained(
             pretrained_model_name_or_path=self.config.auto_llm_trainer_args.model_name,
             token=os.getenv("HF_TOKEN"),
+            attn_implementation=self.config.auto_llm_trainer_args.attn_implementation,
         )
         tokenizer = AutoTokenizer.from_pretrained(
             pretrained_model_name_or_path=self.config.auto_llm_trainer_args.model_name,
             token=os.getenv("HF_TOKEN"),
         )
 
+        tokenizer.pad_token = tokenizer.eos_token
+
+        # While FT, pad to the right. See https://github.com/huggingface/transformers/issues/34842#issuecomment-2528550342.
+        tokenizer.padding_side = "right"
+
         builder = self.get_trainer_data_builder(config=self.config)
         ds_dict = builder.build()
+
+        print("Train Dataset")
+        print(ds_dict["train"])
+        for key, value in ds_dict["train"][0].items():
+            print(f"{key}\n{value}")
 
         pre_processor = SftPreProcessor(
             tokenizer=tokenizer,
@@ -60,6 +82,16 @@ class SftTrainerWrapper:
                 # for non-conversational dataset, use TRL's dataset prep.
                 # TODO: decide if this is needed or custom pre-processor suffices
                 completion_only_loss = True
+                print("Doing non-sft preprocessor")
+                ds_dict = ds_dict.map(
+                    function=pre_processor.pre_process,
+                    fn_kwargs=dict(
+                        max_length=self.config.trainer_args.max_length,
+                        truncation=self.config.auto_llm_trainer_args.truncation,
+                    ),
+                    batched=True,
+                )
+                skip_prepare_dataset = True
 
         trainer_args = SFTConfig(
             **self.config.trainer_args.model_dump(),
@@ -77,6 +109,7 @@ class SftTrainerWrapper:
                 lora_alpha=self.config.peft_config.lora_alpha,
                 lora_dropout=self.config.peft_config.lora_dropout,
                 target_modules=self.config.peft_config.target_modules,
+                task_type=self.config.peft_config.task_type,
             )
 
         # TODO: SFTTrainer not returning eval loss
@@ -88,6 +121,8 @@ class SftTrainerWrapper:
             train_dataset=ds_dict[DatasetSplit.TRAIN],
             eval_dataset=ds_dict[DatasetSplit.VALIDATION],
         )
+
+        print(ds_dict[DatasetSplit.TRAIN][0])
 
         trainer.train()
 
