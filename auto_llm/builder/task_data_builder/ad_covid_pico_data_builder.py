@@ -1,7 +1,7 @@
 import os
 
-from datasets import DatasetDict, Dataset
-
+from datasets import DatasetDict, Dataset, Features, Value, Sequence
+from collections import OrderedDict
 from auto_llm.builder.task_data_builder.task_data_builder import TaskDataBuilder
 from auto_llm.dto.builder_config import TaskDatasetFeatures, DatasetSplit
 
@@ -61,9 +61,29 @@ class AdCovidPicoDataBuilder(TaskDataBuilder):
                             samples[TaskDatasetFeatures.OUTPUT_TEXT]
                         )
 
-        train_ds = Dataset.from_dict(train_samples)
-        dev_ds = Dataset.from_dict(dev_samples)
-        test_ds = Dataset.from_dict(test_samples)
+        # features define the schema of the dataset. If not passed, the order of PICO keys would change.
+        features = Features(
+            {
+                TaskDatasetFeatures.INPUT_TEXT: Value(dtype="string", id=None),
+                TaskDatasetFeatures.OUTPUT_TEXT: {
+                    "P": Sequence(
+                        feature=Value(dtype="string", id=None), length=-1, id=None
+                    ),
+                    "I": Sequence(
+                        feature=Value(dtype="string", id=None), length=-1, id=None
+                    ),
+                    "C": Sequence(
+                        feature=Value(dtype="string", id=None), length=-1, id=None
+                    ),
+                    "O": Sequence(
+                        feature=Value(dtype="string", id=None), length=-1, id=None
+                    ),
+                },
+            }
+        )
+        train_ds = Dataset.from_dict(train_samples, features=features)
+        dev_ds = Dataset.from_dict(dev_samples, features=features)
+        test_ds = Dataset.from_dict(test_samples, features=features)
 
         ds_dict = DatasetDict(
             {
@@ -116,7 +136,7 @@ class AdCovidPicoDataBuilder(TaskDataBuilder):
                             }
                         )
 
-                extracted_entities = {"P": [], "I": [], "C": [], "O": []}
+                extracted_entities = OrderedDict({"P": [], "I": [], "C": [], "O": []})
                 for form in entities_form:
                     entity_text = " ".join(texts[form["start_idx"] : form["stop_idx"]])
 
