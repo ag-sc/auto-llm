@@ -1,6 +1,6 @@
 from typing import Dict, List, Optional
 
-from datasets import load_dataset, Dataset, DatasetDict
+from datasets import load_dataset, Dataset, DatasetDict, Features, Value, Sequence
 
 from auto_llm.builder.task_data_builder.task_data_builder import TaskDataBuilder
 from auto_llm.dto.builder_config import TaskDatasetFeatures, DatasetSplit
@@ -19,6 +19,24 @@ class EbmPicoDataBuilder(TaskDataBuilder):
         raw = load_dataset("bigbio/ebm_pico", trust_remote_code=True)
         splits_to_process = self.splits or list(raw.keys())
         processed = {}
+
+        # features define the schema of the dataset. If not passed, the order of PICO keys would change.
+        features = Features(
+            {
+                TaskDatasetFeatures.INPUT_TEXT: Value(dtype="string", id=None),
+                TaskDatasetFeatures.OUTPUT_TEXT: {
+                    "P": Sequence(
+                        feature=Value(dtype="string", id=None), length=-1, id=None
+                    ),
+                    "I": Sequence(
+                        feature=Value(dtype="string", id=None), length=-1, id=None
+                    ),
+                    "O": Sequence(
+                        feature=Value(dtype="string", id=None), length=-1, id=None
+                    ),
+                },
+            }
+        )
         for split in splits_to_process:
             ds = raw[split]
             self.logger.info(f"Processing split '{split}' with {len(ds)} samples...")
@@ -36,13 +54,15 @@ class EbmPicoDataBuilder(TaskDataBuilder):
                     out[TaskDatasetFeatures.OUTPUT_TEXT]
                 )
 
-            new_ds = Dataset.from_dict(processed_dict)
+            new_ds = Dataset.from_dict(processed_dict, features=features)
 
             if split == DatasetSplit.TRAIN:
                 new_ds = new_ds.shuffle(seed=42)
                 val_size = int(len(new_ds) * self.val_ratio)
                 processed[DatasetSplit.VALIDATION] = new_ds.select(range(val_size))
-                processed[DatasetSplit.TRAIN] = new_ds.select(range(val_size, len(new_ds)))
+                processed[DatasetSplit.TRAIN] = new_ds.select(
+                    range(val_size, len(new_ds))
+                )
             else:
                 processed[split] = new_ds
 
