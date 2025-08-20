@@ -60,7 +60,8 @@ def process_results(doc: Dict[str, Any], result: List[str]):
 
         num_entity_keys_with_values += 1
 
-        predicted_value = predicted_response_dict[key]
+        # if predicted response does not have the expected key, yield "NA".
+        predicted_value = predicted_response_dict.get(key, "NA")
         print(f"\nKey: {key}, Expected: {expected_value}, Predicted: {predicted_value}")
         # expected and predicted value -> List[str]
 
@@ -85,7 +86,7 @@ def process_results(doc: Dict[str, Any], result: List[str]):
             all_ratios = []
             for pred_item in predicted_value:
                 all_ratios.append(fuzz.ratio(exp_item, pred_item) / 100)
-            fuzzy_match += max(all_ratios)
+            fuzzy_match += max(all_ratios, default=0)
         fuzzy_match /= len(expected_value)
         fuzzy_match_score += fuzzy_match
 
@@ -124,6 +125,7 @@ def process_results(doc: Dict[str, Any], result: List[str]):
         "fuzzy_match": fuzzy_match_score,
         "f1_score": f1_score,
     }
+
 
 def parse_dict(text: str) -> Union[Dict | str]:
     try:
