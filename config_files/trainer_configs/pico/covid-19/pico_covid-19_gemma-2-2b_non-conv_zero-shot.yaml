@@ -33,7 +33,7 @@ trainer_args:
   auto_find_batch_size: True
 
   # training related
-  output_dir: /vol/auto_llm/sft_models/pico_ad_gemma-2-2b_non-conv_zero-shot
+  output_dir: /vol/auto_llm/sft_models/pico_covid-19_gemma-2-2b_non-conv_zero-shot
   # resume_from_checkpoint: ""
   gradient_checkpointing: True
   num_train_epochs: 5
@@ -42,7 +42,7 @@ trainer_args:
 
   # tracking/logging related
   report_to: wandb
-  run_name: pico_ad_gemma-2-2b_non-conv_zero-shot
+  run_name: pico_covid-19_gemma-2-2b_non-conv_zero-shot
   logging_steps: 0.1
 
   # eval/save related
