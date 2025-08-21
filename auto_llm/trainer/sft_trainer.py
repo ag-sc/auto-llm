@@ -1,5 +1,6 @@
 import os
 
+import torch
 from peft import LoraConfig
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from trl import SFTConfig, SFTTrainer
@@ -33,11 +34,12 @@ class SftTrainerWrapper:
         self.config = config
 
     def run(self):
-        # TODO: add attn implementation
         model = AutoModelForCausalLM.from_pretrained(
             pretrained_model_name_or_path=self.config.auto_llm_trainer_args.model_name,
             token=os.getenv("HF_TOKEN"),
             attn_implementation=self.config.auto_llm_trainer_args.attn_implementation,
+            low_cpu_mem_usage=True,
+            torch_dtype=torch.bfloat16,  # TODO: pass this as trainer arg?
         )
         tokenizer = AutoTokenizer.from_pretrained(
             pretrained_model_name_or_path=self.config.auto_llm_trainer_args.model_name,

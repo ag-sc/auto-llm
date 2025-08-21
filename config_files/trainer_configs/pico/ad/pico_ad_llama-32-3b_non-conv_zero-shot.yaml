@@ -1,7 +1,7 @@
 auto_llm_trainer_args:
   trainer_type: sft
-  model_name: google/gemma-2-2b
-  attn_implementation: eager # keep eager for gemma
+  model_name: meta-llama/Llama-3.2-3B
+  attn_implementation: sdpa  # flash_attention_2
   truncation: True
   completion_only_loss: True
 
@@ -13,8 +13,8 @@ peft_config:
   task_type: "CAUSAL_LM"
 
 trainer_data_builder_config:
-  dataset_dir: /vol/auto_llm/processed_datasets/pico/EBM
-  instruction_template: 'Given the text "Text", extract the PICO tags in the JSON format "Format". Do not modify the sentences.\nFormat:\n```json\n{\n  "P": ["value for P"],\n  "I": ["value for I"],\n  "O": ["value for O"],\n}\n```\n'
+  dataset_dir: /vol/auto_llm/processed_datasets/pico/AD
+  instruction_template: 'Given the text "Text", extract the PICO tags in the JSON format "Format". Do not modify the sentences.\nFormat:\n```json\n{\n  "P": ["value for P"],\n  "I": ["value for I"],\n  "C": ["value for C"],\n  "O": ["value for O"],\n}\n```\n'
   input_template: "Text: {{input}}\n\nPICO tags according to the format:\n"
   output_template: "```json\n{{output}}\n```"
   dataset_type: prompt_completions
@@ -33,8 +33,7 @@ trainer_args:
   auto_find_batch_size: True
 
   # training related
-  output_dir: /vol/auto_llm/sft_models/pico_ebm_gemma-2-2b_non-conv_zero-shot
-  # resume_from_checkpoint: ""
+  output_dir: /vol/auto_llm/sft_models/pico_ad_llama-32-3b_non-conv_zero-shot
   gradient_checkpointing: True
   num_train_epochs: 5
   learning_rate: 1e-4
@@ -42,7 +41,7 @@ trainer_args:
 
   # tracking/logging related
   report_to: wandb
-  run_name: pico_ebm_gemma-2-2b_non-conv_zero-shot
+  run_name: pico_ad_llama-32-3b_non-conv_zero-shot
   logging_steps: 0.1
 
   # eval/save related
