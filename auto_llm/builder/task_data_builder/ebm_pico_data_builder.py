@@ -79,9 +79,9 @@ class EbmPicoDataBuilder(TaskDataBuilder):
 
             if ent_type.startswith("participant"):
                 buckets["P"].append(ent_text)
-            elif ent_type.startswith == "intervention":
+            elif ent_type.startswith("intervention"):
                 buckets["I"].append(ent_text)
-            elif ent_type.startswith == "outcome":
+            elif ent_type.startswith("outcome"):
                 buckets["O"].append(ent_text)
 
         return buckets
