@@ -55,8 +55,9 @@ def process_results(doc: Dict[str, Any], result: List[str]):
 
     num_entity_keys_with_values = 0
     for key, expected_value in expected_entities_dict.items():
-        if len(expected_value) < 1:
-            continue
+        # penalizing predictions for expected empty list, skipping non-existent key
+        # if len(expected_value) < 1:
+        #     continue
 
         num_entity_keys_with_values += 1
 

@@ -16,7 +16,7 @@ class EbmPicoDataBuilder(TaskDataBuilder):
         self.splits = splits
 
     def build(self) -> DatasetDict:
-        raw = load_dataset("bigbio/ebm_pico", trust_remote_code=True)
+        raw = load_dataset("bigbio/ebm_pico", name="ebm_pico_bigbio_kb",trust_remote_code=True)
         splits_to_process = self.splits or list(raw.keys())
         processed = {}
 
@@ -77,11 +77,11 @@ class EbmPicoDataBuilder(TaskDataBuilder):
             if not ent_text:
                 continue
 
-            if ent_type == "participant":
+            if ent_type.startswith("participant"):
                 buckets["P"].append(ent_text)
-            elif ent_type == "intervention":
+            elif ent_type.startswith == "intervention":
                 buckets["I"].append(ent_text)
-            elif ent_type == "outcome":
+            elif ent_type.startswith == "outcome":
                 buckets["O"].append(ent_text)
 
         return buckets
