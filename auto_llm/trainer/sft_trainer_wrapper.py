@@ -2,7 +2,6 @@ import os
 
 import torch
 from accelerate import Accelerator, DistributedType
-from accelerate.logging import get_logger
 from peft import LoraConfig
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from trl import SFTConfig, SFTTrainer
@@ -17,14 +16,14 @@ from auto_llm.builder.trainer_data_builder.trainer_data_builder import (
 from auto_llm.dto.builder_config import SftDatasetType, DatasetSplit
 from auto_llm.dto.trainer_run_config import TrainerRunConfig
 from auto_llm.pre_processor.sft_pre_procesor import SftPreProcessor
+from auto_llm.trainer.trainer_wrapper import TrainerWrapper
 
 WANDB_TRAIN_PROJECT = "llm4kmu-train"
 
 accelerator = Accelerator()
-logger = get_logger(__name__)
 
 
-class SftTrainerWrapper:
+class SftTrainerWrapper(TrainerWrapper):
     """
     A wrapper class for the Hugging Face TRL SFTTrainer.
 
@@ -34,9 +33,6 @@ class SftTrainerWrapper:
     - Executing `SFTTrainer` with the prepared model, data, and configurations.
     - Saving the fine-tuned model and tokenizer to the specified output directory.
     """
-
-    def __init__(self, config: TrainerRunConfig):
-        self.config = config
 
     def run(self):
         model = AutoModelForCausalLM.from_pretrained(
@@ -59,11 +55,6 @@ class SftTrainerWrapper:
         builder = self.get_trainer_data_builder(config=self.config)
         ds_dict = builder.build()
 
-        print("Train Dataset")
-        print(ds_dict["train"])
-        for key, value in ds_dict["train"][0].items():
-            print(f"{key}\n{value}")
-
         pre_processor = SftPreProcessor(
             tokenizer=tokenizer,
             completion_only_loss=self.config.auto_llm_trainer_args.completion_only_loss,
@@ -76,6 +67,7 @@ class SftTrainerWrapper:
         completion_only_loss = False
         if self.config.auto_llm_trainer_args.completion_only_loss:
             if pre_processor.is_dataset_conversational(dataset_dict=ds_dict):
+                self.logger.info("Using custom preprocessor for Conversational dataset")
                 ds_dict = ds_dict.map(
                     function=pre_processor.pre_process,
                     fn_kwargs=dict(
@@ -89,7 +81,9 @@ class SftTrainerWrapper:
                 # for non-conversational dataset, use TRL's dataset prep.
                 # TODO: decide if this is needed or custom pre-processor suffices
                 completion_only_loss = True
-                print("Doing non-sft preprocessor")
+                self.logger.info(
+                    "Using custom preprocessor for Non-conversational dataset"
+                )
                 ds_dict = ds_dict.map(
                     function=pre_processor.pre_process,
                     fn_kwargs=dict(
@@ -116,8 +110,6 @@ class SftTrainerWrapper:
             ddp_find_unused_parameters=ddp_find_unused_parameters,
         )
 
-        gradient_checkpointing_kwargs = {"use_reentrant": False}
-
         if self.config.trainer_args.report_to == "wandb":
             os.environ["WANDB_PROJECT"] = WANDB_TRAIN_PROJECT
 
@@ -131,7 +123,6 @@ class SftTrainerWrapper:
                 task_type=self.config.peft_config.task_type,
             )
 
-        # TODO: SFTTrainer not returning eval loss
         trainer = SFTTrainer(
             model=model,
             processing_class=tokenizer,
@@ -141,12 +132,20 @@ class SftTrainerWrapper:
             eval_dataset=ds_dict[DatasetSplit.VALIDATION],
         )
 
-        print(ds_dict[DatasetSplit.TRAIN][0])
+        self.logger.info("Train Dataset")
+        self.logger.info(f"# train samples: {len(ds_dict['train'])}")
+        self.logger.info(ds_dict["train"])
+        for key, value in ds_dict["train"][0].items():
+            self.logger.info(f"{key}\n{value}")
 
         trainer.train()
 
         trainer.save_model(self.config.trainer_args.output_dir)
         tokenizer.save_pretrained(self.config.trainer_args.output_dir)
+
+        self.logger.info(
+            f"Model and Tokenizer saved in the path: {self.config.trainer_args.output_dir}"
+        )
 
     @staticmethod
     def get_trainer_data_builder(config: TrainerRunConfig) -> TrainerDataBuilder:

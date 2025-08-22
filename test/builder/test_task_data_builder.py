@@ -55,5 +55,5 @@ def test_ebm_pico_data_builder():
 
     _generic_task_data_builder_tests(ds_dict=ds_dict)
 
-    output_dir = "/vol/auto_llm/processed_datasets/pico/EBM"
+    output_dir = "/vol/auto_llm/processed_datasets/pico/EBM-V2"
     builder.save(ds_dict=ds_dict, path=output_dir)

@@ -13,7 +13,7 @@ peft_config:
   task_type: "CAUSAL_LM"
 
 trainer_data_builder_config:
-  dataset_dir: /vol/auto_llm/processed_datasets/pico/EBM
+  dataset_dir: /vol/auto_llm/processed_datasets/pico/EBM-V2
   instruction_template: 'Given the text "Text", extract the PICO tags in the JSON format "Format". Do not modify the sentences.\nFormat:\n```json\n{\n  "P": ["value for P"],\n  "I": ["value for I"],\n  "O": ["value for O"],\n}\n```\n'
   input_template: "Text: {{input}}\n\nPICO tags according to the format:\n"
   output_template: "```json\n{{output}}\n```"
@@ -27,9 +27,9 @@ trainer_args:
   fp16: False
 
   # bsz related
-  per_device_train_batch_size: 4
-  per_device_eval_batch_size: 4
-  gradient_accumulation_steps: 32
+  per_device_train_batch_size: 16
+  per_device_eval_batch_size: 16
+  gradient_accumulation_steps: 2  # 4 processes, effective bsz=128
   auto_find_batch_size: True
 
   # training related
