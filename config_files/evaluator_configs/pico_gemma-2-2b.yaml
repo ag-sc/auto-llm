@@ -1,7 +1,7 @@
 model: hf
-tasks: ad_pico
+tasks: ad_pico,covid_19_pico
 model_args: pretrained=google/gemma-2-2b
-wandb_args: project=llm4kmu-eval,name=pico_ad_gemma-2-2b_pre
+wandb_args: project=llm4kmu-eval,name=pico_gemma-2-2b_pre
 
 write_out: True
 log_samples: True

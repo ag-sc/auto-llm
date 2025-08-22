@@ -1,6 +1,8 @@
 import os
 
 import torch
+from accelerate import Accelerator, DistributedType
+from accelerate.logging import get_logger
 from peft import LoraConfig
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from trl import SFTConfig, SFTTrainer
@@ -17,6 +19,9 @@ from auto_llm.dto.trainer_run_config import TrainerRunConfig
 from auto_llm.pre_processor.sft_pre_procesor import SftPreProcessor
 
 WANDB_TRAIN_PROJECT = "llm4kmu-train"
+
+accelerator = Accelerator()
+logger = get_logger(__name__)
 
 
 class SftTrainerWrapper:
@@ -95,11 +100,23 @@ class SftTrainerWrapper:
                 )
                 skip_prepare_dataset = True
 
+        use_reentrant = None
+        ddp_find_unused_parameters = None
+        if accelerator.state.distributed_type == DistributedType.FSDP:
+            use_reentrant = True
+        elif accelerator.state.distributed_type == DistributedType.MULTI_GPU:  # for ddp
+            use_reentrant = False
+            ddp_find_unused_parameters = False
+
         trainer_args = SFTConfig(
             **self.config.trainer_args.model_dump(),
             dataset_kwargs={"skip_prepare_dataset": skip_prepare_dataset},
             completion_only_loss=completion_only_loss,
+            gradient_checkpointing_kwargs={"use_reentrant": use_reentrant},
+            ddp_find_unused_parameters=ddp_find_unused_parameters,
         )
+
+        gradient_checkpointing_kwargs = {"use_reentrant": False}
 
         if self.config.trainer_args.report_to == "wandb":
             os.environ["WANDB_PROJECT"] = WANDB_TRAIN_PROJECT

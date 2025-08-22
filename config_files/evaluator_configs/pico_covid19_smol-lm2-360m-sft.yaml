@@ -1,7 +1,7 @@
 model: hf
-tasks: ad_pico
-model_args: pretrained=meta-llama/Llama-3.2-1B
-wandb_args: project=llm4kmu-eval,name=pico_ad_llama-32-1b
+tasks: covid_19_pico
+model_args: pretrained=HuggingFaceTB/SmolLM2-360M,peft=/vol/auto_llm/sft_models/pico_covid-19_smol-lm2-360m_non-conv_zero-shot
+wandb_args: project=llm4kmu-eval,name=pico_covid-19_smol-lm2-360m_non-conv_zero-shot
 
 write_out: True
 log_samples: True

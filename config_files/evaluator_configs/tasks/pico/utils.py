@@ -77,7 +77,11 @@ def process_results(doc: Dict[str, Any], result: List[str]):
         for item in expected_value:
             if item in predicted_value:
                 partial_match += 1
-        partial_match /= len(expected_value)
+        try:
+            partial_match /= len(expected_value)
+        except ZeroDivisionError:
+            partial_match = 0
+
         partial_match_score += partial_match
 
         # fuzzy ratio
@@ -88,7 +92,11 @@ def process_results(doc: Dict[str, Any], result: List[str]):
             for pred_item in predicted_value:
                 all_ratios.append(fuzz.ratio(exp_item, pred_item) / 100)
             fuzzy_match += max(all_ratios, default=0)
-        fuzzy_match /= len(expected_value)
+        try:
+            fuzzy_match /= len(expected_value)
+        except ZeroDivisionError:
+            fuzzy_match = 0
+
         fuzzy_match_score += fuzzy_match
 
         # f1 score

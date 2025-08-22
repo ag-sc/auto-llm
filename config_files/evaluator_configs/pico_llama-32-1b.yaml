@@ -1,0 +1,38 @@
+model: hf
+tasks: ad_pico,covid_19_pico
+model_args: pretrained=meta-llama/Llama-3.2-1B
+wandb_args: project=llm4kmu-eval,name=pico_llama-32-1b_pre
+
+write_out: True
+log_samples: True
+output_path: /vol/auto_llm/eval_results
+
+include_path: config_files/evaluator_configs/tasks
+
+#num_fewshot:
+#batch_size:
+#max_batch_size:
+#device:
+#output_path:
+#limit:
+#samples:
+#use_cache:
+#cache_requests:
+#check_integrity:
+#write_out:
+#log_samples:
+#system_instruction:
+#apply_chat_template:
+#fewshot_as_multiturn:
+#show_config:
+#include_path:
+#gen_kwargs:
+#verbosity:
+#wandb_args:
+#wandb_config_args:
+#hf_hub_log_args:
+#predict_only:
+#seed:
+#trust_remote_code:
+#confirm_run_unsafe_code:
+#metadata:
