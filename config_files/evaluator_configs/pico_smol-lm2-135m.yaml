@@ -1,7 +1,8 @@
 model: hf
-tasks: ad_pico,covid_19_pico
+#tasks: ad_pico,covid_19_pico,ebm_pico
+tasks: ebm_pico
 model_args: pretrained=HuggingFaceTB/SmolLM2-135M
-wandb_args: project=llm4kmu-eval,name=pico_smol-lm2-135m_pre
+wandb_args: project=llm4kmu-eval,name=pico-ebm-NoDuplicates_smol-lm2-135m_pre
 
 write_out: True
 log_samples: True

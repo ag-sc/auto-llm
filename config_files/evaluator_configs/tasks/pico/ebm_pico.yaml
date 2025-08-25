@@ -6,7 +6,7 @@ task: ebm_pico
 dataset_path: arrow
 dataset_kwargs:
   data_files:
-    test: /vol/auto_llm/processed_datasets/pico/EBM/test/data-00000-of-00001.arrow
+    test: /vol/auto_llm/processed_datasets/pico/EBM-NoDuplicates/test/data-00000-of-00001.arrow
 test_split: test
 
 doc_to_text: |
@@ -16,7 +16,6 @@ doc_to_text: |
   {
     "P": ["value for P"],
     "I": ["value for I"],
-    "C": ["value for C"],
     "O": ["value for O"],
   }
   ```

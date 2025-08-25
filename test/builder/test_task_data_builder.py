@@ -57,3 +57,14 @@ def test_ebm_pico_data_builder():
 
     output_dir = "/vol/auto_llm/processed_datasets/pico/EBM-V2"
     builder.save(ds_dict=ds_dict, path=output_dir)
+
+
+def test_ebm_pico_data_builder_wo_duplciates():
+    # pip install datasets==3.6.0
+    builder = EbmPicoDataBuilder(keep_duplicate_entities=False)
+    ds_dict = builder.build()
+
+    _generic_task_data_builder_tests(ds_dict=ds_dict)
+
+    output_dir = "/vol/auto_llm/processed_datasets/pico/EBM-NoDuplicates"
+    builder.save(ds_dict=ds_dict, path=output_dir)

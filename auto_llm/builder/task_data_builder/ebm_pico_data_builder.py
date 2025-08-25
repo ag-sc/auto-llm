@@ -11,12 +11,20 @@ class EbmPicoDataBuilder(TaskDataBuilder):
     Constructs EBM PICO data from HF dataset bigbio/ebm_pico.
     """
 
-    def __init__(self, val_ratio: float = 0.1, splits: Optional[List[str]] = None):
+    def __init__(
+        self,
+        val_ratio: float = 0.1,
+        splits: Optional[List[str]] = None,
+        keep_duplicate_entities: bool = False,
+    ):
         self.val_ratio = val_ratio
         self.splits = splits
+        self.keep_duplicate_entities = keep_duplicate_entities
 
     def build(self) -> DatasetDict:
-        raw = load_dataset("bigbio/ebm_pico", name="ebm_pico_bigbio_kb",trust_remote_code=True)
+        raw = load_dataset(
+            "bigbio/ebm_pico", name="ebm_pico_bigbio_kb", trust_remote_code=True
+        )
         splits_to_process = self.splits or list(raw.keys())
         processed = {}
 
@@ -68,8 +76,16 @@ class EbmPicoDataBuilder(TaskDataBuilder):
 
         return DatasetDict(processed)
 
+    def _extract_entities(self, entities: List[dict]) -> Dict[str, List[str]]:
+        if self.keep_duplicate_entities:
+            return self._extract_entities_with_duplication(entities=entities)
+        else:
+            return self._extract_entities_wo_duplication(entities=entities)
+
     @staticmethod
-    def _extract_entities(entities: List[dict]) -> Dict[str, List[str]]:
+    def _extract_entities_with_duplication(
+        entities: List[dict],
+    ) -> Dict[str, List[str]]:
         buckets = {"P": [], "I": [], "O": []}
         for ent in entities or []:
             ent_type = ent.get("type", "").lower()
@@ -82,6 +98,24 @@ class EbmPicoDataBuilder(TaskDataBuilder):
             elif ent_type.startswith("intervention"):
                 buckets["I"].append(ent_text)
             elif ent_type.startswith("outcome"):
+                buckets["O"].append(ent_text)
+
+        return buckets
+
+    @staticmethod
+    def _extract_entities_wo_duplication(entities: List[dict]) -> Dict[str, List[str]]:
+        buckets = {"P": [], "I": [], "O": []}
+        for ent in entities or []:
+            ent_type = ent.get("type", "").lower()
+            ent_text = " ".join(ent.get("text") or []).strip()
+            if not ent_text:
+                continue
+
+            if ent_text not in buckets["P"] and ent_type.startswith("participant"):
+                buckets["P"].append(ent_text)
+            elif ent_text not in buckets["I"] and ent_type.startswith("intervention"):
+                buckets["I"].append(ent_text)
+            elif ent_text not in buckets["O"] and ent_type.startswith("outcome"):
                 buckets["O"].append(ent_text)
 
         return buckets

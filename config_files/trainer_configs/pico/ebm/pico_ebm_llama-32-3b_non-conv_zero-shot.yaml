@@ -13,7 +13,7 @@ peft_config:
   task_type: "CAUSAL_LM"
 
 trainer_data_builder_config:
-  dataset_dir: /vol/auto_llm/processed_datasets/pico/EBM-V2
+  dataset_dir: /vol/auto_llm/processed_datasets/pico/EBM-NoDuplicates
   instruction_template: 'Given the text "Text", extract the PICO tags in the JSON format "Format". Do not modify the sentences.\nFormat:\n```json\n{\n  "P": ["value for P"],\n  "I": ["value for I"],\n  "O": ["value for O"],\n}\n```\n'
   input_template: "Text: {{input}}\n\nPICO tags according to the format:\n"
   output_template: "```json\n{{output}}\n```"
@@ -33,7 +33,7 @@ trainer_args:
   auto_find_batch_size: True
 
   # training related
-  output_dir: /vol/auto_llm/sft_models/pico_ebm_llama-32-3b_non-conv_zero-shot
+  output_dir: /vol/auto_llm/sft_models/pico_ebm-NoDuplicates_llama-32-3b_non-conv_zero-shot
   # resume_from_checkpoint: ""
   gradient_checkpointing: True
   num_train_epochs: 5
@@ -42,7 +42,7 @@ trainer_args:
 
   # tracking/logging related
   report_to: wandb
-  run_name: pico_ebm_llama-32-3b_non-conv_zero-shot
+  run_name: pico_ebm-NoDuplicates_llama-32-3b_non-conv_zero-shot
   logging_steps: 0.1
 
   # eval/save related

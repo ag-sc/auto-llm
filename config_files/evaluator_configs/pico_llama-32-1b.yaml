@@ -1,7 +1,8 @@
 model: hf
-tasks: ad_pico,covid_19_pico
+#tasks: ad_pico,covid_19_pico,ebm_pico
+tasks: ebm_pico
 model_args: pretrained=meta-llama/Llama-3.2-1B
-wandb_args: project=llm4kmu-eval,name=pico_llama-32-1b_pre
+wandb_args: project=llm4kmu-eval,name=pico-ebm-NoDuplicates_llama-32-1b_pre
 
 write_out: True
 log_samples: True
