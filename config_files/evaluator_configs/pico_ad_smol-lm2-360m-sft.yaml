@@ -1,0 +1,38 @@
+model: hf
+tasks: ad_pico
+model_args: pretrained=HuggingFaceTB/SmolLM2-360M,peft=/vol/auto_llm/sft_models/pico_ad_smol-lm2-360m_non-conv_zero-shot
+wandb_args: project=llm4kmu-eval,name=pico_ad_smol-lm2-360m_non-conv_zero-shot
+
+write_out: True
+log_samples: True
+output_path: /vol/auto_llm/eval_results
+
+include_path: config_files/evaluator_configs/tasks
+
+#num_fewshot:
+#batch_size:
+#max_batch_size:
+#device:
+#output_path:
+#limit:
+#samples:
+#use_cache:
+#cache_requests:
+#check_integrity:
+#write_out:
+#log_samples:
+#system_instruction:
+#apply_chat_template:
+#fewshot_as_multiturn:
+#show_config:
+#include_path:
+#gen_kwargs:
+#verbosity:
+#wandb_args:
+#wandb_config_args:
+#hf_hub_log_args:
+#predict_only:
+#seed:
+#trust_remote_code:
+#confirm_run_unsafe_code:
+#metadata:

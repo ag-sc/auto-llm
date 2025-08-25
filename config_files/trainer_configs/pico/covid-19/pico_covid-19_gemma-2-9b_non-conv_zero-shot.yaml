@@ -1,0 +1,50 @@
+auto_llm_trainer_args:
+  trainer_type: sft
+  model_name: google/gemma-2-9b
+  attn_implementation: eager # keep eager for gemma
+  truncation: True
+  completion_only_loss: True
+
+peft_config:
+  r: 16
+  lora_alpha: 32
+  lora_dropout: 0.05
+  target_modules: "all-linear"
+  task_type: "CAUSAL_LM"
+
+trainer_data_builder_config:
+  dataset_dir: /vol/auto_llm/processed_datasets/pico/Covid19
+  instruction_template: 'Given the text "Text", extract the PICO tags in the JSON format "Format". Do not modify the sentences.\nFormat:\n```json\n{\n  "P": ["value for P"],\n  "I": ["value for I"],\n  "C": ["value for C"],\n  "O": ["value for O"],\n}\n```\n'
+  input_template: "Text: {{input}}\n\nPICO tags according to the format:\n"
+  output_template: "```json\n{{output}}\n```"
+  dataset_type: prompt_completions
+  instruction_input_separator: "\n"
+  parse_output_as_json: True
+
+trainer_args:
+  max_length: 1024
+  bf16: True
+  fp16: False
+
+  # bsz related
+  per_device_train_batch_size: 4
+  per_device_eval_batch_size: 4
+  gradient_accumulation_steps: 32
+  auto_find_batch_size: True
+
+  # training related
+  output_dir: /vol/auto_llm/sft_models/pico_covid-19_gemma-2-9b_non-conv_zero-shot
+  # resume_from_checkpoint: ""
+  gradient_checkpointing: True
+  num_train_epochs: 5
+  learning_rate: 1e-4
+  warmup_steps: 10
+
+  # tracking/logging related
+  report_to: wandb
+  run_name: pico_covid-19_gemma-2-9b_non-conv_zero-shot
+  logging_steps: 0.1
+
+  # eval/save related
+  eval_strategy: steps
+  save_strategy: epoch

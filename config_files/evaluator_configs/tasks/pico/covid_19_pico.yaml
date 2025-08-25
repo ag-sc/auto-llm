@@ -1,0 +1,44 @@
+tag:
+  - pico
+
+task: covid_19_pico
+
+dataset_path: arrow
+dataset_kwargs:
+  data_files:
+    test: /vol/auto_llm/processed_datasets/pico/Covid19/test/data-00000-of-00001.arrow
+    # validation: /homes/vsudhi/llm4kmu_datasets/section_specific_annotation_of_PICO/data/COVID-19/processed/dev/data-00000-of-00001.arrow
+test_split: test
+
+doc_to_text: |
+  Given the text "Text", extract the PICO tags in the JSON format "Format". Do not modify the sentences.
+  Format:
+  ```json
+  {
+    "P": ["value for P"],
+    "I": ["value for I"],
+    "C": ["value for C"],
+    "O": ["value for O"],
+  }
+  ```
+
+  Text: {{input_text}}
+
+  PICO tags according to the format:
+doc_to_target: "{{output_text}}"
+
+process_results: !function utils.process_results
+
+metric_list:
+  - metric: exact_match
+    aggregation: mean
+    higher_is_better: true
+  - metric: partial_match
+    aggregation: mean
+    higher_is_better: true
+  - metric: fuzzy_match
+    aggregation: mean
+    higher_is_better: true
+
+metadata:
+  version: 1.0
