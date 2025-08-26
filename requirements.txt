@@ -6,6 +6,6 @@ wandb==0.21.0
 PyYAML~=6.0.2
 datasets==3.6.0
 aenum==3.1.16
-gradio==5.42.0
+gradio==5.43.1
 peft==0.16.0
 torch==2.7.1
