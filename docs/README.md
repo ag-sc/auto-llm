@@ -39,10 +39,15 @@ output_text = """
 
 ### ```TrainerDataBuilder```
 
-- The ingested task specific data is processed and converted to the specific trainer you choose.
+- The ingested task specific data is further processed and converted to the format of the specific trainer you choose.
+- Here you can add a couple of more features:
+  - ``model_name``: which pre-trained model? Parameter Efficient FT or Full-Weights FT?
+  - ``instruction``: prompt template for input and output text
+  - ``few-shots``: how many? how to sample them? etc.
+  - ...
 - For example:
 ```python
-# for PICO task with Supervised Fine-Tuning (SFT) Trainer
+# for PICO task with Supervised Fine-Tuning (SFT) Trainer - Non-Conversational Dataset
 prompt = """\
 Given the text "Text", extract the PICO tags in the JSON format "Format". Do not modify the sentences.
 Format:
