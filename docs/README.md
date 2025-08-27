@@ -7,7 +7,7 @@
 </p>
 
 
-# Step 1: Data Ingestion
+# 📋 Step 1: Data Ingestion
 
 ### ``TaskDataBuilder``
 - As a user, you ingest the data for the task you want to achieve with the help of an LLM.
@@ -84,7 +84,7 @@ completions = """\
 """
 ```
 
-# Step 2: Define Evaluation Metrics
+# ⚖️ Step 2: Define Evaluation Metrics
 
 - Here, you should define which metrics would suit best for evaluating the task.
 - For example:
@@ -96,7 +96,7 @@ metrics = [
 ]
 ```
 
-# Step 3: Train and Evaluate
+# 🔄 Step 3: Train and Evaluate
 
 - With the ``Evaluator``, you can evaluate the performance of pre-trained LLMs on the task you defined, against the evaluation metrics you configured.
 - With the ``Trainer``, you can train different LLMs of your choice.
