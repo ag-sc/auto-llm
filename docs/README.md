@@ -1,4 +1,4 @@
-from lm_eval.tasks.mlqa.utils import f1_score<h1 align="center">
+<h1 align="center">
     AutoLLM
 </h1>
 
