@@ -3,7 +3,7 @@ import os
 import torch
 from accelerate import Accelerator, DistributedType
 from peft import LoraConfig
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer, AutoConfig
 from trl import SFTConfig, SFTTrainer
 
 from auto_llm.builder.trainer_data_builder.sft_data_builder import (
@@ -22,6 +22,14 @@ WANDB_TRAIN_PROJECT = "llm4kmu-train"
 
 accelerator = Accelerator()
 
+# possible keys where the max context length of a model is set in its HF configuration
+CTX_LENGTH_KEYS = [
+    "max_position_embeddings",
+    "n_positions",
+    "seq_length",
+    "max_seq_len",
+]
+
 
 class SftTrainerWrapper(TrainerWrapper):
     """
@@ -34,7 +42,14 @@ class SftTrainerWrapper(TrainerWrapper):
     - Saving the fine-tuned model and tokenizer to the specified output directory.
     """
 
+    def __init__(self, config: TrainerRunConfig):
+        self.config = config
+
     def run(self):
+        hf_model_config = AutoConfig.from_pretrained(
+            self.config.auto_llm_trainer_args.model_name
+        ).to_dict()
+
         model = AutoModelForCausalLM.from_pretrained(
             pretrained_model_name_or_path=self.config.auto_llm_trainer_args.model_name,
             token=os.getenv("HF_TOKEN"),
@@ -48,6 +63,21 @@ class SftTrainerWrapper(TrainerWrapper):
         )
 
         tokenizer.pad_token = tokenizer.eos_token
+
+        # Set max_length to the configured value, if it exists. Otherwise, find the model max context length.
+        if self.config.trainer_args.max_length:
+            max_length = self.config.trainer_args.max_length
+        else:
+            for key in CTX_LENGTH_KEYS:
+                if key in list(hf_model_config.keys()):
+                    max_length = hf_model_config[key]
+                    break
+            else:
+                raise Exception(f"Max length can not be found in the model config!")
+
+            # Model max length can be as large as 131072. This is unnecessary while SFT. Setting a minimum of 1024,
+            # if max_length not configured by the user.
+            max_length = min(1024, max_length)
 
         # While FT, pad to the right. See https://github.com/huggingface/transformers/issues/34842#issuecomment-2528550342.
         tokenizer.padding_side = "right"
@@ -71,7 +101,7 @@ class SftTrainerWrapper(TrainerWrapper):
                 ds_dict = ds_dict.map(
                     function=pre_processor.pre_process,
                     fn_kwargs=dict(
-                        max_length=self.config.trainer_args.max_length,
+                        max_length=max_length,
                         truncation=self.config.auto_llm_trainer_args.truncation,
                     ),
                     batched=True,
