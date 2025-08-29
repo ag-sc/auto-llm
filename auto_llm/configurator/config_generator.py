@@ -15,15 +15,20 @@ from auto_llm.dto.trainer_run_config import (
 
 
 class Priority(enum.Enum):
-    PRIORITY_ONE = "1"
-    PRIORITY_TWO = "2"
-    PRIORITY_THREE = "3"
+    PRIORITY_ONE = 1
+    PRIORITY_TWO = 2
+    PRIORITY_THREE = 3
+
+
+class ConfigMode(enum.Enum):
+    TRAINER_RUN_CFG = "trainer_run_cfg"
+    EVALUATOR_RUN_CFG = "evaluator_run_cfg"
 
 
 class ConfiguratorOutput(BaseModel):
     run_name: str
     config_path: str
-    mode: Literal["trainer_cfg", "evaluator_cfg"]
+    mode: ConfigMode
     config: Dict[str, Any]
     priority: Priority
 
@@ -185,7 +190,7 @@ class TrainEvalRunConfigurator:
         return ConfiguratorOutput(
             run_name=run_name,
             config_path=config_path,
-            mode="trainer_cfg",
+            mode=ConfigMode.TRAINER_RUN_CFG,
             config=config,
             priority=Priority.PRIORITY_TWO,
         )
@@ -270,7 +275,7 @@ class TrainEvalRunConfigurator:
             ConfiguratorOutput(
                 run_name=run_name,
                 config_path=config_path,
-                mode="evaluator_cfg",
+                mode=ConfigMode.EVALUATOR_RUN_CFG,
                 config=eval_config,
                 priority=priority,
             )
