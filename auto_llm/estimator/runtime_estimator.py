@@ -1,0 +1,48 @@
+import math
+from typing import Union, Dict, Any
+
+from auto_llm.estimator.estimator import Estimator
+from auto_llm.estimator.inference_flops_estimator import InferenceFlopsEstimator
+from auto_llm.estimator.trainer_flops_estimator import TrainerFlopsEstimator
+from auto_llm.estimator.utils import get_model_params, get_gpu_params
+
+
+class RuntimeEstimator(Estimator):
+    def __init__(
+        self,
+        flops_estimator: Union[TrainerFlopsEstimator, InferenceFlopsEstimator],
+        gpu_params: Dict[str, Any],
+        gpu_name: str,
+    ):
+        self.flops_estimator = flops_estimator
+        self.gpu_params = gpu_params
+        self.gpu_name = gpu_name
+
+    def estimate(self) -> float:
+        flops = self.flops_estimator.estimate()
+        try:
+            tflops = self.gpu_params[self.gpu_name].get("tflops") * math.pow(10, 12)
+        except KeyError:
+            raise Exception(f"GPU name not found!")
+
+        runtime = flops / tflops
+        return runtime
+
+
+if __name__ == "__main__":
+    models_meta = get_model_params()
+
+    config_path = "config_files/evaluator_configs/pico_ad_gemma-2-2b-sft.yaml"
+    flops_estimator = InferenceFlopsEstimator(
+        config_path=config_path, models_meta=models_meta
+    )
+
+    gpu_params = get_gpu_params()
+    runtime_estimator = RuntimeEstimator(
+        flops_estimator=flops_estimator,
+        gpu_params=gpu_params,
+        gpu_name="NVIDIA H100 SXM5 80GB",
+    )
+
+    runtime = runtime_estimator.estimate()
+    print(runtime)

@@ -1,4 +1,5 @@
 import os
+from typing import Dict, Any
 
 import torch
 from accelerate import Accelerator, DistributedType
@@ -64,20 +65,10 @@ class SftTrainerWrapper(TrainerWrapper):
 
         tokenizer.pad_token = tokenizer.eos_token
 
-        # Set max_length to the configured value, if it exists. Otherwise, find the model max context length.
-        if self.config.trainer_args.max_length:
-            max_length = self.config.trainer_args.max_length
-        else:
-            for key in CTX_LENGTH_KEYS:
-                if key in list(hf_model_config.keys()):
-                    max_length = hf_model_config[key]
-                    break
-            else:
-                raise Exception(f"Max length can not be found in the model config!")
-
-            # Model max length can be as large as 131072. This is unnecessary while SFT. Setting a minimum of 1024,
-            # if max_length not configured by the user.
-            max_length = min(1024, max_length)
+        max_length = self.get_max_length(
+            max_length=self.config.trainer_args.max_length,
+            hf_model_config=hf_model_config,
+        )
 
         # While FT, pad to the right. See https://github.com/huggingface/transformers/issues/34842#issuecomment-2528550342.
         tokenizer.padding_side = "right"
@@ -176,6 +167,25 @@ class SftTrainerWrapper(TrainerWrapper):
         self.logger.info(
             f"Model and Tokenizer saved in the path: {self.config.trainer_args.output_dir}"
         )
+
+    @staticmethod
+    def get_max_length(
+        hf_model_config: Dict[str, Any],
+        max_length: int = None,
+    ):
+        # Set max_length to the configured value, if it exists. Otherwise, find the model max context length.
+        if not max_length:
+            for key in CTX_LENGTH_KEYS:
+                if key in list(hf_model_config.keys()):
+                    max_length = hf_model_config[key]
+                    break
+            else:
+                raise Exception(f"Max length can not be found in the model config!")
+
+            # Model max length can be as large as 131072. This is unnecessary while SFT. Setting a minimum of 1024,
+            # if max_length not configured by the user.
+            max_length = min(1024, max_length)
+        return max_length
 
     @staticmethod
     def get_trainer_data_builder(config: TrainerRunConfig) -> TrainerDataBuilder:

@@ -20,9 +20,17 @@ from auto_llm.configurator.config_generator import (
     ConfiguratorOutput,
 )
 from auto_llm.dto.builder_config import TrainerDataBuilderConfig
+from auto_llm.estimator.emission_estimator import EmissionEstimator
+from auto_llm.estimator.inference_flops_estimator import InferenceFlopsEstimator
+from auto_llm.estimator.runtime_estimator import RuntimeEstimator
+from auto_llm.estimator.trainer_flops_estimator import TrainerFlopsEstimator
+from auto_llm.estimator.utils import get_gpu_params, get_model_params
 
 OUTPUT_DIR = "/vol/auto_llm/sft_models/"
 CONFIGS_DIR = ".cache"
+
+
+GPU_PARAMS = get_gpu_params()
 
 
 def generate_configs(
@@ -124,7 +132,6 @@ def execute_configs(configurator_outputs: List[ConfiguratorOutput]):
 
 
 def change_tab(id: int):
-    print("changing tab to", id)
     return gr.Tabs(selected=id)
 
 
@@ -159,8 +166,46 @@ def display_status():
         jobs.append(job_info)
 
     df = pd.DataFrame(jobs)
-    # print(df)
     return df
+
+
+def update_estimates(config_path: str, gpu_name: str, gpu_count: int):
+    if not config_path:
+        return None, None
+
+    models_meta = get_model_params()
+
+    if "eval" in config_path:
+        flops_estimator = InferenceFlopsEstimator(
+            config_path=config_path, models_meta=models_meta
+        )
+    elif "train" in config_path:
+        flops_estimator = TrainerFlopsEstimator(
+            config_path=config_path, models_meta=models_meta
+        )
+    else:
+        return None, None
+
+    gpu_params = get_gpu_params()
+    runtime_estimator = RuntimeEstimator(
+        flops_estimator=flops_estimator,
+        gpu_params=gpu_params,
+        gpu_name=gpu_name,
+    )
+    runtime = runtime_estimator.estimate()
+
+    emission_estimator = EmissionEstimator(
+        runtime_estimator=runtime_estimator,
+        gpu_params=gpu_params,
+        gpu_name=gpu_name,
+    )
+
+    emission = emission_estimator.estimate()
+
+    runtime = f"{round(runtime, 2)} seconds"
+    emission = f"{round(emission, 2)} grams"
+
+    return runtime, emission
 
 
 with gr.Blocks() as demo:
@@ -200,6 +245,27 @@ with gr.Blocks() as demo:
                         multiselect=True,
                         allow_custom_value=True,
                         info="Pick models from the list or of your choice. You can also add models from HuggingFace. See: [here](https://huggingface.co/models).",
+                    )
+                with gr.Column():
+                    hardware = gr.Dropdown(
+                        label="Hardware",
+                        choices=list(GPU_PARAMS.keys()),
+                        value=list(GPU_PARAMS.keys())[0],
+                        multiselect=False,
+                        allow_custom_value=False,
+                        info="Select the device configuration.",
+                        interactive=True,
+                    )
+                    num_hardware = (
+                        gr.Slider(
+                            minimum=1,
+                            maximum=8,
+                            step=1,
+                            value=1,
+                            label="Number of GPUs",
+                            info="Choose between 1 and 8",
+                            interactive=True,
+                        ),
                     )
 
             with gr.Row(equal_height=True):
@@ -243,16 +309,31 @@ with gr.Blocks() as demo:
             """
             gr.Markdown(validate_desc)
             with gr.Row():
-                with gr.Column():
+                with gr.Column(scale=2):
                     config_explorer = gr.FileExplorer(
                         label="", glob="*.yaml", file_count="single", visible=False
                     )
 
-                with gr.Column():
+                with gr.Column(scale=2):
                     file_viewer = gr.Code(
-                        label="", language="yaml", visible=False, max_lines=20
+                        label="", language="yaml", visible=False, lines=30, max_lines=30
                     )
-                    save_btn = gr.Button(value="✅ Save file", visible=False)
+                    save_btn = gr.Button(value="🗂️ Save configuration", visible=False)
+
+                with gr.Column(scale=1):
+                    text = """\
+                    ### ⏳ **Estimated runtime**
+                    Runtime is estimated based on the configured device and the task complexity.
+                    """
+                    gr.Markdown(text)
+                    estimated_runtime = gr.Label(show_label=False)
+
+                    text = """\
+                    ### 🌱 **Estimated CO2 emission**
+                    CO2 emission is estimated based on the configured device, the task complexity and the region of use (assumed as Germany).
+                    """
+                    gr.Markdown(text)
+                    estimated_emission = gr.Label(show_label=False)
             with gr.Row():
                 validate_submit_btn = gr.Button("✅ Next")
 
@@ -306,8 +387,12 @@ with gr.Blocks() as demo:
         fn=view_yaml_file, inputs=[config_explorer], outputs=[file_viewer]
     ).success(
         fn=update_file_name, inputs=[config_explorer], outputs=[file_viewer]
-    ).then(
+    ).success(
         fn=update_save_btn, inputs=[], outputs=[save_btn]
+    ).success(
+        fn=update_estimates,
+        inputs=[config_explorer, hardware, num_hardware[0]],
+        outputs=[estimated_runtime, estimated_emission],
     )
 
     validate_submit_btn.click(fn=change_tab, inputs=[gr.State(2)], outputs=[tabs])

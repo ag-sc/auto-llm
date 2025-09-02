@@ -1,6 +1,6 @@
 import enum
 import os
-from typing import List, Dict, Any, Literal
+from typing import List, Dict, Any
 
 import yaml
 from pydantic import BaseModel
@@ -120,13 +120,6 @@ class TrainEvalRunConfigurator:
         )
 
         config_outputs.extend(trainer_run_config_paths)
-
-        # # build evaluator configs for pre-trained models
-        # evaluator_run_config_paths = self.get_evaluator_run_config(
-        #     model_name=model_name,
-        #     model_output_dir=None,
-        #     run_name=run_name,
-        # )
 
         return config_outputs
 
