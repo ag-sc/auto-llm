@@ -13,3 +13,4 @@ models
 wandb/*
 .cache
 *.gradio*
+*.egg*
