@@ -9,3 +9,4 @@ aenum==3.1.16
 gradio==5.43.1
 peft==0.16.0
 torch==2.7.1
+flash-attn==2.8.3

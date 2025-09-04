@@ -161,6 +161,23 @@ class SftTrainerWrapper(TrainerWrapper):
 
         trainer.train()
 
+        # from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
+        #
+        # full_state_dict_config = FullStateDictConfig(
+        #     offload_to_cpu=True, rank0_only=True
+        # )
+        # with FSDP.state_dict_type(
+        #     model, StateDictType.FULL_STATE_DICT, full_state_dict_config
+        # ):
+        #     state_dict = model.state_dict()
+        #
+        # model.save_pretrained(
+        #     save_directory=self.config.trainer_args.output_dir,
+        #     is_main_process=accelerator.is_main_process,
+        #     save_function=accelerator.save,
+        #     state_dict=state_dict,
+        # )
+
         trainer.save_model(self.config.trainer_args.output_dir)
         tokenizer.save_pretrained(self.config.trainer_args.output_dir)
 

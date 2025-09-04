@@ -42,6 +42,11 @@ class TrainerDataBuilderConfig(BaseModel):
         title="Dataset Directory",
         description="The path where the dataset dictionary lies. This contains the ``TaskData`` specific to the task you configured.",
     )
+    limit: int = Field(
+        title="Limit for dataset samples",
+        description="Number of samples to consider",
+        default=None,
+    )
     instruction_template: str = Field(
         title="Instruction Template",
         description="The template for the instruction. This is the text that goes to the ``system`` field in case of an instruction tuned model. You can also add placeholders to be replaced with input or examples. \nPossible placeholders: ``{{input}}``, ``{{examples}}``",

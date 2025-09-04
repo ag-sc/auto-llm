@@ -29,6 +29,7 @@ class SftDataBuilder(TrainerDataBuilder):
         input_template: str,
         output_template: str,
         dataset_type: SftDatasetType,
+        limit: int = None,
         instruction_input_separator: str = None,
         use_system_message: bool = None,
         parse_output_as_json: bool = False,
@@ -55,6 +56,7 @@ class SftDataBuilder(TrainerDataBuilder):
 
         self.dataset_dir = dataset_dir
         self.dataset_type = dataset_type
+        self.limit = limit
 
         self.instruction_template = instruction_template.strip()
         self.input_template = input_template.strip()
@@ -88,6 +90,10 @@ class SftDataBuilder(TrainerDataBuilder):
                 load_from_cache_file=False,
                 fn_kwargs={"few_shot_split": few_shot_split},
             )
+
+        if self.limit:
+            for key, value in ds_dict.items():
+                ds_dict[key] = value.select(range(self.limit))
 
         return ds_dict
 
