@@ -1,7 +1,7 @@
 model: hf
 tasks: ad_pico
-model_args: pretrained=/vol/auto_llm/sft_models/pico_ad_llama-32-1b_fft_non-conv_zero-shot
-wandb_args: project=llm4kmu-eval,name=pico_ad_llama-32-1b_fft_non-conv_zero-shot
+model_args: pretrained=/vol/auto_llm/sft_models/pico_ad_llama-32-1b_fft_10_epochs_non-conv_zero-shot
+wandb_args: project=llm4kmu-eval,name=pico_ad_llama-32-1b_fft_10_epochs_non-conv_zero-shot
 
 write_out: True
 log_samples: True

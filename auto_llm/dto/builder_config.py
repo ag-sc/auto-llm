@@ -42,7 +42,7 @@ class TrainerDataBuilderConfig(BaseModel):
         title="Dataset Directory",
         description="The path where the dataset dictionary lies. This contains the ``TaskData`` specific to the task you configured.",
     )
-    limit: int = Field(
+    limit: Optional[int] = Field(
         title="Limit for dataset samples",
         description="Number of samples to consider",
         default=None,
