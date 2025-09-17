@@ -38,9 +38,10 @@ $python3.10
 pip install -r requirements.txt
 ```
 
-## Trainer
+# Components
 
-
+<details>
+<summary>Trainer</summary>
 
 ### Running via terminal 
 Run: ``python -m auto_llm.trainer.run --config_path <config_path>``
@@ -49,7 +50,11 @@ Run: ``python -m auto_llm.trainer.run --config_path <config_path>``
 - Configure venv and config paths in the slurm script ``scripts/autollm_train.sbatch``.
 - Run the script: ``sbatch scripts/autollm_train.sbatch``.
 
-## Evaluator
+</details>
+
+
+<details>
+<summary>Evaluator</summary>
 
 #### Step 1. Task Definition
 - Follow this step if you want to **add a new task**. If the task already exists, continue from Step 2. Also see the guidelines [here](https://github.com/EleutherAI/lm-evaluation-harness/blob/main/docs/new_task_guide.md).
@@ -105,7 +110,7 @@ include_path: config_files/evaluator_configs/tasks
 - Running via SLURM:
   - Configure venv and config paths in the slurm script ``scripts/autollm_eval.sbatch``. 
   - Run the script: ``sbatch scripts/autollm_eval.sbatch``.
-
+</details>
 
 # Contact Us
 
