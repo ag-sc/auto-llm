@@ -3,23 +3,35 @@
 </h1>
 
 <p align="center">
-    <strong>Train and Evaluate your LMs effortlessly. 😊</strong>
+    <strong>⚙️ Train and ⚖️ Evaluate your LMs effortlessly!</strong>
 </p>
 
+<p align="center">
+| <a href="https://llm4kmu.de/"><b>Website</b></a> 
+| <a href="https://wandb.ai/llm4kmu/projects"><b>Reports</b></a> 
+| <a href="https://www.linkedin.com/company/llm4kmu/"><b>LinkedIn</b></a>
+|
+</p>
 
-**TODO:** some description of the package/project. :)
+---
+
+# About 
+**AutoLLM** supports you in finding the **right** open source model, architecture and training method for your application. Inspired by "Auto-ML" methods, **AutoLLM** automatically determines the optimal LLM configuration for a problem, train and evaluate different LLMs for your application. You can choose from different open-source models, training techniques and evaluation metrics.
+
+The platform is part of the project "LLM4KMU". 
 
 
-Find the Weights and Biases project here: [LLM4KMU W&B](https://wandb.ai/llm4kmu/projects).
+> Optimierter Einsatz von Open Source Large Language Models (LLMs) in kleinen und mittelständischen Unternehmen (KMUs). Mit Mitteln der Europäischen Union gefördert. 
+> 
+> **#efre #efrenrw #EUinmyRegion**
 
-
-## 📢 Announcements
+# 📢 Announcements
 
 ✅ Now supports ``SftTrainer`` with `conversational` and `non-conversational` datasets. Read more [here](https://huggingface.co/docs/trl/en/sft_trainer#dataset-format-support).
 
 ✅ Now supports all benchmarks in `lm-eval-harness`. Read more [here](https://github.com/EleutherAI/lm-evaluation-harness).
 
-## Setup
+# Getting Started
 
 ```shell
 $python3.10
@@ -93,3 +105,10 @@ include_path: config_files/evaluator_configs/tasks
 - Running via SLURM:
   - Configure venv and config paths in the slurm script ``scripts/autollm_eval.sbatch``. 
   - Run the script: ``sbatch scripts/autollm_eval.sbatch``.
+
+
+# Contact Us
+
+For software related issues and requests, please create an issue [here](https://github.com/ag-sc/auto-llm/issues).
+
+For other questions and collaborations, please feel free to reach out to us [here](https://llm4kmu.de/).
