@@ -10,35 +10,35 @@ from auto_llm.dto.builder_config import TrainerDataBuilderConfig
 
 class LoraConfig(BaseModel):
     r: int = Field(
-        default=16, description="Lora attention dimension (the rank).", title="r"
+        description="Lora attention dimension (the rank).", title="r", default=16
     )
     lora_alpha: int = Field(
-        default=32,
         description="The alpha parameter for Lora scaling.",
         title="lora_alpha",
+        default=32,
     )
     lora_dropout: float = Field(
-        default=0.05,
         description="The dropout probability for Lora layers.",
         title="lora_dropout",
+        default=0.05,
     )
     target_modules: Optional[Union[List[str], str]] = Field(
-        default="all-linear",
         description="The names of the modules to apply the adapter to.",
         title="target_modules",
+        default="all-linear",
     )
     task_type: Optional[TaskType] = Field(
-        default="CAUSAL_LM",
         description="The task type for which the model is being fine-tuned (e.g., causal language modeling, sequence classification). Possible values `peft.TaskType`",
         title="Task Type",
+        default="CAUSAL_LM",
     )
 
 
 class AutoLlmTrainerArgs(BaseModel):
     trainer_type: Literal["sft"] = Field(
-        default="sft",
         description="Sets the Trainer Type. Supported types: ['sft']",
         title="Trainer Type",
+        default="sft",
     )
     model_name: str = Field(
         description="Name of the model to further train",
@@ -48,17 +48,18 @@ class AutoLlmTrainerArgs(BaseModel):
     attn_implementation: str = Field(
         description="Name of the model to further train",
         title="Model Name",
-        default="eager",
         examples=["eager", "sdpa", "flash_attention_2", "flash_attention_3"],
+        default="eager",
     )
     truncation: bool = Field(
-        default=True,
         description="Sets truncation of the input sequences",
         title="Truncation",
+        default=True,
     )
     completion_only_loss: bool = Field(
         description="Sets the loss computation of the Trainer. If set to True, input tokens are ignored for loss computation. This is useful while instruction tuning the model. If set to False, all tokens in the sequences are considered for the loss computation. This is the default causal language modeling objective.",
         title="Completion Only Loss",
+        default=True,
     )
 
 
@@ -68,6 +69,7 @@ class TrainerArgs(BaseModel):
     max_length: int = Field(
         description="Maximum sequence length. This lets the tokenizer decide how long to pad and/or to truncate the input sequences",
         title="Maximum Length",
+        default=1024,
     )
     bf16: bool = Field(
         description="Whether to use bf16 16-bit (mixed) precision training instead of 32-bit training.",
@@ -77,24 +79,29 @@ class TrainerArgs(BaseModel):
     fp16: bool = Field(
         description="Whether to use fp16 16-bit (mixed) precision training instead of 32-bit training.",
         title="fp16",
+        default=False,
     )
 
     # bsz related
     per_device_train_batch_size: int = Field(
         description="Batch size per device accelerator core/CPU for training.",
         title="Per Device Train Batch Size",
+        default=4,
     )
     per_device_eval_batch_size: int = Field(
         description="Batch size per device accelerator core/CPU for evaluation.",
         title="Per Device Evaluation Batch Size",
+        default=4,
     )
     gradient_accumulation_steps: int = Field(
         description="Batch size per device accelerator core/CPU for evaluation.",
         title="Per Device Evaluation Batch Size",
+        default=4,
     )
     auto_find_batch_size: bool = Field(
         description="Batch size per device accelerator core/CPU for evaluation.",
         title="Per Device Evaluation Batch Size",
+        default=True,
     )
 
     # training related
@@ -110,10 +117,12 @@ class TrainerArgs(BaseModel):
     gradient_checkpointing: bool = Field(
         description="If True, use gradient checkpointing to save memory at the expense of slower backward pass.",
         title="Gradient Checkpointing",
+        default=True,
     )
     num_train_epochs: int = Field(
         description="Total number of training epochs to perform",
         title="Number of Training Epochs",
+        default=5,
     )
     learning_rate: float = Field(
         description="The initial learning rate for the optimizer.",
@@ -133,7 +142,7 @@ class TrainerArgs(BaseModel):
     warmup_steps: int = Field(
         description="Number of steps used for a linear warmup from 0 to `learning_rate`.",
         title="Warmup Steps",
-        default=0,
+        default=10,
     )
 
     # tracking/logging related
@@ -204,7 +213,8 @@ class TrainerRunConfig(BaseModel):
         description="Configuration for building trainer data",
         title="Trainer Data Builder Config",
     )
-    peft_config: LoraConfig = Field(
+    peft_config: Optional[LoraConfig] = Field(
         description="Configuration for PEFT technique",
         title="PEFT Config",
+        default=None,
     )

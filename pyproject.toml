@@ -1,0 +1,12 @@
+[project]
+name = "auto_llm"
+version = "0.0.1"
+dynamic = ["dependencies"]
+requires-python = ">=3.10"
+description = "AutoLLM"
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+
+[tool.setuptools.packages]
+find = {include = ["auto_llm", "auto_llm.*"]}

@@ -27,7 +27,7 @@ with gr.Blocks() as demo:
     with gr.Row():
         with gr.Column():
             gr.Image(
-                "auto_llm/ui/images/uni-bielefeld-logo.png",
+                value="auto_llm/ui/images/uni-bielefeld-logo.png",
                 show_label=False,
                 container=False,
                 # height=100,

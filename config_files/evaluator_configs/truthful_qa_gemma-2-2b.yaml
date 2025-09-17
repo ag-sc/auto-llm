@@ -1,0 +1,4 @@
+model: hf
+tasks: truthfulqa_gen
+model_args: pretrained=google/gemma-2-2b
+wandb_args: project=llm4kmu-eval,name=test-run
