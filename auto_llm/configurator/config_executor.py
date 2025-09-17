@@ -7,9 +7,10 @@ from auto_llm.configurator.config_generator import (
     Priority,
     ConfigMode,
 )
-
-EVALUATOR_RUN_SCRIPT = "scripts/autollm_eval.sbatch"
-TRAINER_RUN_SCRIPT = "scripts/autollm_train.sbatch"
+from auto_llm.registry.configurator_registry import (
+    EVALUATOR_RUN_SCRIPT,
+    TRAINER_RUN_SCRIPT,
+)
 
 
 class ConfigExecutor:

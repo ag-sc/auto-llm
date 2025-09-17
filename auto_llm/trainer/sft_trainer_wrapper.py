@@ -17,19 +17,11 @@ from auto_llm.builder.trainer_data_builder.trainer_data_builder import (
 from auto_llm.dto.builder_config import SftDatasetType, DatasetSplit
 from auto_llm.dto.trainer_run_config import TrainerRunConfig
 from auto_llm.pre_processor.sft_pre_procesor import SftPreProcessor
+from auto_llm.registry.estimator_registry import CTX_LENGTH_KEYS
+from auto_llm.registry.tracker_registry import WANDB_TRAIN_PROJECT
 from auto_llm.trainer.trainer_wrapper import TrainerWrapper
 
-WANDB_TRAIN_PROJECT = "llm4kmu-train"
-
 accelerator = Accelerator()
-
-# possible keys where the max context length of a model is set in its HF configuration
-CTX_LENGTH_KEYS = [
-    "max_position_embeddings",
-    "n_positions",
-    "seq_length",
-    "max_seq_len",
-]
 
 
 class SftTrainerWrapper(TrainerWrapper):

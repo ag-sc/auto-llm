@@ -8,10 +8,9 @@ import yaml
 
 from auto_llm.dto.example_dtos import EXAMPLE_TRAINER_RUN_CONFIG
 from auto_llm.dto.trainer_run_config import TrainerRunConfig
+from auto_llm.registry.configurator_registry import TRAINER_RUN_SCRIPT
 
 CONFIG_ROOT_PATH = "/vol/auto_llm/config_files/trainer_configs"
-WANDB_TRAIN_REPORT_URL = "https://api.wandb.ai/links/llm4kmu/v9qfir8d"
-TRAIN_SBATCH_SCRIPT = "scripts/autollm_train.sbatch"
 
 
 def save_trainer_run_config(
@@ -44,7 +43,7 @@ def start_trainer_run(config_path: str, venv_path: str, env_path: str):
     info = subprocess.check_output(
         [
             "sbatch",
-            TRAIN_SBATCH_SCRIPT,
+            TRAINER_RUN_SCRIPT,
             config_path,
             venv_path,
             env_path,

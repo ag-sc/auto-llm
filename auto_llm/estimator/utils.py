@@ -3,16 +3,11 @@ from typing import List, Dict, Any
 
 from transformers import AutoModel, AutoConfig
 
-CTX_LENGTH_KEYS = [
-    "max_position_embeddings",
-    "n_positions",
-    "seq_length",
-    "max_seq_len",
-]
-
-
-MODEL_PARAMS_CACHE_PATH = "/vol/auto_llm/stats/model_params.json"
-GPU_PARAMS_CACHE_PATH = "/vol/auto_llm/stats/gpu_params.json"
+from auto_llm.registry.estimator_registry import (
+    CTX_LENGTH_KEYS,
+    MODEL_PARAMS_CACHE_PATH,
+    GPU_PARAMS_CACHE_PATH,
+)
 
 
 def cache_model_params(model_name: str):

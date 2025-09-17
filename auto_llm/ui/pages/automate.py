@@ -7,29 +7,31 @@ import gradio as gr
 import pandas as pd
 import yaml
 
-from auto_llm.builder.task_data_builder.registry import (
+from auto_llm.registry.configurator_registry import MODEL_NAMES, TASKS
+from auto_llm.registry.prompt_templates_registry import (
     INSTRUCTION_TEMPLATES_MAPPING,
     INPUT_TEMPLATES_MAPPING,
     OUTPUT_TEMPLATES_MAPPING,
 )
 from auto_llm.configurator.config_executor import ConfigExecutor
 from auto_llm.configurator.config_generator import (
-    MODEL_NAMES,
     TrainEvalRunConfigurator,
-    TASKS,
     ConfiguratorOutput,
 )
+
 from auto_llm.dto.builder_config import TrainerDataBuilderConfig
 from auto_llm.estimator.emission_estimator import EmissionEstimator
 from auto_llm.estimator.inference_flops_estimator import InferenceFlopsEstimator
 from auto_llm.estimator.runtime_estimator import RuntimeEstimator
 from auto_llm.estimator.trainer_flops_estimator import TrainerFlopsEstimator
 from auto_llm.estimator.utils import get_gpu_params, get_model_params
+from auto_llm.registry.tracker_registry import (
+    WANDB_TRAIN_REPORT_URL,
+    WANDB_EVAL_REPORT_URL,
+)
 
 OUTPUT_DIR = "/vol/auto_llm/sft_models/"
 CONFIGS_DIR = ".cache"
-WANDB_TRAIN_REPORT_URL = "https://api.wandb.ai/links/llm4kmu/v9qfir8d"
-WANDB_EVAL_REPORT_URL = "https://api.wandb.ai/links/llm4kmu/rm3d6va1"
 
 GPU_PARAMS = get_gpu_params()
 

@@ -1,11 +1,12 @@
 from typing import Any, Dict
 
-import yaml
 from lm_eval.__main__ import setup_parser
 from lm_eval.tasks import TaskManager
 
+from auto_llm.registry.evaluator_registry import LM_EVAL_HARNESS_CUSTOM_TASKS_PATH
+
 # TODO: ideally this should come from the eval config file. But causes a lots of delay.
-LM_EVAL_TASK_MANAGER = TaskManager(include_path="config_files/evaluator_configs/tasks")
+LM_EVAL_TASK_MANAGER = TaskManager(include_path=LM_EVAL_HARNESS_CUSTOM_TASKS_PATH)
 
 
 def parse_lm_eval_config(config: Dict[str, Any]):
@@ -24,12 +25,3 @@ def get_lm_eval_tasks(lm_eval_args, task_manager: TaskManager = LM_EVAL_TASK_MAN
     tasks = task_manager.load_task_or_group(task_list=task_list)
 
     return tasks
-
-
-if __name__ == "__main__":
-    config_path = "config_files/evaluator_configs/hellaswag_truthful_qa.yaml"
-    with open(config_path, "r") as f:
-        config = yaml.safe_load(f)
-
-    lm_eval_args = parse_lm_eval_config(config)
-    ...

@@ -33,10 +33,6 @@ class ConfiguratorOutput(BaseModel):
     priority: Priority
 
 
-MODEL_NAMES = ["google/gemma-2-2b", "google/gemma-2-2b-it"]
-TASKS = ["pico"]
-
-
 class TrainEvalRunConfigurator:
     def __init__(
         self,
