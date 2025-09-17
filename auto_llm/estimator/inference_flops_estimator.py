@@ -3,7 +3,6 @@ from typing import Dict, Any
 import yaml
 
 from auto_llm.estimator.estimator import Estimator
-from auto_llm.estimator.utils import get_model_params
 from auto_llm.evaluator.utils import parse_lm_eval_config, get_lm_eval_tasks
 
 
@@ -19,6 +18,9 @@ class InferenceFlopsEstimator(Estimator):
         # 6 * N * D
         # N = num params [get this from model config]
         # D = num samples [get this from ds config] * avg tokens per sample [get this from model config - max length] * num epochs
+
+        # TODO: this fails when estimating inference FLOPs for full weights fine tuned models. Their pretrained field
+        #  contains the FT model's name. This won't match any key in model keys.
         model_name = [
             x.replace("pretrained=", "")
             for x in self.config.model_args.split(",")
@@ -31,6 +33,7 @@ class InferenceFlopsEstimator(Estimator):
         for key, value in tasks.items():
             num_samples += value.eval_docs.num_rows
 
+        # TODO: is this how the argument is passed or used in lm-eval-harness?
         avg_tokens_per_sample = min(
             1024, self.models_meta[model_name].get("max_length")
         )

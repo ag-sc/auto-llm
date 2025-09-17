@@ -3,9 +3,7 @@ from typing import Dict
 from typing_extensions import Any
 
 from auto_llm.estimator.estimator import Estimator
-from auto_llm.estimator.inference_flops_estimator import InferenceFlopsEstimator
 from auto_llm.estimator.runtime_estimator import RuntimeEstimator
-from auto_llm.estimator.utils import get_model_params, get_gpu_params
 
 
 class EmissionEstimator(Estimator):
@@ -37,6 +35,7 @@ class EmissionEstimator(Estimator):
 
         energy_consumption_kWh = tdp * runtime_in_h
 
+        # TODO: take region as an argument and compute carbon_intensity_g_per_kWh based on this argument
         # Source: https://www.nowtricity.com/country/germany/
         carbon_intensity_g_per_kWh = 321
 

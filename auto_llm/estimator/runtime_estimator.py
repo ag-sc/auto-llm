@@ -4,7 +4,6 @@ from typing import Union, Dict, Any
 from auto_llm.estimator.estimator import Estimator
 from auto_llm.estimator.inference_flops_estimator import InferenceFlopsEstimator
 from auto_llm.estimator.trainer_flops_estimator import TrainerFlopsEstimator
-from auto_llm.estimator.utils import get_model_params, get_gpu_params
 
 
 class RuntimeEstimator(Estimator):

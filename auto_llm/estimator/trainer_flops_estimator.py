@@ -6,7 +6,6 @@ from datasets import DatasetDict
 from auto_llm.dto.builder_config import DatasetSplit
 from auto_llm.dto.trainer_run_config import TrainerRunConfig
 from auto_llm.estimator.estimator import Estimator
-from auto_llm.estimator.utils import get_model_params
 
 
 class TrainerFlopsEstimator(Estimator):
