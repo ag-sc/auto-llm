@@ -27,22 +27,3 @@ class RuntimeEstimator(Estimator):
 
         runtime = flops / tflops
         return runtime
-
-
-if __name__ == "__main__":
-    models_meta = get_model_params()
-
-    config_path = "config_files/evaluator_configs/pico_ad_gemma-2-2b-sft.yaml"
-    flops_estimator = InferenceFlopsEstimator(
-        config_path=config_path, models_meta=models_meta
-    )
-
-    gpu_params = get_gpu_params()
-    runtime_estimator = RuntimeEstimator(
-        flops_estimator=flops_estimator,
-        gpu_params=gpu_params,
-        gpu_name="NVIDIA H100 SXM5 80GB",
-    )
-
-    runtime = runtime_estimator.estimate()
-    print(runtime)

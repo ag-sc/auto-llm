@@ -43,26 +43,3 @@ class EmissionEstimator(Estimator):
         co2_emissions_g = energy_consumption_kWh * carbon_intensity_g_per_kWh
 
         return co2_emissions_g
-
-
-if __name__ == "__main__":
-    models_meta = get_model_params()
-
-    config_path = "config_files/evaluator_configs/pico_ad_gemma-2-2b-sft.yaml"
-    flops_estimator = InferenceFlopsEstimator(
-        config_path=config_path, models_meta=models_meta
-    )
-
-    gpu_params = get_gpu_params()
-    runtime_estimator = RuntimeEstimator(
-        flops_estimator=flops_estimator,
-        gpu_params=gpu_params,
-        gpu_name="NVIDIA H100 SXM5 80GB",
-    )
-
-    emission_estimator = EmissionEstimator(
-        runtime_estimator=runtime_estimator,
-        gpu_params=gpu_params,
-        gpu_name="NVIDIA H100 SXM5 80GB",
-    )
-    print(emission_estimator.estimate())

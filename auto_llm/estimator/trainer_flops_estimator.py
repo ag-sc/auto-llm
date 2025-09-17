@@ -54,19 +54,3 @@ class TrainerFlopsEstimator(Estimator):
             N = 0.5 / 100 * N
 
         return int(N)
-
-
-if __name__ == "__main__":
-    models_meta = get_model_params(
-        model_names=[
-            "meta-llama/Llama-3.2-1B",
-            "google/gemma-2-2b-it",
-            "google/gemma-2-2b",
-        ]
-    )
-    config_path = (
-        "config_files/trainer_configs/pico/ad/pico_ad_gemma-2-2b-it_conv_few-shot.yaml"
-    )
-    estimator = TrainerFlopsEstimator(config_path=config_path, models_meta=models_meta)
-    flops = estimator.estimate()
-    print(flops)

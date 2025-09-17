@@ -47,14 +47,3 @@ class InferenceFlopsEstimator(Estimator):
         N = self.models_meta[model_name].get("num_params")
 
         return int(N)
-
-
-if __name__ == "__main__":
-    models_meta = get_model_params()
-
-    config_path = "/homes/vsudhi/auto-llm/.cache/2025-09-02_16-58-42_configs/evaluator_run_configs/fft-pico_ad_gemma-2-2b-it_prompt_completions_eval_run_config.yaml"
-    estimator = InferenceFlopsEstimator(
-        config_path=config_path, models_meta=models_meta
-    )
-    flops = estimator.estimate()
-    print(flops)
