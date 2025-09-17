@@ -28,7 +28,8 @@ from auto_llm.estimator.utils import get_gpu_params, get_model_params
 
 OUTPUT_DIR = "/vol/auto_llm/sft_models/"
 CONFIGS_DIR = ".cache"
-
+WANDB_TRAIN_REPORT_URL = "https://api.wandb.ai/links/llm4kmu/v9qfir8d"
+WANDB_EVAL_REPORT_URL = "https://api.wandb.ai/links/llm4kmu/rm3d6va1"
 
 GPU_PARAMS = get_gpu_params()
 
@@ -153,12 +154,17 @@ def display_status():
     for job in data["jobs"]:
         if not username in job.get("current_working_directory"):
             continue
+
+        if job.get("job_state") == "CANCELLED":
+            continue
+
+        if "language_model" in job.get("name"):
+            continue
+
         job_info = {
             "Job ID": job.get("job_id"),
             "Job Name": job.get("name"),
             "State": job.get("job_state"),
-            "Reason": job.get("reason"),
-            "Time": job.get("time"),
             "Nodes": job.get("nodes"),
             "Partition": job.get("partition"),
             "Dependency": job.get("dependency"),
@@ -206,6 +212,11 @@ def update_estimates(config_path: str, gpu_name: str, gpu_count: int):
     emission = f"{round(emission, 2)} grams"
 
     return runtime, emission
+
+
+def wandb_report(url):
+    iframe = f'<iframe src={url} style="border:none;height:1024px;width:100%">'
+    return gr.HTML(iframe)
 
 
 with gr.Blocks() as demo:
@@ -345,9 +356,18 @@ with gr.Blocks() as demo:
             status_text = gr.Dataframe(
                 label="Job Status",
                 every=1,
-                value=display_status,
-                show_fullscreen_button=True,  # noqa
+                value=display_status,  # noqa
+                show_fullscreen_button=True,
+                wrap=True,
+                # column_widths=["1px", "1px", "1px", "1px", "1px", "1px"],
             )
+
+        with gr.TabItem("Monitor", id=3):
+            with gr.Accordion("Trainer Runs", open=False):
+                wandb_report(WANDB_TRAIN_REPORT_URL)
+
+            with gr.Accordion("Evaluator Runs", open=False):
+                wandb_report(WANDB_EVAL_REPORT_URL)
 
     task.input(
         fn=update_instruction_textbox,

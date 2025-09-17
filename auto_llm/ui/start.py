@@ -1,6 +1,6 @@
 import gradio as gr
 
-from auto_llm.ui.pages import home, automate, train, eval, playground, data
+from auto_llm.ui.pages import home, automate, train, eval, playground, define
 
 with gr.Blocks(
     title="AutoLLM",
@@ -9,8 +9,8 @@ with gr.Blocks(
     home.demo.render()
 
 # add other pages
-with demo.route(name="📚 Data", path="/data"):
-    data.demo.render()
+with demo.route(name="📚 Define", path="/define"):
+    define.demo.render()
 with demo.route(name="📁 Automate", path="/automate"):
     automate.demo.render()
 with demo.route(name="⚙️ Train", path="/train"):
