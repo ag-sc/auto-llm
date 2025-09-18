@@ -21,4 +21,4 @@ with demo.route(name="▶️ Playground", path="/playground"):
     playground.demo.render()
 
 if __name__ == "__main__":
-    demo.launch()
+    demo.launch(auth=[("user", "test")], auth_message="Login")
