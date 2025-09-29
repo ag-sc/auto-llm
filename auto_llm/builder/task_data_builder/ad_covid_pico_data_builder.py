@@ -16,15 +16,7 @@ class AdCovidPicoDataBuilder(TaskDataBuilder):
         self.raw_data_path = raw_data_path
 
     def build(self) -> DatasetDict:
-        train_samples = {
-            TaskDatasetFeatures.INPUT_TEXT: [],
-            TaskDatasetFeatures.OUTPUT_TEXT: [],
-        }
-        dev_samples = {
-            TaskDatasetFeatures.INPUT_TEXT: [],
-            TaskDatasetFeatures.OUTPUT_TEXT: [],
-        }
-        test_samples = {
+        all_samples = {
             TaskDatasetFeatures.INPUT_TEXT: [],
             TaskDatasetFeatures.OUTPUT_TEXT: [],
         }
@@ -39,27 +31,16 @@ class AdCovidPicoDataBuilder(TaskDataBuilder):
                         continue
                     self.logger.info(f"Checking {data_path}")
                     samples = self.construct_pico_data(data_path=data_path)
-                    if "train" in file:
-                        train_samples[TaskDatasetFeatures.INPUT_TEXT].extend(
-                            samples[TaskDatasetFeatures.INPUT_TEXT]
-                        )
-                        train_samples[TaskDatasetFeatures.OUTPUT_TEXT].extend(
-                            samples[TaskDatasetFeatures.OUTPUT_TEXT]
-                        )
-                    elif "dev" in file:
-                        dev_samples[TaskDatasetFeatures.INPUT_TEXT].extend(
-                            samples[TaskDatasetFeatures.INPUT_TEXT]
-                        )
-                        dev_samples[TaskDatasetFeatures.OUTPUT_TEXT].extend(
-                            samples[TaskDatasetFeatures.OUTPUT_TEXT]
-                        )
-                    elif "test" in file:
-                        test_samples[TaskDatasetFeatures.INPUT_TEXT].extend(
-                            samples[TaskDatasetFeatures.INPUT_TEXT]
-                        )
-                        test_samples[TaskDatasetFeatures.OUTPUT_TEXT].extend(
-                            samples[TaskDatasetFeatures.OUTPUT_TEXT]
-                        )
+
+                    for inp_text, out_text in zip(
+                        samples[TaskDatasetFeatures.INPUT_TEXT],
+                        samples[TaskDatasetFeatures.OUTPUT_TEXT],
+                    ):
+                        if inp_text in all_samples[TaskDatasetFeatures.INPUT_TEXT]:
+                            continue
+
+                        all_samples[TaskDatasetFeatures.INPUT_TEXT].append(inp_text)
+                        all_samples[TaskDatasetFeatures.OUTPUT_TEXT].append(out_text)
 
         # features define the schema of the dataset. If not passed, the order of PICO keys would change.
         features = Features(
@@ -81,15 +62,18 @@ class AdCovidPicoDataBuilder(TaskDataBuilder):
                 },
             }
         )
-        train_ds = Dataset.from_dict(train_samples, features=features)
-        dev_ds = Dataset.from_dict(dev_samples, features=features)
-        test_ds = Dataset.from_dict(test_samples, features=features)
+
+        ds = Dataset.from_dict(all_samples, features=features)
+        ds_dict_sp_one = ds.train_test_split(test_size=0.1, shuffle=True)
+        ds_dict_sp_two = ds_dict_sp_one["test"].train_test_split(
+            test_size=0.5, shuffle=True
+        )
 
         ds_dict = DatasetDict(
             {
-                DatasetSplit.TRAIN: train_ds,
-                DatasetSplit.VALIDATION: dev_ds,
-                DatasetSplit.TEST: test_ds,
+                DatasetSplit.TRAIN: ds_dict_sp_one["train"],
+                DatasetSplit.VALIDATION: ds_dict_sp_two["train"],
+                DatasetSplit.TEST: ds_dict_sp_two["test"],
             }
         )
         return ds_dict
@@ -111,9 +95,15 @@ class AdCovidPicoDataBuilder(TaskDataBuilder):
         entities = []
         for line in data:
             if "-DOCSTART-" in line:
+                inp_text = " ".join(texts)
+
                 if not len(texts) > 1:
                     continue
-                samples[TaskDatasetFeatures.INPUT_TEXT].append(" ".join(texts))
+
+                if inp_text in samples[TaskDatasetFeatures.INPUT_TEXT]:
+                    continue
+
+                samples[TaskDatasetFeatures.INPUT_TEXT].append(inp_text)
                 # samples["texts"].append(texts)
                 # samples[TaskDatasetFeatures.OUTPUT_TEXT].append(entities)
 

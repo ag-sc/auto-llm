@@ -5,6 +5,7 @@ from auto_llm.builder.task_data_builder.ad_covid_pico_data_builder import (
 )
 from auto_llm.builder.task_data_builder.ebm_pico_data_builder import EbmPicoDataBuilder
 from auto_llm.dto.builder_config import DatasetSplit, TaskDatasetFeatures
+from auto_llm.builder.utils import push_dataset_to_hub
 
 
 def _generic_task_data_builder_tests(ds_dict: DatasetDict):
@@ -25,6 +26,25 @@ def _generic_task_data_builder_tests(ds_dict: DatasetDict):
         TaskDatasetFeatures.OUTPUT_TEXT in ds_dict[DatasetSplit.VALIDATION].column_names
     )
 
+    # check for data contamination. All splits should be unique - they should not have duplicate items.
+    all_samples = []
+    all_samples.extend(ds_dict[DatasetSplit.TRAIN][TaskDatasetFeatures.INPUT_TEXT])
+    all_samples.extend(ds_dict[DatasetSplit.VALIDATION][TaskDatasetFeatures.INPUT_TEXT])
+
+    assert len(all_samples) == len(set(all_samples))
+
+    all_samples = []
+    all_samples.extend(ds_dict[DatasetSplit.TRAIN][TaskDatasetFeatures.INPUT_TEXT])
+    all_samples.extend(ds_dict[DatasetSplit.TEST][TaskDatasetFeatures.INPUT_TEXT])
+
+    assert len(all_samples) == len(set(all_samples))
+
+    all_samples = []
+    all_samples.extend(ds_dict[DatasetSplit.VALIDATION][TaskDatasetFeatures.INPUT_TEXT])
+    all_samples.extend(ds_dict[DatasetSplit.TEST][TaskDatasetFeatures.INPUT_TEXT])
+
+    assert len(all_samples) == len(set(all_samples))
+
 
 def test_ad_pico_data_builder():
     raw_data_path = "/vol/auto_llm/raw_datasets"
@@ -34,7 +54,7 @@ def test_ad_pico_data_builder():
     _generic_task_data_builder_tests(ds_dict=ds_dict)
 
     out_path = "/vol/auto_llm/processed_datasets/pico/AD"
-    # builder.save(ds_dict=ds_dict, path=out_path)
+    builder.save(ds_dict=ds_dict, path=out_path)
 
 
 def test_covid_19_pico_data_builder():
@@ -45,7 +65,7 @@ def test_covid_19_pico_data_builder():
     _generic_task_data_builder_tests(ds_dict=ds_dict)
 
     out_path = "/vol/auto_llm/processed_datasets/pico/Covid19"
-    # builder.save(ds_dict=ds_dict, path=out_path)
+    builder.save(ds_dict=ds_dict, path=out_path)
 
 
 def test_ebm_pico_data_builder():
@@ -68,3 +88,13 @@ def test_ebm_pico_data_builder_wo_duplciates():
 
     output_dir = "/vol/auto_llm/processed_datasets/pico/EBM-NoDuplicates"
     # builder.save(ds_dict=ds_dict, path=output_dir)
+
+
+def test_push_dataset_to_hub():
+    dataset_dir = "/vol/auto_llm/processed_datasets/pico/AD"
+    dataset_name = "pico_ad"
+    push_dataset_to_hub(dataset_dir=dataset_dir, dataset_name=dataset_name)
+
+    dataset_dir = "/vol/auto_llm/processed_datasets/pico/Covid19"
+    dataset_name = "pico_covid19"
+    push_dataset_to_hub(dataset_dir=dataset_dir, dataset_name=dataset_name)
