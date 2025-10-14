@@ -1,8 +1,10 @@
 import json
+import os
 import random
 from typing import Dict, Any, List
 
-from datasets import DatasetDict, Dataset, load_from_disk
+import warnings
+from datasets import DatasetDict, Dataset, load_from_disk, load_dataset
 
 from auto_llm.builder.trainer_data_builder.trainer_data_builder import (
     TrainerDataBuilder,
@@ -73,9 +75,14 @@ class SftDataBuilder(TrainerDataBuilder):
         self.sanity_check()
 
     def build(self) -> DatasetDict:
-        # TODO: refactor. there could be many other options to consider
-        #   local or remote with all the above options
-        ds_dict = load_from_disk(self.dataset_dir)
+        if os.path.isdir(self.dataset_dir):
+            ds_dict = load_from_disk(self.dataset_dir)
+        else:
+            ds_dict = load_dataset(self.dataset_dir)
+            assert isinstance(
+                ds_dict, DatasetDict
+            ), "Please check the dataset_dir provided. It should yield a DatasetDict object."
+
         ds_dict = ds_dict.map(
             function=self.construct_samples,
             batched=True,
@@ -92,6 +99,9 @@ class SftDataBuilder(TrainerDataBuilder):
             )
 
         if self.limit:
+            print(
+                f"***WARNING***You have set a limit of `{self.limit}`. This is intended only for debugging. Please remove this for real trainer runs."
+            )
             for key, value in ds_dict.items():
                 ds_dict[key] = value.select(range(self.limit))
 
@@ -138,6 +148,12 @@ class PromptCompletionsSftDataBuilder(SftDataBuilder):
     """
 
     def sanity_check(self):
+        if PromptPlaceholders.EXAMPLES_TEXT in self.input_template:
+            if not self.num_few_shot_examples or self.num_few_shot_examples == 0:
+                print(
+                    f"***WARNING*** You have added the examples placeholder `{PromptPlaceholders.EXAMPLES_TEXT}` but did not pass a valid value for num_few_shot_examples."
+                )
+
         if self.num_few_shot_examples and self.num_few_shot_examples >= 1:
             assert self.few_shot_examples_split is not None
 
@@ -183,7 +199,7 @@ class PromptCompletionsSftDataBuilder(SftDataBuilder):
             examples = [example.replace("{{examples}}", "") for example in examples]
             examples_str = ""
             for idx, example in enumerate(examples):
-                examples_str += f"Example {idx+1}:\n{example}\n"
+                examples_str += f"\nExample {idx+1}:\n{example.strip()}\n"
             prompts.append(prompt.replace("{{examples}}", examples_str))
 
         ds_items[PromptCompletionDatasetFeatures.PROMPT] = prompts
@@ -197,6 +213,12 @@ class ConversationalSftDataBuilder(SftDataBuilder):
     """
 
     def sanity_check(self):
+        if PromptPlaceholders.EXAMPLES_TEXT in self.input_template:
+            if not self.num_few_shot_examples or self.num_few_shot_examples == 0:
+                raise warnings.warn(
+                    f"You have added the examples placeholder but did not pass a valid value for num_few_shot_examples."
+                )
+
         if self.num_few_shot_examples and self.num_few_shot_examples >= 1:
             assert self.few_shot_examples_split is not None
 

@@ -55,7 +55,8 @@ class SftPreProcessor(PreProcessor):
         if truncation:
             encodings = self.truncate(encodings=encodings, max_length=max_length)
 
-        # TODO: instead of padding always up until the max length, look for max length in the corresponding batch and pad accordingly.
+        # TODO: instead of padding always up until the max length, look for max length in the corresponding batch and
+        #  pad accordingly.
         encodings = {
             "input_ids": self.pad(
                 encodings=encodings["input_ids"],
@@ -159,10 +160,16 @@ class SftPreProcessor(PreProcessor):
         return input_sequences, full_sequences
 
     def collect_labels(self, full_sequences_encodings, input_sequences_encodings):
-        labels = copy.deepcopy(full_sequences_encodings["input_ids"])
+        labels = copy.deepcopy(full_sequences_encodings["input_ids"])  # List[List[int]]
         if self.completion_only_loss:
             for labels_list, length in zip(labels, input_sequences_encodings["length"]):
                 labels_list[:length] = [-100] * length
+
+                # throw a warning if all labels are -100. This means there is nothing to train upon.
+                if list(set(labels_list)):
+                    print(
+                        "***WARNING*** All labels are masked! Please check the input."
+                    )
 
         return labels
 
@@ -217,7 +224,8 @@ class SftPreProcessor(PreProcessor):
         # B. Conversational DS         + Tokenizer w/o Chat Template   --> Exception - tokenizing system/user tokens differently
         # C. Non-Conversational DS     + Tokenizer w/ Chat Template    --> Warning
         # D. Non-Conversational DS     + Tokenizer w/o Chat Template   --> Match
-        # TODO: mostly non-instruct models do not contain a chat template. However, this is not always the case. Any better way to check if or if not chat model?
+        # TODO: mostly non-instruct models do not contain a chat template. However, this is not always the case.
+        #  Any better way to check if or if not chat model?
 
         if self.tokenizer.chat_template:
             if not is_conversational:

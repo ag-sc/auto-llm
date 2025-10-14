@@ -4,6 +4,7 @@ from auto_llm.builder.task_data_builder.ad_covid_pico_data_builder import (
     AdCovidPicoDataBuilder,
 )
 from auto_llm.builder.task_data_builder.ebm_pico_data_builder import EbmPicoDataBuilder
+from auto_llm.builder.task_data_builder.pubmedqa_data_builder import PubMedQADataBuilder
 from auto_llm.dto.builder_config import DatasetSplit, TaskDatasetFeatures
 from auto_llm.builder.utils import push_dataset_to_hub
 
@@ -31,13 +32,17 @@ def _generic_task_data_builder_tests(ds_dict: DatasetDict):
     all_samples.extend(ds_dict[DatasetSplit.TRAIN][TaskDatasetFeatures.INPUT_TEXT])
     all_samples.extend(ds_dict[DatasetSplit.VALIDATION][TaskDatasetFeatures.INPUT_TEXT])
 
-    assert len(all_samples) == len(set(all_samples))
+    assert len(all_samples) == len(
+        set(all_samples)
+    ), "Train and Validation splits should be unique - they should not have duplicate items."
 
     all_samples = []
     all_samples.extend(ds_dict[DatasetSplit.TRAIN][TaskDatasetFeatures.INPUT_TEXT])
     all_samples.extend(ds_dict[DatasetSplit.TEST][TaskDatasetFeatures.INPUT_TEXT])
 
-    assert len(all_samples) == len(set(all_samples))
+    assert len(all_samples) == len(
+        set(all_samples)
+    ), "Train and Test splits should be unique - they should not have duplicate items."
 
     all_samples = []
     all_samples.extend(ds_dict[DatasetSplit.VALIDATION][TaskDatasetFeatures.INPUT_TEXT])
@@ -79,7 +84,7 @@ def test_ebm_pico_data_builder():
     # builder.save(ds_dict=ds_dict, path=output_dir)
 
 
-def test_ebm_pico_data_builder_wo_duplciates():
+def test_ebm_pico_data_builder_wo_duplicates():
     # pip install datasets==3.6.0
     builder = EbmPicoDataBuilder(keep_duplicate_entities=False)
     ds_dict = builder.build()
@@ -90,11 +95,25 @@ def test_ebm_pico_data_builder_wo_duplciates():
     # builder.save(ds_dict=ds_dict, path=output_dir)
 
 
-def test_push_dataset_to_hub():
-    dataset_dir = "/vol/auto_llm/processed_datasets/pico/AD"
-    dataset_name = "pico_ad"
-    push_dataset_to_hub(dataset_dir=dataset_dir, dataset_name=dataset_name)
+def test_pubmedqa_data_builder():
+    builder = PubMedQADataBuilder()
+    ds_dict = builder.build()
 
-    dataset_dir = "/vol/auto_llm/processed_datasets/pico/Covid19"
-    dataset_name = "pico_covid19"
+    _generic_task_data_builder_tests(ds_dict=ds_dict)
+
+    output_dir = "/vol/auto_llm/processed_datasets/qa/pubmedqa"
+    builder.save(ds_dict=ds_dict, path=output_dir)
+
+
+def test_push_dataset_to_hub():
+    # dataset_dir = "/vol/auto_llm/processed_datasets/pico/AD"
+    # dataset_name = "pico_ad"
+    # push_dataset_to_hub(dataset_dir=dataset_dir, dataset_name=dataset_name)
+    #
+    # dataset_dir = "/vol/auto_llm/processed_datasets/pico/Covid19"
+    # dataset_name = "pico_covid19"
+    # push_dataset_to_hub(dataset_dir=dataset_dir, dataset_name=dataset_name)
+
+    dataset_dir = "/vol/auto_llm/processed_datasets/qa/pubmedqa"
+    dataset_name = "qa_pubmedqa"
     push_dataset_to_hub(dataset_dir=dataset_dir, dataset_name=dataset_name)

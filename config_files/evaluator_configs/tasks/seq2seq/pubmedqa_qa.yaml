@@ -1,0 +1,37 @@
+tag:
+  - seq2seq
+
+task: pubmedqa_qa
+
+dataset_path: arrow
+dataset_kwargs:
+  data_files:
+    test: /vol/auto_llm/processed_datasets/qa/pubmedqa/test/data-00000-of-00001.arrow
+test_split: test
+
+doc_to_text: |
+  Answer the following question based on the given context.
+
+  {{input_text}}
+
+  Answer:
+doc_to_target: "{{output_text}}"
+
+process_results: !function utils.process_results
+
+metric_list:
+  - metric: bleu
+    aggregation: mean
+    higher_is_better: true
+  - metric: rouge1
+    aggregation: mean
+    higher_is_better: true
+  - metric: rouge2
+    aggregation: mean
+    higher_is_better: true
+  - metric: rougeL
+    aggregation: mean
+    higher_is_better: true
+
+metadata:
+  version: 1.0

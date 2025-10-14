@@ -13,6 +13,9 @@ from auto_llm.registry.configurator_registry import (
 )
 
 
+# TODO: Implement python-based config executor
+
+
 class ConfigExecutor:
     def __init__(self, configurator_outputs: List[ConfiguratorOutput]):
         self.configurator_outputs = configurator_outputs
