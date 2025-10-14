@@ -4,7 +4,12 @@ from auto_llm.builder.task_data_builder.ad_covid_pico_data_builder import (
     AdCovidPicoDataBuilder,
 )
 from auto_llm.builder.task_data_builder.ebm_pico_data_builder import EbmPicoDataBuilder
-from auto_llm.builder.task_data_builder.pubmedqa_data_builder import PubMedQADataBuilder
+from auto_llm.builder.task_data_builder.pubmed_gen_qa_data_builder import (
+    PubMedGenQaDataBuilder,
+)
+from auto_llm.builder.task_data_builder.pubmed_mcqa_data_builder import (
+    PubMedMcqaDataBuilder,
+)
 from auto_llm.dto.builder_config import DatasetSplit, TaskDatasetFeatures
 from auto_llm.builder.utils import push_dataset_to_hub
 
@@ -95,13 +100,23 @@ def test_ebm_pico_data_builder_wo_duplicates():
     # builder.save(ds_dict=ds_dict, path=output_dir)
 
 
-def test_pubmedqa_data_builder():
-    builder = PubMedQADataBuilder()
+def test_pubmed_gen_qa_data_builder():
+    builder = PubMedGenQaDataBuilder()
     ds_dict = builder.build()
 
     _generic_task_data_builder_tests(ds_dict=ds_dict)
 
-    output_dir = "/vol/auto_llm/processed_datasets/qa/pubmedqa"
+    output_dir = "/vol/auto_llm/processed_datasets/qa/pubmed_gen_qa"
+    builder.save(ds_dict=ds_dict, path=output_dir)
+
+
+def test_pubmed_mcqa_data_builder():
+    builder = PubMedMcqaDataBuilder()
+    ds_dict = builder.build()
+
+    _generic_task_data_builder_tests(ds_dict=ds_dict)
+
+    output_dir = "/vol/auto_llm/processed_datasets/qa/pubmed_mcqa"
     builder.save(ds_dict=ds_dict, path=output_dir)
 
 
@@ -114,6 +129,10 @@ def test_push_dataset_to_hub():
     # dataset_name = "pico_covid19"
     # push_dataset_to_hub(dataset_dir=dataset_dir, dataset_name=dataset_name)
 
-    dataset_dir = "/vol/auto_llm/processed_datasets/qa/pubmedqa"
-    dataset_name = "qa_pubmedqa"
+    dataset_dir = "/vol/auto_llm/processed_datasets/qa/pubmed_gen_qa"
+    dataset_name = "qa_pubmed_gen_qa"
+    push_dataset_to_hub(dataset_dir=dataset_dir, dataset_name=dataset_name)
+
+    dataset_dir = "/vol/auto_llm/processed_datasets/qa/pubmed_mcqa"
+    dataset_name = "qa_pubmed_mcqa"
     push_dataset_to_hub(dataset_dir=dataset_dir, dataset_name=dataset_name)

@@ -1,0 +1,30 @@
+tag:
+  - seq2seq
+
+task: pubmed_mcqa
+
+dataset_path: arrow
+dataset_kwargs:
+  data_files:
+    test: /vol/auto_llm/processed_datasets/qa/pubmed_mcqa/test/data-00000-of-00001.arrow
+test_split: test
+
+output_type: multiple_choice
+doc_to_text: |
+  Answer the following question based on the given abstract. Answer only with a yes/no/maybe.
+
+  {{input_text}}
+
+  Answer:
+doc_to_target: "{{output_text}}"
+doc_to_choice: ["yes", "no", "maybe"]
+
+# process_results: !function utils.process_results
+
+metric_list:
+  - metric: acc
+    aggregation: mean
+    higher_is_better: true
+
+metadata:
+  version: 1.0

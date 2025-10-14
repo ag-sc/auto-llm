@@ -1,12 +1,12 @@
 tag:
   - seq2seq
 
-task: pubmed_qa
+task: pubmed_gen_qa
 
 dataset_path: arrow
 dataset_kwargs:
   data_files:
-    test: /vol/auto_llm/processed_datasets/qa/pubmedqa/test/data-00000-of-00001.arrow
+    test: /vol/auto_llm/processed_datasets/qa/pubmed_gen_qa/test/data-00000-of-00001.arrow
 test_split: test
 
 doc_to_text: |

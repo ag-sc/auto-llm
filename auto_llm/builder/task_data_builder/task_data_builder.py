@@ -1,7 +1,11 @@
 import logging
 from abc import ABC, abstractmethod
 
-from datasets import DatasetDict
+from datasets import DatasetDict, Dataset
+
+from auto_llm.dto.builder_config import DatasetSplit
+
+SEED = 0
 
 
 class TaskDataBuilder(ABC):
@@ -21,3 +25,20 @@ class TaskDataBuilder(ABC):
     def save(self, ds_dict: DatasetDict, path: str):
         ds_dict.save_to_disk(dataset_dict_path=path)
         self.logger.info(f"Saved to {path}")
+
+    @staticmethod
+    def split_ds(ds: Dataset) -> DatasetDict:
+        ds_dict_sp_1 = ds.train_test_split(test_size=0.1, shuffle=True, seed=SEED)
+        ds_dict_sp_2 = ds_dict_sp_1["test"].train_test_split(
+            test_size=0.5, shuffle=True, seed=SEED
+        )
+
+        ds_dict = DatasetDict(
+            {
+                DatasetSplit.TRAIN: ds_dict_sp_1["train"],
+                DatasetSplit.VALIDATION: ds_dict_sp_2["train"],
+                DatasetSplit.TEST: ds_dict_sp_2["test"],
+            }
+        )
+
+        return ds_dict

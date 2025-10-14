@@ -64,18 +64,7 @@ class AdCovidPicoDataBuilder(TaskDataBuilder):
         )
 
         ds = Dataset.from_dict(all_samples, features=features)
-        ds_dict_sp_one = ds.train_test_split(test_size=0.1, shuffle=True)
-        ds_dict_sp_two = ds_dict_sp_one["test"].train_test_split(
-            test_size=0.5, shuffle=True
-        )
-
-        ds_dict = DatasetDict(
-            {
-                DatasetSplit.TRAIN: ds_dict_sp_one["train"],
-                DatasetSplit.VALIDATION: ds_dict_sp_two["train"],
-                DatasetSplit.TEST: ds_dict_sp_two["test"],
-            }
-        )
+        ds_dict = self.split_ds(ds=ds)
         return ds_dict
 
     @staticmethod
