@@ -1,0 +1,5 @@
+model: hf
+tasks: truthfulqa_gen  # truthfulqa_mc1
+model_args: pretrained=google/gemma-2-2b
+gen_kwargs: dola_layers=low,custom_generate=/homes/vsudhi/language-model-service/lms/decoding/dola,repetition_penalty=1.2
+wandb_args: project=cd-experiments,name=gemma-2-2b-dola-low

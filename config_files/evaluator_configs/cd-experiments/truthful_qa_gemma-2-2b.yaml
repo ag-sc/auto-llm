@@ -1,0 +1,5 @@
+model: hf
+tasks: truthfulqa_gen  # truthfulqa_mc1
+model_args: pretrained=google/gemma-2-2b,attn_implementation=flash_attention_2,dtype=bfloat16
+gen_kwargs: repetition_penalty=1.2
+wandb_args: project=cd-experiments,name=gemma-2-2b
