@@ -9,6 +9,7 @@ from auto_llm.dto.builder_config import (
     DatasetSplit,
     PromptCompletionDatasetFeatures,
     SftDatasetType,
+    ConversationalDatasetFeatures,
 )
 
 
@@ -35,6 +36,7 @@ def conversational_data_builder_config() -> TrainerDataBuilderConfig:
         dataset_type=SftDatasetType.CONVERSATIONAL,
         instruction_input_separator="\n",
         parse_output_as_json=True,
+        use_system_message=False,
     )
 
 
@@ -44,31 +46,9 @@ def test_prompt_completions_data_builder(prompt_completions_data_builder_config)
     )
     ds_dict = builder.build()
 
-    assert (
-        PromptCompletionDatasetFeatures.PROMPT
-        in ds_dict[DatasetSplit.TRAIN].column_names
-    )
-    assert (
-        PromptCompletionDatasetFeatures.PROMPT
-        in ds_dict[DatasetSplit.TEST].column_names
-    )
-    assert (
-        PromptCompletionDatasetFeatures.PROMPT
-        in ds_dict[DatasetSplit.VALIDATION].column_names
-    )
-
-    assert (
-        PromptCompletionDatasetFeatures.COMPLETION
-        in ds_dict[DatasetSplit.TRAIN].column_names
-    )
-    assert (
-        PromptCompletionDatasetFeatures.COMPLETION
-        in ds_dict[DatasetSplit.TEST].column_names
-    )
-    assert (
-        PromptCompletionDatasetFeatures.COMPLETION
-        in ds_dict[DatasetSplit.VALIDATION].column_names
-    )
+    for split in DatasetSplit:
+        assert PromptCompletionDatasetFeatures.PROMPT in ds_dict[split].column_names
+        assert PromptCompletionDatasetFeatures.COMPLETION in ds_dict[split].column_names
 
 
 def test_conversational_data_builder(conversational_data_builder_config):
@@ -77,28 +57,6 @@ def test_conversational_data_builder(conversational_data_builder_config):
     )
     ds_dict = builder.build()
 
-    assert (
-        PromptCompletionDatasetFeatures.PROMPT
-        in ds_dict[DatasetSplit.TRAIN].column_names
-    )
-    assert (
-        PromptCompletionDatasetFeatures.PROMPT
-        in ds_dict[DatasetSplit.TEST].column_names
-    )
-    assert (
-        PromptCompletionDatasetFeatures.PROMPT
-        in ds_dict[DatasetSplit.VALIDATION].column_names
-    )
-
-    assert (
-        PromptCompletionDatasetFeatures.COMPLETION
-        in ds_dict[DatasetSplit.TRAIN].column_names
-    )
-    assert (
-        PromptCompletionDatasetFeatures.COMPLETION
-        in ds_dict[DatasetSplit.TEST].column_names
-    )
-    assert (
-        PromptCompletionDatasetFeatures.COMPLETION
-        in ds_dict[DatasetSplit.VALIDATION].column_names
-    )
+    for split in DatasetSplit:
+        assert ConversationalDatasetFeatures.MESSAGES in ds_dict[split].column_names
+        assert ConversationalDatasetFeatures.EXAMPLES in ds_dict[split].column_names

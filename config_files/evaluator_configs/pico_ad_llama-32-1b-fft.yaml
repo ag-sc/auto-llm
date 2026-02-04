@@ -1,8 +1,14 @@
 model: hf
-tasks: hellaswag,truthfulqa_gen
-model_args: pretrained=google/gemma-2-2b
-wandb_args: project=llm4kmu-eval,name=test-run
-limit: 100
+tasks: ad_pico
+model_args: pretrained=/vol/auto_llm/sft_models/pico_ad_llama-32-1b_fft_10_epochs_non-conv_zero-shot
+wandb_args: project=llm4kmu-eval,name=pico_ad_llama-32-1b_fft_10_epochs_non-conv_zero-shot
+
+write_out: True
+log_samples: True
+output_path: /vol/auto_llm/eval_results
+
+include_path: config_files/evaluator_configs/tasks
+
 #num_fewshot:
 #batch_size:
 #max_batch_size:

@@ -16,7 +16,7 @@ echo "Process $SLURM_PROCID of Job $SLURM_JOBID with the local id $SLURM_LOCALID
 
 export LOGLEVEL=DEBUG
 source $VENV_PATH/bin/activate
-source $ENV_VARIABLES_PATH  # /homes/vsudhi/env.sh
+source $ENV_VARIABLES_PATH
 
 python -m auto_llm.evaluator.run --config_path $CONFIG_PATH
 

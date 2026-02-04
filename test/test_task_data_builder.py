@@ -34,7 +34,7 @@ def test_ad_pico_data_builder():
     _generic_task_data_builder_tests(ds_dict=ds_dict)
 
     out_path = "/vol/auto_llm/processed_datasets/pico/AD"
-    builder.save(ds_dict=ds_dict, path=out_path)
+    # builder.save(ds_dict=ds_dict, path=out_path)
 
 
 def test_covid_19_pico_data_builder():
@@ -45,7 +45,7 @@ def test_covid_19_pico_data_builder():
     _generic_task_data_builder_tests(ds_dict=ds_dict)
 
     out_path = "/vol/auto_llm/processed_datasets/pico/Covid19"
-    builder.save(ds_dict=ds_dict, path=out_path)
+    # builder.save(ds_dict=ds_dict, path=out_path)
 
 
 def test_ebm_pico_data_builder():
@@ -55,8 +55,8 @@ def test_ebm_pico_data_builder():
 
     _generic_task_data_builder_tests(ds_dict=ds_dict)
 
-    output_dir = "/vol/auto_llm/processed_datasets/pico/EBM-V2"
-    builder.save(ds_dict=ds_dict, path=output_dir)
+    output_dir = "/vol/auto_llm/processed_datasets/pico/EBM"
+    # builder.save(ds_dict=ds_dict, path=output_dir)
 
 
 def test_ebm_pico_data_builder_wo_duplciates():
@@ -67,4 +67,4 @@ def test_ebm_pico_data_builder_wo_duplciates():
     _generic_task_data_builder_tests(ds_dict=ds_dict)
 
     output_dir = "/vol/auto_llm/processed_datasets/pico/EBM-NoDuplicates"
-    builder.save(ds_dict=ds_dict, path=output_dir)
+    # builder.save(ds_dict=ds_dict, path=output_dir)

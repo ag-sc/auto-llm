@@ -2,9 +2,10 @@ import os
 from typing import Dict, List
 
 import pytest
-from transformers import AutoTokenizer, PreTrainedTokenizer
+from transformers import AutoTokenizer, PreTrainedTokenizer, AutoConfig
 
 from auto_llm.pre_processor.sft_pre_procesor import SftPreProcessor
+from auto_llm.trainer.sft_trainer_wrapper import CTX_LENGTH_KEYS
 
 
 @pytest.fixture
@@ -246,3 +247,26 @@ def test_pre_processor_with_conversational_ds_completion_only_loss(
     assert encoded_inputs["labels"][0].tolist() == [-100, -100, -100, -100, -100, -100, -100, -100, -100, -100]
     assert encoded_inputs["attention_mask"][0].tolist() == [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
     # fmt: on
+
+
+def test_automatic_setting_of_model_max_length():
+    model_names = [
+        "google/gemma-2-2b-it",
+        "google/gemma-2-2b",
+        "meta-llama/Llama-3.2-1B",
+        "meta-llama/Llama-3.2-3B",
+        "HuggingFaceTB/SmolLM2-135M",
+        "HuggingFaceTB/SmolLM2-360M",
+        "HuggingFaceTB/SmolLM2-1.7B",
+    ]
+
+    for model in model_names:
+        hf_model_config = AutoConfig.from_pretrained(model).to_dict()
+        for key in CTX_LENGTH_KEYS:
+            if key in list(hf_model_config.keys()):
+                max_length = hf_model_config[key]
+                break
+        else:
+            max_length = None
+
+        print(f"Model: {model}, Max Context Length: {max_length}")

@@ -46,7 +46,7 @@ EXAMPLE_TRAINER_RUN_CONFIG = TrainerRunConfig(
         save_total_limit=None,
     ),
     trainer_data_builder_config=TrainerDataBuilderConfig(
-        dataset_dir="",
+        dataset_dir="/vol/auto_llm/processed_datasets/pico/AD",
         instruction_template="",
         input_template="",
         output_template="",

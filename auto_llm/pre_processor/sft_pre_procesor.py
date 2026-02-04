@@ -55,6 +55,7 @@ class SftPreProcessor(PreProcessor):
         if truncation:
             encodings = self.truncate(encodings=encodings, max_length=max_length)
 
+        # TODO: instead of padding always up until the max length, look for max length in the corresponding batch and pad accordingly.
         encodings = {
             "input_ids": self.pad(
                 encodings=encodings["input_ids"],

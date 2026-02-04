@@ -1,9 +1,10 @@
 import os
+from typing import Dict, Any
 
 import torch
 from accelerate import Accelerator, DistributedType
 from peft import LoraConfig
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer, AutoConfig
 from trl import SFTConfig, SFTTrainer
 
 from auto_llm.builder.trainer_data_builder.sft_data_builder import (
@@ -16,9 +17,9 @@ from auto_llm.builder.trainer_data_builder.trainer_data_builder import (
 from auto_llm.dto.builder_config import SftDatasetType, DatasetSplit
 from auto_llm.dto.trainer_run_config import TrainerRunConfig
 from auto_llm.pre_processor.sft_pre_procesor import SftPreProcessor
+from auto_llm.registry.estimator_registry import CTX_LENGTH_KEYS
+from auto_llm.registry.tracker_registry import WANDB_TRAIN_PROJECT
 from auto_llm.trainer.trainer_wrapper import TrainerWrapper
-
-WANDB_TRAIN_PROJECT = "llm4kmu-train"
 
 accelerator = Accelerator()
 
@@ -34,7 +35,14 @@ class SftTrainerWrapper(TrainerWrapper):
     - Saving the fine-tuned model and tokenizer to the specified output directory.
     """
 
+    def __init__(self, config: TrainerRunConfig):
+        self.config = config
+
     def run(self):
+        hf_model_config = AutoConfig.from_pretrained(
+            self.config.auto_llm_trainer_args.model_name
+        ).to_dict()
+
         model = AutoModelForCausalLM.from_pretrained(
             pretrained_model_name_or_path=self.config.auto_llm_trainer_args.model_name,
             token=os.getenv("HF_TOKEN"),
@@ -48,6 +56,11 @@ class SftTrainerWrapper(TrainerWrapper):
         )
 
         tokenizer.pad_token = tokenizer.eos_token
+
+        max_length = self.get_max_length(
+            max_length=self.config.trainer_args.max_length,
+            hf_model_config=hf_model_config,
+        )
 
         # While FT, pad to the right. See https://github.com/huggingface/transformers/issues/34842#issuecomment-2528550342.
         tokenizer.padding_side = "right"
@@ -71,7 +84,7 @@ class SftTrainerWrapper(TrainerWrapper):
                 ds_dict = ds_dict.map(
                     function=pre_processor.pre_process,
                     fn_kwargs=dict(
-                        max_length=self.config.trainer_args.max_length,
+                        max_length=max_length,
                         truncation=self.config.auto_llm_trainer_args.truncation,
                     ),
                     batched=True,
@@ -140,12 +153,48 @@ class SftTrainerWrapper(TrainerWrapper):
 
         trainer.train()
 
+        # from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
+        #
+        # full_state_dict_config = FullStateDictConfig(
+        #     offload_to_cpu=True, rank0_only=True
+        # )
+        # with FSDP.state_dict_type(
+        #     model, StateDictType.FULL_STATE_DICT, full_state_dict_config
+        # ):
+        #     state_dict = model.state_dict()
+        #
+        # model.save_pretrained(
+        #     save_directory=self.config.trainer_args.output_dir,
+        #     is_main_process=accelerator.is_main_process,
+        #     save_function=accelerator.save,
+        #     state_dict=state_dict,
+        # )
+
         trainer.save_model(self.config.trainer_args.output_dir)
         tokenizer.save_pretrained(self.config.trainer_args.output_dir)
 
         self.logger.info(
             f"Model and Tokenizer saved in the path: {self.config.trainer_args.output_dir}"
         )
+
+    @staticmethod
+    def get_max_length(
+        hf_model_config: Dict[str, Any],
+        max_length: int = None,
+    ):
+        # Set max_length to the configured value, if it exists. Otherwise, find the model max context length.
+        if not max_length:
+            for key in CTX_LENGTH_KEYS:
+                if key in list(hf_model_config.keys()):
+                    max_length = hf_model_config[key]
+                    break
+            else:
+                raise Exception(f"Max length can not be found in the model config!")
+
+            # Model max length can be as large as 131072. This is unnecessary while SFT. Setting a minimum of 1024,
+            # if max_length not configured by the user.
+            max_length = min(1024, max_length)
+        return max_length
 
     @staticmethod
     def get_trainer_data_builder(config: TrainerRunConfig) -> TrainerDataBuilder:
