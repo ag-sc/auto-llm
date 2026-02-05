@@ -10,8 +10,6 @@ from auto_llm.dto.example_dtos import EXAMPLE_TRAINER_RUN_CONFIG
 from auto_llm.dto.trainer_run_config import TrainerRunConfig
 from auto_llm.registry.configurator_registry import TRAINER_RUN_SCRIPT
 
-CONFIG_ROOT_PATH = "/vol/auto_llm/config_files/trainer_configs"
-
 
 def save_trainer_run_config(
     uploaded_config: str,

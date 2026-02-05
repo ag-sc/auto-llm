@@ -50,7 +50,7 @@ def generate(
 ):
     generation_kwargs = json.loads(generation_kwargs)
     response = lms_api.generate(
-        model_name=model_name, texts=[text], generation_kwargs=generation_kwargs
+        model_name=model_name, messages=[text], generation_kwargs=generation_kwargs
     )[0]
     return response
 
