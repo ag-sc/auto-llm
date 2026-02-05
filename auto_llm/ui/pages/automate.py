@@ -30,6 +30,7 @@ from auto_llm.registry.tracker_registry import (
     WANDB_EVAL_REPORT_URL,
 )
 
+# TODO: avoid hard-coded paths
 OUTPUT_DIR = "/vol/auto_llm/sft_models/"
 CONFIGS_DIR = ".cache"
 
@@ -139,6 +140,8 @@ def change_tab(id: int):
 
 
 def display_status():
+    # TODO: update hard-coded values, including username
+    # TODO: consider Config Executor without Slurm
     username = "vsudhi"
     cmd = [
         "squeue",
@@ -254,6 +257,8 @@ with gr.Blocks() as demo:
                 with gr.Column():
                     model_names = gr.Dropdown(
                         label="Models",
+                        # TODO: model names should be listed based on the configured task and language.
+                        # TODO: also, consider the hardware requirements while selecting models
                         choices=MODEL_NAMES,
                         multiselect=True,
                         allow_custom_value=True,

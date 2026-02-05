@@ -1,5 +1,0 @@
-model: hf
-tasks: truthfulqa_gen  # truthfulqa_mc1
-model_args: pretrained=google/gemma-2-27b,parallelize=True,cache_dir=/vol/auto_llm/cache,attn_implementation=flash_attention_2
-gen_kwargs: repetition_penalty=1.2
-wandb_args: project=cd-experiments,name=gemma-2-27b
