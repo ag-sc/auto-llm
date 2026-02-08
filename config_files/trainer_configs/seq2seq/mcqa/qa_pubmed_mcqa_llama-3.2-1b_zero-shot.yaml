@@ -1,6 +1,6 @@
 auto_llm_trainer_args:
   trainer_type: sft
-  model_name: google/gemma-2-2b
+  model_name: meta-llama/Llama-3.2-1B
   attn_implementation: eager # keep eager for gemma
   truncation: True
   completion_only_loss: True
@@ -33,7 +33,7 @@ trainer_args:
   auto_find_batch_size: True
 
   # training related
-  output_dir: /vol/auto_llm/sft_models/qa_pubmed_mcqa_gemma-2-2b_zero-shot
+  output_dir: sft_models/qa_pubmed_mcqa_llama-3.2-1b_zero-shot
   gradient_checkpointing: True
   num_train_epochs: 5
   learning_rate: 1e-4
@@ -41,7 +41,7 @@ trainer_args:
 
   # tracking/logging related
   report_to: wandb
-  run_name: qa_pubmed_mcqa_gemma-2-2b_zero-shot
+  run_name: qa_pubmed_mcqa_llama-3.2-1b_zero-shot
   logging_steps: 0.1
 
   # eval/save related

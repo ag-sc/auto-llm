@@ -7,7 +7,9 @@ import gradio as gr
 import pandas as pd
 import yaml
 
-from auto_llm.registry.configurator_registry import MODEL_NAMES, TASKS
+from auto_llm.automator.automator import Automator
+
+
 from auto_llm.registry.prompt_templates_registry import (
     INSTRUCTION_TEMPLATES_MAPPING,
     INPUT_TEMPLATES_MAPPING,
@@ -29,12 +31,13 @@ from auto_llm.registry.tracker_registry import (
     WANDB_TRAIN_REPORT_URL,
     WANDB_EVAL_REPORT_URL,
 )
+from auto_llm.tasks.registry import TASKS
 
 # TODO: avoid hard-coded paths
 OUTPUT_DIR = "/vol/auto_llm/sft_models/"
 CONFIGS_DIR = ".cache"
 
-GPU_PARAMS = get_gpu_params()
+# GPU_PARAMS = get_gpu_params()
 
 
 def generate_configs(
@@ -103,15 +106,35 @@ def update_save_btn():
 
 
 def update_instruction_textbox(task: str):
-    return INSTRUCTION_TEMPLATES_MAPPING.get(task)
+    configured_task = TASKS.get(task)
+    return configured_task.sample_trainer_run_config.trainer_data_builder_config.instruction_template
 
 
 def update_input_textbox(task: str):
-    return INPUT_TEMPLATES_MAPPING.get(task)
+    configured_task = TASKS.get(task)
+    return configured_task.sample_trainer_run_config.trainer_data_builder_config.input_template
 
 
 def update_output_textbox(task: str):
-    return OUTPUT_TEMPLATES_MAPPING.get(task)
+    configured_task = TASKS.get(task)
+    return configured_task.sample_trainer_run_config.trainer_data_builder_config.output_template
+
+
+def update_models(task: str, dataset: str, hardware_type: str, hardware_count: int):
+    configured_task = TASKS.get(task)
+    automator = Automator(
+        task_type=configured_task.name,
+        dataset=dataset,
+        hardware_type=hardware_type,
+        hardware_count=hardware_count
+    )
+
+    model_results = automator.get_models_df()
+    return automator.model_names, model_results
+
+
+def update_models_dropdown(model_names: List[str]):
+    return gr.update(choices=model_names)
 
 
 def save_file(file_path: str, file_contents: str):
@@ -140,44 +163,45 @@ def change_tab(id: int):
 
 
 def display_status():
-    # TODO: update hard-coded values, including username
-    # TODO: consider Config Executor without Slurm
-    username = "vsudhi"
-    cmd = [
-        "squeue",
-        "-u",
-        username,
-        "--json",
-    ]
-    result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-    data = json.loads(result.stdout)
-
-    if not data.get("jobs"):
-        return None
-
-    jobs = []
-    for job in data["jobs"]:
-        if not username in job.get("current_working_directory"):
-            continue
-
-        if job.get("job_state") == "CANCELLED":
-            continue
-
-        if "language_model" in job.get("name"):
-            continue
-
-        job_info = {
-            "Job ID": job.get("job_id"),
-            "Job Name": job.get("name"),
-            "State": job.get("job_state"),
-            "Nodes": job.get("nodes"),
-            "Partition": job.get("partition"),
-            "Dependency": job.get("dependency"),
-        }
-        jobs.append(job_info)
-
-    df = pd.DataFrame(jobs)
-    return df
+    # # TODO: update hard-coded values, including username
+    # # TODO: consider Config Executor without Slurm
+    # username = "vsudhi"
+    # cmd = [
+    #     "squeue",
+    #     "-u",
+    #     username,
+    #     "--json",
+    # ]
+    # result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+    # data = json.loads(result.stdout)
+    #
+    # if not data.get("jobs"):
+    #     return None
+    #
+    # jobs = []
+    # for job in data["jobs"]:
+    #     if not username in job.get("current_working_directory"):
+    #         continue
+    #
+    #     if job.get("job_state") == "CANCELLED":
+    #         continue
+    #
+    #     if "language_model" in job.get("name"):
+    #         continue
+    #
+    #     job_info = {
+    #         "Job ID": job.get("job_id"),
+    #         "Job Name": job.get("name"),
+    #         "State": job.get("job_state"),
+    #         "Nodes": job.get("nodes"),
+    #         "Partition": job.get("partition"),
+    #         "Dependency": job.get("dependency"),
+    #     }
+    #     jobs.append(job_info)
+    #
+    # df = pd.DataFrame(jobs)
+    # return df
+    return None
 
 
 def update_estimates(config_path: str, gpu_name: str, gpu_count: int):
@@ -197,7 +221,7 @@ def update_estimates(config_path: str, gpu_name: str, gpu_count: int):
     else:
         return None, None
 
-    gpu_params = get_gpu_params()
+    # gpu_params = get_gpu_params()
     runtime_estimator = RuntimeEstimator(
         flops_estimator=flops_estimator,
         gpu_params=gpu_params,
@@ -231,49 +255,39 @@ with gr.Blocks() as demo:
                 with gr.Column():
                     task = gr.Dropdown(
                         label="Task Name",
-                        choices=TASKS,
-                        value=None,  # noqa
+                        choices=list(TASKS.keys()),
+                        value=None, # list(TASKS.keys())[0],  # noqa
                         multiselect=False,
                         allow_custom_value=True,
                         interactive=True,
                         info=f"Name of the task you configured.",
                     )
 
-            with gr.Row(equal_height=True):
+                datasets_list = ""
+                datasets_prefix = "https://huggingface.co/datasets"
+                for dataset in Automator.get_datasets():
+                    datasets_list += f"* [``{dataset}``]({datasets_prefix}/{dataset})\n"
+
                 with gr.Column():
-                    dataset_name = gr.Textbox(
-                        label="Dataset Name",
-                        info=f"Name of the dataset belonging to the ``Task`` you configured.",
-                    )
-                with gr.Column():
-                    dataset_dir = gr.Textbox(
-                        label="Dataset Directory",
-                        info=TrainerDataBuilderConfig.model_fields[
-                            "dataset_dir"
-                        ].description,
+                    dataset_path = gr.Textbox(
+                        label="Dataset Path",
+                        info=f"Path of the dataset belonging to the ``Task`` you configured. It can either be HuggingFace links or lcoal paths. Examples:\n{datasets_list}",
+
                     )
 
             with gr.Row(equal_height=True):
                 with gr.Column():
-                    model_names = gr.Dropdown(
-                        label="Models",
-                        # TODO: model names should be listed based on the configured task and language.
-                        # TODO: also, consider the hardware requirements while selecting models
-                        choices=MODEL_NAMES,
-                        multiselect=True,
-                        allow_custom_value=True,
-                        info="Pick models from the list or of your choice. You can also add models from HuggingFace. See: [here](https://huggingface.co/models).",
-                    )
-                with gr.Column():
                     hardware = gr.Dropdown(
                         label="Hardware",
-                        choices=list(GPU_PARAMS.keys()),
-                        value=list(GPU_PARAMS.keys())[0],
+                        choices=["hardware"], # list(GPU_PARAMS.keys()),
+                        value=None,
+                        #value=list(GPU_PARAMS.keys())[0],
                         multiselect=False,
                         allow_custom_value=False,
                         info="Select the device configuration.",
                         interactive=True,
                     )
+                with gr.Column():
                     num_hardware = (
                         gr.Slider(
                             minimum=1,
@@ -285,6 +299,25 @@ with gr.Blocks() as demo:
                             interactive=True,
                         ),
                     )
+
+            with gr.Row(equal_height=True):
+                with gr.Column():
+                    model_names = gr.Dropdown(
+                        label="Models",
+                        # TODO: model names should be listed based on the configured task and language.
+                        # TODO: also, consider the hardware requirements while selecting models
+                        choices=None,
+                        value=None, # noqa
+                        multiselect=True,
+                        allow_custom_value=True,
+                        info="Pick models from the list or of your choice. You can also add models from HuggingFace. See: [here](https://huggingface.co/models).",
+                    )
+
+                    with gr.Accordion(label="Model Overview", open=False):
+                        gr.Markdown("Based on results from [Open LLM Leaderboard](https://huggingface.co/spaces/open-llm-leaderboard/open_llm_leaderboard).")
+                        model_results = gr.Dataframe(
+                            value=None,
+                        )
 
             with gr.Row(equal_height=True):
                 with gr.Column():
@@ -388,6 +421,19 @@ with gr.Blocks() as demo:
         fn=update_output_textbox,
         inputs=[task],
         outputs=[output_template],
+    ).then(
+        fn=update_models,
+        inputs=[
+            task,
+            dataset_path,
+            hardware,
+            num_hardware[0]
+        ],
+        outputs=[model_names, model_results]
+    ).then(
+        fn=update_models_dropdown,
+        inputs=[],
+        outputs=[model_names],
     )
 
     configs_path = gr.State()
@@ -397,8 +443,7 @@ with gr.Blocks() as demo:
         inputs=[
             model_names,
             task,
-            dataset_name,
-            dataset_dir,
+            dataset_path,
             instruction_template,
             input_template,
             output_template,

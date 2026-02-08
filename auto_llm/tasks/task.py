@@ -9,9 +9,6 @@ class BaseTask(BaseModel):
     name: str
     description: str
 
-    metrics_list: List[str]
-    models_list: List[str]
-
     sample_trainer_run_config: TrainerRunConfig = None
     sample_evaluator_run_config: TrainerRunConfig = None
 

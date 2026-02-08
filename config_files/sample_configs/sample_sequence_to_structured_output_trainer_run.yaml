@@ -33,7 +33,7 @@ trainer_args:
   auto_find_batch_size: True
 
   # training related
-  output_dir: /vol/auto_llm/sft_models/pico_ebm-NoDuplicates_gemma-2-2b_non-conv_zero-shot
+  output_dir: /vol/auto_llm/sft_models/sample_sequence_to_structured_output_trainer_run
   # resume_from_checkpoint: ""
   gradient_checkpointing: True
   num_train_epochs: 5
@@ -42,7 +42,7 @@ trainer_args:
 
   # tracking/logging related
   report_to: wandb
-  run_name: pico_ebm-NoDuplicates_gemma-2-2b_non-conv_zero-shot
+  run_name: sample_sequence_to_structured_output_trainer_run
   logging_steps: 0.1
 
   # eval/save related
