@@ -103,7 +103,8 @@ class SftDataBuilder(TrainerDataBuilder):
                 f"***WARNING***You have set a limit of `{self.limit}`. This is intended only for debugging. Please remove this for real trainer runs."
             )
             for key, value in ds_dict.items():
-                ds_dict[key] = value.select(range(self.limit))
+                limit = min(self.limit, len(ds_dict[key]))
+                ds_dict[key] = value.select(range(limit))
 
         return ds_dict
 

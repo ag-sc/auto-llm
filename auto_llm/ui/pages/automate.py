@@ -30,6 +30,7 @@ from auto_llm.estimator.utils import get_gpu_params, get_model_params
 from auto_llm.registry.tracker_registry import (
     WANDB_TRAIN_REPORT_URL,
     WANDB_EVAL_REPORT_URL,
+    WANDB_CURRENT_RUNS_REPORT_URL,
 )
 from auto_llm.tasks.registry import TASKS
 
@@ -37,14 +38,13 @@ from auto_llm.tasks.registry import TASKS
 OUTPUT_DIR = "/vol/auto_llm/sft_models/"
 CONFIGS_DIR = ".cache"
 
-# GPU_PARAMS = get_gpu_params()
+GPU_PARAMS = get_gpu_params()
 
 
 def generate_configs(
     model_names: List[str],
     task: str,
-    dataset_name: str,
-    dataset_dir: str,
+    dataset_path: str,
     instruction_template: str,
     input_template: str,
     output_template: str,
@@ -52,6 +52,8 @@ def generate_configs(
     timestamp = datetime.datetime.now()
     timestamp_str = timestamp.strftime("%Y-%m-%d_%H-%M-%S")
     configs_path = f"{CONFIGS_DIR}/{timestamp_str}_configs"
+
+    print("Config", locals())
 
     incomplete = False
     for var_value in locals().values():
@@ -65,8 +67,7 @@ def generate_configs(
     configurator = TrainEvalRunConfigurator(
         model_names=model_names,
         task=task,
-        dataset_name=dataset_name,
-        dataset_dir=dataset_dir,
+        dataset_path=dataset_path,
         configs_path=configs_path,
         output_path=OUTPUT_DIR,
         instruction_template=instruction_template,
@@ -79,9 +80,7 @@ def generate_configs(
 
 
 def update_file_explorer(configs_path: str):
-    return gr.update(
-        label=configs_path, root_dir=configs_path, interactive=True, visible=True
-    )
+    return gr.update(label=configs_path, root_dir=configs_path, interactive=True, visible=True)
 
 
 def view_yaml_file(path: str):
@@ -126,7 +125,7 @@ def update_models(task: str, dataset: str, hardware_type: str, hardware_count: i
         task_type=configured_task.name,
         dataset=dataset,
         hardware_type=hardware_type,
-        hardware_count=hardware_count
+        hardware_count=hardware_count,
     )
 
     model_results = automator.get_models_df()
@@ -163,45 +162,44 @@ def change_tab(id: int):
 
 
 def display_status():
-    # # TODO: update hard-coded values, including username
-    # # TODO: consider Config Executor without Slurm
-    # username = "vsudhi"
-    # cmd = [
-    #     "squeue",
-    #     "-u",
-    #     username,
-    #     "--json",
-    # ]
-    # result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-    # data = json.loads(result.stdout)
-    #
-    # if not data.get("jobs"):
-    #     return None
-    #
-    # jobs = []
-    # for job in data["jobs"]:
-    #     if not username in job.get("current_working_directory"):
-    #         continue
-    #
-    #     if job.get("job_state") == "CANCELLED":
-    #         continue
-    #
-    #     if "language_model" in job.get("name"):
-    #         continue
-    #
-    #     job_info = {
-    #         "Job ID": job.get("job_id"),
-    #         "Job Name": job.get("name"),
-    #         "State": job.get("job_state"),
-    #         "Nodes": job.get("nodes"),
-    #         "Partition": job.get("partition"),
-    #         "Dependency": job.get("dependency"),
-    #     }
-    #     jobs.append(job_info)
-    #
-    # df = pd.DataFrame(jobs)
-    # return df
-    return None
+    # TODO: update hard-coded values, including username
+    # TODO: consider Config Executor without Slurm
+    username = "vsudhi"
+    cmd = [
+        "squeue",
+        "-u",
+        username,
+        "--json",
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+    data = json.loads(result.stdout)
+
+    if not data.get("jobs"):
+        return None
+
+    jobs = []
+    for job in data["jobs"]:
+        if not username in job.get("current_working_directory"):
+            continue
+
+        if job.get("job_state") == "CANCELLED":
+            continue
+
+        if "language_model" in job.get("name"):
+            continue
+
+        job_info = {
+            "Job ID": job.get("job_id"),
+            "Job Name": job.get("name"),
+            "State": job.get("job_state"),
+            "Nodes": job.get("nodes"),
+            "Partition": job.get("partition"),
+            "Dependency": job.get("dependency"),
+        }
+        jobs.append(job_info)
+
+    df = pd.DataFrame(jobs)
+    return df
 
 
 def update_estimates(config_path: str, gpu_name: str, gpu_count: int):
@@ -211,17 +209,14 @@ def update_estimates(config_path: str, gpu_name: str, gpu_count: int):
     models_meta = get_model_params()
 
     if "eval" in config_path:
-        flops_estimator = InferenceFlopsEstimator(
-            config_path=config_path, models_meta=models_meta
-        )
+        flops_estimator = InferenceFlopsEstimator(config_path=config_path, models_meta=models_meta)
     elif "train" in config_path:
-        flops_estimator = TrainerFlopsEstimator(
-            config_path=config_path, models_meta=models_meta
-        )
+        # TODO: models_meta is not updated with the requested model
+        flops_estimator = TrainerFlopsEstimator(config_path=config_path, models_meta=models_meta)
     else:
         return None, None
 
-    # gpu_params = get_gpu_params()
+    gpu_params = get_gpu_params()
     runtime_estimator = RuntimeEstimator(
         flops_estimator=flops_estimator,
         gpu_params=gpu_params,
@@ -256,7 +251,7 @@ with gr.Blocks() as demo:
                     task = gr.Dropdown(
                         label="Task Name",
                         choices=list(TASKS.keys()),
-                        value=None, # list(TASKS.keys())[0],  # noqa
+                        value=None,  # noqa
                         multiselect=False,
                         allow_custom_value=True,
                         interactive=True,
@@ -271,17 +266,15 @@ with gr.Blocks() as demo:
                 with gr.Column():
                     dataset_path = gr.Textbox(
                         label="Dataset Path",
-                        info=f"Path of the dataset belonging to the ``Task`` you configured. It can either be HuggingFace links or lcoal paths. Examples:\n{datasets_list}",
-
+                        info=f"Path of the dataset belonging to the ``Task`` you configured. It can either be HuggingFace links or local paths. Examples:\n{datasets_list}",
                     )
 
             with gr.Row(equal_height=True):
                 with gr.Column():
                     hardware = gr.Dropdown(
                         label="Hardware",
-                        choices=["hardware"], # list(GPU_PARAMS.keys()),
-                        value=None,
-                        #value=list(GPU_PARAMS.keys())[0],
+                        choices=list(GPU_PARAMS.keys()),
+                        value=list(GPU_PARAMS.keys())[0],
                         multiselect=False,
                         allow_custom_value=False,
                         info="Select the device configuration.",
@@ -307,14 +300,16 @@ with gr.Blocks() as demo:
                         # TODO: model names should be listed based on the configured task and language.
                         # TODO: also, consider the hardware requirements while selecting models
                         choices=None,
-                        value=None, # noqa
+                        value=None,  # noqa
                         multiselect=True,
                         allow_custom_value=True,
                         info="Pick models from the list or of your choice. You can also add models from HuggingFace. See: [here](https://huggingface.co/models).",
                     )
 
                     with gr.Accordion(label="Model Overview", open=False):
-                        gr.Markdown("Based on results from [Open LLM Leaderboard](https://huggingface.co/spaces/open-llm-leaderboard/open_llm_leaderboard).")
+                        gr.Markdown(
+                            "Based on results from [Open LLM Leaderboard](https://huggingface.co/spaces/open-llm-leaderboard/open_llm_leaderboard)."
+                        )
                         model_results = gr.Dataframe(
                             value=None,
                         )
@@ -324,28 +319,19 @@ with gr.Blocks() as demo:
                     instruction_template = gr.Textbox(
                         label="Instruction Template",
                         lines=10,
-                        info=TrainerDataBuilderConfig.model_fields[
-                            "instruction_template"
-                        ].description,
-                        # value=INSTRUCTION_TEMPLATES_MAPPING.get(task),
+                        info=TrainerDataBuilderConfig.model_fields["instruction_template"].description,
                     )
                 with gr.Column():
                     input_template = gr.Textbox(
                         label="Input Template",
                         lines=10,
-                        info=TrainerDataBuilderConfig.model_fields[
-                            "input_template"
-                        ].description,
-                        # value=INPUT_TEMPLATES_MAPPING.get(task),
+                        info=TrainerDataBuilderConfig.model_fields["input_template"].description,
                     )
                 with gr.Column():
                     output_template = gr.Textbox(
                         label="Output Template",
                         lines=10,
-                        info=TrainerDataBuilderConfig.model_fields[
-                            "output_template"
-                        ].description,
-                        # value=OUTPUT_TEMPLATES_MAPPING.get(task),
+                        info=TrainerDataBuilderConfig.model_fields["output_template"].description,
                     )
 
             submit_btn = gr.Button("✅ Next")
@@ -361,14 +347,10 @@ with gr.Blocks() as demo:
             gr.Markdown(validate_desc)
             with gr.Row():
                 with gr.Column(scale=2):
-                    config_explorer = gr.FileExplorer(
-                        label="", glob="*.yaml", file_count="single", visible=False
-                    )
+                    config_explorer = gr.FileExplorer(label="", glob="*.yaml", file_count="single", visible=False)
 
                 with gr.Column(scale=2):
-                    file_viewer = gr.Code(
-                        label="", language="yaml", visible=False, lines=30, max_lines=30
-                    )
+                    file_viewer = gr.Code(label="", language="yaml", visible=False, lines=30, max_lines=30)
                     save_btn = gr.Button(value="🗂️ Save configuration", visible=False)
 
                 with gr.Column(scale=1):
@@ -403,6 +385,9 @@ with gr.Blocks() as demo:
             )
 
         with gr.TabItem("Monitor", id=3):
+            with gr.Accordion("Current Runs", open=True):
+                wandb_report(WANDB_CURRENT_RUNS_REPORT_URL)
+
             with gr.Accordion("Trainer Runs", open=False):
                 wandb_report(WANDB_TRAIN_REPORT_URL)
 
@@ -423,13 +408,8 @@ with gr.Blocks() as demo:
         outputs=[output_template],
     ).then(
         fn=update_models,
-        inputs=[
-            task,
-            dataset_path,
-            hardware,
-            num_hardware[0]
-        ],
-        outputs=[model_names, model_results]
+        inputs=[task, dataset_path, hardware, num_hardware[0]],
+        outputs=[model_names, model_results],
     ).then(
         fn=update_models_dropdown,
         inputs=[],
@@ -449,19 +429,13 @@ with gr.Blocks() as demo:
             output_template,
         ],
         outputs=[configurator_outputs, configs_path],
-    ).success(
-        fn=update_file_explorer, inputs=[configs_path], outputs=[config_explorer]
-    ).then(
+    ).success(fn=update_file_explorer, inputs=[configs_path], outputs=[config_explorer]).then(
         fn=change_tab, inputs=[gr.State(1)], outputs=[tabs]
     )
 
-    config_explorer.change(
-        fn=view_yaml_file, inputs=[config_explorer], outputs=[file_viewer]
-    ).success(
+    config_explorer.change(fn=view_yaml_file, inputs=[config_explorer], outputs=[file_viewer]).success(
         fn=update_file_name, inputs=[config_explorer], outputs=[file_viewer]
-    ).success(
-        fn=update_save_btn, inputs=[], outputs=[save_btn]
-    ).success(
+    ).success(fn=update_save_btn, inputs=[], outputs=[save_btn]).success(
         fn=update_estimates,
         inputs=[config_explorer, hardware, num_hardware[0]],
         outputs=[estimated_runtime, estimated_emission],

@@ -10,3 +10,6 @@ dependencies = {file = ["requirements.txt"]}
 
 [tool.setuptools.packages]
 find = {include = ["auto_llm", "auto_llm.*"]}
+
+[tool.black]
+line-length = 120

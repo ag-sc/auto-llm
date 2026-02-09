@@ -27,18 +27,18 @@ trainer_args:
   fp16: False
 
   # bsz related
-  per_device_train_batch_size: 4
-  per_device_eval_batch_size: 4
-  gradient_accumulation_steps: 8  # 4 processes, effective bsz=128
-  auto_find_batch_size: True
+  per_device_train_batch_size: 1
+  per_device_eval_batch_size: 1
+  gradient_accumulation_steps: 32  # 1 process
+  auto_find_batch_size: False
 
   # training related
   output_dir: /vol/auto_llm/sft_models/sample_sequence_to_structured_output_trainer_run
   # resume_from_checkpoint: ""
   gradient_checkpointing: True
-  num_train_epochs: 5
+  num_train_epochs: 1
   learning_rate: 1e-4
-  warmup_steps: 10
+  warmup_steps: 0
 
   # tracking/logging related
   report_to: wandb

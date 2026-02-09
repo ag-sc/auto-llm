@@ -9,9 +9,7 @@ from auto_llm.dto.builder_config import TrainerDataBuilderConfig
 
 
 class LoraConfig(BaseModel):
-    r: int = Field(
-        description="Lora attention dimension (the rank).", title="r", default=16
-    )
+    r: int = Field(description="Lora attention dimension (the rank).", title="r", default=16)
     lora_alpha: int = Field(
         description="The alpha parameter for Lora scaling.",
         title="lora_alpha",
@@ -101,7 +99,7 @@ class TrainerArgs(BaseModel):
     auto_find_batch_size: bool = Field(
         description="Batch size per device accelerator core/CPU for evaluation.",
         title="Per Device Evaluation Batch Size",
-        default=True,
+        default=False,
     )
 
     # training related

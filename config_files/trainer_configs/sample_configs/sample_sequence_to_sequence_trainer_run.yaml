@@ -13,13 +13,14 @@ peft_config:
   task_type: "CAUSAL_LM"
 
 trainer_data_builder_config:
-  dataset_dir: llm-4-kmu/qa_pubmed_gen_qa
+  dataset_dir: llm-4-kmu/pubmed_gen_qa
   instruction_template: "Answer the following Question based on the given Context."
   input_template: "{{input}}\nAnswer:"
   output_template: "{{output}}"
   dataset_type: prompt_completions
   instruction_input_separator: "\n"
   parse_output_as_json: False
+  limit: 100
 
 trainer_args:
   max_length: 8192
@@ -29,15 +30,15 @@ trainer_args:
   # bsz related
   per_device_train_batch_size: 1
   per_device_eval_batch_size: 1
-  gradient_accumulation_steps: 32  # 4 processes
-  auto_find_batch_size: True
+  gradient_accumulation_steps: 32  # 1 process
+  auto_find_batch_size: False
 
   # training related
   output_dir: /vol/auto_llm/sft_models/sample_sequence_to_sequence_trainer_run
   gradient_checkpointing: True
-  num_train_epochs: 5
+  num_train_epochs: 1
   learning_rate: 1e-4
-  warmup_steps: 10
+  warmup_steps: 0
 
   # tracking/logging related
   report_to: wandb

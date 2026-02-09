@@ -1,7 +1,7 @@
 from typing import Dict, Any
 
 import yaml
-from datasets import DatasetDict
+from datasets import DatasetDict, load_dataset
 
 from auto_llm.dto.builder_config import DatasetSplit
 from auto_llm.dto.trainer_run_config import TrainerRunConfig
@@ -23,13 +23,16 @@ class TrainerFlopsEstimator(Estimator):
         model_name = self.config.auto_llm_trainer_args.model_name
         N = self.get_num_params(model_name=model_name)
 
-        num_samples = (
-            DatasetDict.load_from_disk(
-                self.config.trainer_data_builder_config.dataset_dir
+        try:
+            num_samples = (
+                DatasetDict.load_from_disk(self.config.trainer_data_builder_config.dataset_dir)
+                .get(DatasetSplit.TRAIN)
+                .num_rows
             )
-            .get(DatasetSplit.TRAIN)
-            .num_rows
-        )
+        except FileNotFoundError:
+            num_samples = load_dataset(
+                self.config.trainer_data_builder_config.dataset_dir, split=DatasetSplit.TRAIN
+            ).num_rows
 
         avg_tokens_per_sample = (
             min(1024, self.models_meta[model_name].get("max_length"))

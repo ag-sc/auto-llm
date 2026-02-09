@@ -12,6 +12,7 @@ from auto_llm.dto.trainer_run_config import (
     LoraConfig,
     TrainerRunConfig,
 )
+from auto_llm.registry.evaluator_registry import LM_EVAL_HARNESS_CUSTOM_TASKS_PATH
 
 
 class Priority(enum.Enum):
@@ -38,8 +39,7 @@ class TrainEvalRunConfigurator:
         self,
         model_names: List[str],
         task: str,
-        dataset_name: str,
-        dataset_dir: str,
+        dataset_path: str,
         output_path: str,
         configs_path: str,
         instruction_template: str,
@@ -48,20 +48,17 @@ class TrainEvalRunConfigurator:
     ) -> None:
         self.model_names = model_names
         self.task = task
-        self.dataset_name = dataset_name
-        self.dataset_dir = dataset_dir
+        self.dataset_path = dataset_path
+        self.dataset_name = self.dataset_path.split("/")[-1]
+
         self.output_path = output_path
         self.configs_path = configs_path
         self.instruction_template = instruction_template
         self.input_template = input_template
         self.output_template = output_template
 
-        self.trainer_run_configs_path = os.path.join(
-            self.configs_path, "trainer_run_configs"
-        )
-        self.evaluator_run_configs_path = os.path.join(
-            self.configs_path, "evaluator_run_configs"
-        )
+        self.trainer_run_configs_path = os.path.join(self.configs_path, "trainer_run_configs")
+        self.evaluator_run_configs_path = os.path.join(self.configs_path, "evaluator_run_configs")
 
     def generate(self):
         # create sub-folders, if they do not exist
@@ -73,24 +70,18 @@ class TrainEvalRunConfigurator:
 
         trainer_config_outputs = []
         for model_name in self.model_names:
-            config_outputs = self._generate_trainer_config_outputs(
-                model_name=model_name
-            )
+            config_outputs = self._generate_trainer_config_outputs(model_name=model_name)
             trainer_config_outputs.extend(config_outputs)
 
         evaluator_config_outputs = []
         # build evaluator configs for pre-trained models
         for model_name in self.model_names:
-            config_outputs = self._generate_evaluator_config_outputs(
-                model_name=model_name
-            )
+            config_outputs = self._generate_evaluator_config_outputs(model_name=model_name)
             evaluator_config_outputs.extend(config_outputs)
 
         # build evaluator configs for fine-tuned models
         for config_output in trainer_config_outputs:
-            config_outputs = self._generate_evaluator_config_outputs(
-                trainer_config_output=config_output
-            )
+            config_outputs = self._generate_evaluator_config_outputs(trainer_config_output=config_output)
             evaluator_config_outputs.extend(config_outputs)
 
         all_config_outputs = []
@@ -98,14 +89,12 @@ class TrainEvalRunConfigurator:
         all_config_outputs.extend(evaluator_config_outputs)
         return all_config_outputs
 
-    def _generate_trainer_config_outputs(
-        self, model_name: str
-    ) -> List[ConfiguratorOutput]:
+    def _generate_trainer_config_outputs(self, model_name: str) -> List[ConfiguratorOutput]:
         config_outputs = []
         model_name_repr = model_name.split("/")[-1]
         # TODO: set dataset_type based on the type of model
         dataset_type = SftDatasetType.PROMPT_COMPLETIONS
-        run_name = f"{self.task}_{self.dataset_name}_{model_name_repr}_{dataset_type}"
+        run_name = f"{self.dataset_name}_{model_name_repr}_{dataset_type}"
         model_output_dir = os.path.join(self.output_path, run_name)
 
         trainer_run_config_paths = self.get_trainer_run_config(
@@ -156,12 +145,8 @@ class TrainEvalRunConfigurator:
         dataset_type: str,
         peft_config: LoraConfig = None,
     ) -> ConfiguratorOutput:
-        trainer_args = self.build_trainer_args(
-            model_output_dir=model_output_dir, run_name=run_name
-        )
-        trainer_data_builder_config = self.build_trainer_data_builder_config(
-            dataset_type=dataset_type
-        )
+        trainer_args = self.build_trainer_args(model_output_dir=model_output_dir, run_name=run_name)
+        trainer_data_builder_config = self.build_trainer_data_builder_config(dataset_type=dataset_type)
 
         trainer_run_config = self.build_trainer_run_config(
             auto_llm_trainer_args=auto_llm_trainer_args,
@@ -192,25 +177,17 @@ class TrainEvalRunConfigurator:
         dataset_type = SftDatasetType.PROMPT_COMPLETIONS
         if model_name:
             model_name_repr = model_name.split("/")[-1]
-            run_name = (
-                f"pre_{self.task}_{self.dataset_name}_{model_name_repr}_{dataset_type}"
-            )
+            run_name = f"pre_{self.dataset_name}_{model_name_repr}_{dataset_type}"
 
         if trainer_config_output:
-            model_name = trainer_config_output.config.get("auto_llm_trainer_args").get(
-                "model_name"
-            )
+            model_name = trainer_config_output.config.get("auto_llm_trainer_args").get("model_name")
             run_name = trainer_config_output.run_name
 
         config_outputs = None
         if trainer_config_output:
             if "lora" in trainer_config_output.run_name:
-                model_output_dir = trainer_config_output.config.get("trainer_args").get(
-                    "output_dir"
-                )
-                model_name = trainer_config_output.config.get(
-                    "auto_llm_trainer_args"
-                ).get("model_name")
+                model_output_dir = trainer_config_output.config.get("trainer_args").get("output_dir")
+                model_name = trainer_config_output.config.get("auto_llm_trainer_args").get("model_name")
                 model_args = f"pretrained={model_name},peft={model_output_dir}"
                 config_outputs = self.get_evaluator_run_config(
                     model_args=model_args,
@@ -218,9 +195,7 @@ class TrainEvalRunConfigurator:
                     priority=Priority.PRIORITY_THREE,
                 )
             elif "fft" in trainer_config_output.run_name:
-                model_output_dir = trainer_config_output.config.get("trainer_args").get(
-                    "output_dir"
-                )
+                model_output_dir = trainer_config_output.config.get("trainer_args").get("output_dir")
                 model_args = f"pretrained={model_output_dir}"
                 config_outputs = self.get_evaluator_run_config(
                     model_args=model_args,
@@ -237,13 +212,11 @@ class TrainEvalRunConfigurator:
 
         return config_outputs
 
-    def get_evaluator_run_config(
-        self, model_args: str, run_name: str, priority: Priority
-    ) -> List[ConfiguratorOutput]:
+    def get_evaluator_run_config(self, model_args: str, run_name: str, priority: Priority) -> List[ConfiguratorOutput]:
         config_outputs = []
 
         # TODO: evaluator can also take different parameters, including few-shots, etc. Handle this.
-        task = f"{self.dataset_name}_{self.task}"
+        task = f"{self.dataset_name}"
         eval_config = {
             "model": "hf",
             "tasks": task,
@@ -252,7 +225,7 @@ class TrainEvalRunConfigurator:
             "write_out": True,
             "log_samples": True,
             "output_path": "/vol/auto_llm/eval_results",
-            "include_path": "config_files/evaluator_configs/tasks",
+            "include_path": LM_EVAL_HARNESS_CUSTOM_TASKS_PATH,
         }
         config_path = self.save_config_yaml(
             config=eval_config,
@@ -300,12 +273,13 @@ class TrainEvalRunConfigurator:
     def build_trainer_data_builder_config(self, dataset_type: str):
         # TODO: set parse_output_as_json based on the type of task - structured output / otherwise
         trainer_data_builder_config = TrainerDataBuilderConfig(
-            dataset_dir=self.dataset_dir,
+            dataset_dir=self.dataset_path,
             dataset_type=dataset_type,
             instruction_template=self.instruction_template,
             input_template=self.input_template,
             output_template=self.output_template,
-            parse_output_as_json=True,
+            instruction_input_separator="\n",
+            limit=100,  # for debug
         )
         return trainer_data_builder_config
 
@@ -313,9 +287,7 @@ class TrainEvalRunConfigurator:
         peft_config = LoraConfig()
         return peft_config
 
-    def save_config_yaml(
-        self, config: Dict[str, Any], configs_path: str, config_name: str
-    ) -> str:
+    def save_config_yaml(self, config: Dict[str, Any], configs_path: str, config_name: str) -> str:
         config_path = os.path.join(configs_path, config_name)
         with open(config_path, "w+") as f:
             yaml.dump(config, f)

@@ -3,6 +3,7 @@ from typing import Dict, Any
 import yaml
 
 from auto_llm.estimator.estimator import Estimator
+from auto_llm.estimator.utils import get_model_params
 from auto_llm.evaluator.utils import parse_lm_eval_config, get_lm_eval_tasks
 
 
@@ -21,11 +22,7 @@ class InferenceFlopsEstimator(Estimator):
 
         # TODO: this fails when estimating inference FLOPs for full weights fine tuned models. Their pretrained field
         #  contains the FT model's name. This won't match any key in model keys.
-        model_name = [
-            x.replace("pretrained=", "")
-            for x in self.config.model_args.split(",")
-            if "pretrained=" in x
-        ][0]
+        model_name = [x.replace("pretrained=", "") for x in self.config.model_args.split(",") if "pretrained=" in x][0]
         N = self.get_num_params(model_name=model_name)
 
         tasks = get_lm_eval_tasks(lm_eval_args=self.config)
@@ -34,9 +31,7 @@ class InferenceFlopsEstimator(Estimator):
             num_samples += value.eval_docs.num_rows
 
         # TODO: is this how the argument is passed or used in lm-eval-harness?
-        avg_tokens_per_sample = min(
-            1024, self.models_meta[model_name].get("max_length")
-        )
+        avg_tokens_per_sample = min(1024, self.models_meta[model_name].get("max_length"))
 
         num_train_epochs = 1  # setting to 1 since this is an evaluation run
 
@@ -47,6 +42,10 @@ class InferenceFlopsEstimator(Estimator):
         return flops
 
     def get_num_params(self, model_name: str) -> int:
-        N = self.models_meta[model_name].get("num_params")
+        try:
+            N = self.models_meta[model_name].get("num_params")
+        except KeyError as e:
+            self.models_meta = get_model_params(model_names=[model_name])
+            N = self.models_meta[model_name].get("num_params")
 
         return int(N)

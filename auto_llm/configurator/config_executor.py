@@ -12,7 +12,6 @@ from auto_llm.registry.configurator_registry import (
     TRAINER_RUN_SCRIPT,
 )
 
-
 # TODO: Implement python-based config executor
 
 
@@ -27,13 +26,9 @@ class ConfigExecutor:
         # run trainer cfgs -> prio 2
         # how to decide ddp or fsdp?
         # run evaluator configs for ft models -> prio 3
-        configs_path = Path(
-            self.configurator_outputs[0].config_path
-        ).parent.parent.absolute()
+        configs_path = Path(self.configurator_outputs[0].config_path).parent.parent.absolute()
 
-        configurator_outputs_dict = [
-            output.model_dump(mode="json") for output in self.configurator_outputs
-        ]
+        configurator_outputs_dict = [output.model_dump(mode="json") for output in self.configurator_outputs]
         configurator_outputs_dict.sort(key=self.func)
 
         self.configurator_outputs = [
@@ -71,9 +66,7 @@ class ConfigExecutor:
                 job_ids_prio.append(job_id_var)
 
                 if dependencies:
-                    cmd_w_prefix = (
-                        f"{job_id_var}=$(sbatch --parsable {dependencies} {cmd})"
-                    )
+                    cmd_w_prefix = f"{job_id_var}=$(sbatch --parsable {dependencies} {cmd})"
                 else:
                     cmd_w_prefix = f"{job_id_var}=$(sbatch --parsable {cmd})"
 
@@ -97,7 +90,7 @@ class ConfigExecutor:
     def _get_trainer_run_suffix(cfg_output: ConfiguratorOutput):
         venv_path = "venv"
         env_path = "../env.sh"
-        parallelism = ...
+        parallelism = "ddp"
         # TODO: how to decide upon which parallelism to use
         cmd = f"{TRAINER_RUN_SCRIPT} {cfg_output.config_path} {venv_path} {env_path} {parallelism}"
         return cmd

@@ -1,5 +1,7 @@
 import json
+from json import JSONDecodeError
 from typing import List, Dict, Any
+from huggingface_hub import model_info
 
 from transformers import AutoModel, AutoConfig
 
@@ -13,8 +15,12 @@ from auto_llm.registry.estimator_registry import (
 def cache_model_params(model_name: str):
     model_meta = {}
 
-    model = AutoModel.from_pretrained(model_name)
-    N = sum(p.numel() for p in model.parameters())
+    info = model_info(model_name)
+    if hasattr(info, "safetensors") and info.safetensors is not None:
+        N = info.safetensors.get("total", None)
+        if not N:
+            model = AutoModel.from_pretrained(model_name)
+            N = sum(p.numel() for p in model.parameters())
 
     model_config = AutoConfig.from_pretrained(model_name).to_dict()
     for key in CTX_LENGTH_KEYS:
@@ -37,6 +43,8 @@ def get_model_params(
         with open(model_params_cache_path, "r") as f:
             models_meta = json.load(f)
     except FileNotFoundError:
+        models_meta = {}
+    except JSONDecodeError:
         models_meta = {}
 
     if not model_names:
