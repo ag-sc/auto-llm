@@ -123,6 +123,15 @@ def update_models(task: str, dataset: str, hardware_type: str, hardware_count: i
     )
 
     model_results = automator.get_models_df()
+
+    def bold_max(s):
+        is_max = s == s.max()
+        return ["font-weight: bold" if v else "" for v in is_max]
+
+    result_cols = model_results.columns[2:]
+    model_results = model_results.style.highlight_max(color="#7bb37d", axis=0, subset=result_cols)
+    model_results.apply(bold_max, subset=result_cols)
+
     return automator.model_names, model_results
 
 
@@ -255,17 +264,6 @@ with gr.Blocks() as demo:
     with gr.Tabs() as tabs:
         with gr.TabItem("Configure", id=0):
             with gr.Row(equal_height=True):
-                with gr.Column():
-                    task = gr.Dropdown(
-                        label="Task Name",
-                        choices=list(TASKS.keys()),
-                        value=None,  # noqa
-                        multiselect=False,
-                        allow_custom_value=True,
-                        interactive=True,
-                        info=f"Name of the task you configured.",
-                    )
-
                 datasets_list = ""
                 datasets_prefix = "https://huggingface.co/datasets"
                 for dataset in Automator.get_datasets():
@@ -274,7 +272,18 @@ with gr.Blocks() as demo:
                 with gr.Column():
                     dataset_path = gr.Textbox(
                         label="Dataset Path",
-                        info=f"Path of the dataset belonging to the ``Task`` you configured. It can either be HuggingFace links or local paths. Examples:\n{datasets_list}",
+                        info=f"Path of the dataset. This can either be remote HuggingFace Datasets paths or local paths. Examples:\n{datasets_list}",
+                    )
+
+                with gr.Column():
+                    task = gr.Dropdown(
+                        label="Task Category",
+                        choices=list(TASKS.keys()),
+                        value=None,  # noqa
+                        multiselect=False,
+                        allow_custom_value=True,
+                        interactive=True,
+                        info=f"Category of the task.",
                     )
 
             with gr.Row(equal_height=True):
@@ -300,25 +309,21 @@ with gr.Blocks() as demo:
                             interactive=True,
                         ),
                     )
+            with gr.Group():
+                model_names = gr.Dropdown(
+                    label="Models",
+                    # TODO: model names should be listed based on the configured task and language.
+                    # TODO: also, consider the hardware requirements while selecting models
+                    choices=None,
+                    value=None,  # noqa
+                    multiselect=True,
+                    allow_custom_value=True,
+                    info="Pick models from the list or of your choice. You can also add models from HuggingFace Models. See: [here](https://huggingface.co/models).",
+                )
 
-            with gr.Row(equal_height=True):
-                with gr.Column():
-                    model_names = gr.Dropdown(
-                        label="Models",
-                        # TODO: model names should be listed based on the configured task and language.
-                        # TODO: also, consider the hardware requirements while selecting models
-                        choices=None,
-                        value=None,  # noqa
-                        multiselect=True,
-                        allow_custom_value=True,
-                        info="Pick models from the list or of your choice. You can also add models from HuggingFace. See: [here](https://huggingface.co/models).",
-                    )
-
-                    with gr.Accordion(label="Model Overview", open=False):
-                        gr.Markdown("Based on results from [Open LLM Leaderboard](https://huggingface.co/spaces/open-llm-leaderboard/open_llm_leaderboard).")
-                        model_results = gr.Dataframe(
-                            value=None,
-                        )
+                with gr.Accordion(label="Model Overview", open=False):
+                    gr.Markdown("Based on results from [Open LLM Leaderboard](https://huggingface.co/spaces/open-llm-leaderboard/open_llm_leaderboard).")
+                    model_results = gr.Dataframe(value=None)
 
             with gr.Row(equal_height=True):
                 with gr.Column():

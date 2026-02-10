@@ -45,20 +45,14 @@ def load_models(lms_api: LmsRestDelegate, cfg: str):
     return status
 
 
-def generate(
-    lms_api: LmsRestDelegate, model_name: str, text: str, generation_kwargs: str
-):
+def generate(lms_api: LmsRestDelegate, model_name: str, text: str, generation_kwargs: str):
     generation_kwargs = json.loads(generation_kwargs)
-    response = lms_api.generate(
-        model_name=model_name, messages=[text], generation_kwargs=generation_kwargs
-    )[0]
+    response = lms_api.generate(model_name=model_name, messages=[text], generation_kwargs=generation_kwargs)[0]
     return response
 
 
 def update_models_dropdown(models):
-    return gr.update(
-        choices=models, interactive=True, value="", allow_custom_value=False
-    )
+    return gr.update(choices=models, interactive=True, value="", allow_custom_value=False)
 
 
 with gr.Blocks() as demo:
@@ -71,10 +65,8 @@ with gr.Blocks() as demo:
                 container=False,
             )
             with gr.Accordion("Connect", open=False):
-                gr.Markdown(
-                    "Connect to the **Language Model Service** endpoint. This should be running in `localhost`."
-                )
-                port = gr.Textbox(label="Port", value="9985", interactive=True)
+                gr.Markdown("Connect to the **Language Model Service** endpoint. This should be running in `localhost`.")
+                port = gr.Textbox(label="Port", value="8000", interactive=True)
                 connect_btn = gr.Button("Connect")
 
                 lms_api = gr.State()
@@ -140,9 +132,7 @@ with gr.Blocks() as demo:
             outputs=[response],
         )
 
-        load_btn.click(
-            fn=load_models, inputs=[lms_api, cfg], outputs=[load_status]
-        ).then(fn=get_available_models, inputs=[lms_api], outputs=[loaded_models]).then(
+        load_btn.click(fn=load_models, inputs=[lms_api, cfg], outputs=[load_status]).then(fn=get_available_models, inputs=[lms_api], outputs=[loaded_models]).then(
             fn=update_models_dropdown,
             inputs=[loaded_models],
             outputs=[model_name],

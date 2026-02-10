@@ -22,9 +22,7 @@ class Automator:
     -
     """
 
-    def __init__(
-        self, task_type: str, dataset: str, hardware_type: str, hardware_count: int
-    ) -> None:
+    def __init__(self, task_type: str, dataset: str, hardware_type: str, hardware_count: int) -> None:
         # TODO: task_type should be of type Task
         self.task_type = task_type
 
