@@ -14,7 +14,7 @@ peft_config:
 
 trainer_data_builder_config:
   dataset_dir: llm-4-kmu/qa_pubmed_gen_qa
-  instruction_template: "Answer the following Question based on the given Context. Answer with a 'yes', 'no' or 'maybe'."
+  instruction_template: "Answer the following question based on the given abstract. Answer only with a yes/no/maybe."
   input_template: "{{input}}\nAnswer:"
   output_template: "{{output}}"
   dataset_type: prompt_completions

@@ -3,10 +3,8 @@ tag:
 
 task: pubmed_mcqa
 
-dataset_path: arrow
-dataset_kwargs:
-  data_files:
-    test: /vol/auto_llm/processed_datasets/qa/pubmed_mcqa/test/data-00000-of-00001.arrow
+dataset_path: llm-4-kmu/pubmed_mcqa
+
 test_split: test
 
 output_type: multiple_choice

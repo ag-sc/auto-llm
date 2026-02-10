@@ -237,16 +237,17 @@ def update_estimates(config_path: str, gpu_name: str, gpu_count: int):
 
 
 def wandb_report(url):
-    iframe = f'<iframe id="my-frame" src={url} style="border:none;height:1024px;width:100%"></iframe>'
-    refresh_script = """
+    iframe = """
+<iframe id="my-frame" src={url} style="border:none;height:1024px;width:100%"></iframe>
 <script>
-    setInterval(function(){
-        document.getElementById('my-frame').src = document.getElementById('my-frame').src;
-    }, 5000); // Refreshes every 5 seconds
-</script>    
-    """
+window.setInterval("reloadIFrame();", 20000);
+function reloadIFrame() {
+ var frameHolder=document.getElementById("my-frame");
+frameHolder.src={url}
+}
+</script>
+    """.replace("{url}", url).strip()
 
-    iframe = iframe + "\n" + refresh_script
     return gr.HTML(iframe)
 
 
