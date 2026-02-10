@@ -14,3 +14,4 @@ wandb/*
 .cache
 *.gradio*
 *.egg*
+.logs

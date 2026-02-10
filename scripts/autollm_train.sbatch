@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH --job-name=autollm-train
 #SBATCH --partition=gpu
-#SBATCH --gres=gpu:4
-#SBATCH --cpus-per-task=1
+#SBATCH --gres=gpu:1
+#SBATCH --cpus-per-task=120
 #SBATCH --time=03:00:00
 #SBATCH --mail-type=BEGIN,FAIL,END
 #SBATCH --output=/vol/auto_llm/logs/%x-%u-%j.out

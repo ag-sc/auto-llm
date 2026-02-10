@@ -12,7 +12,7 @@ Output: Structured Output
 Example tasks: NER task, PICO
 """
 
-with open("config_files/sample_configs/sample_sequence_to_structured_output_trainer_run.yaml", "r") as f:
+with open("config_files/trainer_configs/sample_configs/sample_sequence_to_structured_output_trainer_run.yaml", "r") as f:
     config = yaml.safe_load(f.read())
 
 sample_trainer_run_config = TrainerRunConfig.model_validate(config)

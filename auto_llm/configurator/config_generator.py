@@ -108,16 +108,15 @@ class TrainEvalRunConfigurator:
 
         return config_outputs
 
-    def get_trainer_run_config(
-        self, dataset_type: str, model_name: str, model_output_dir: str, run_name: str
-    ) -> List[ConfiguratorOutput]:
+    def get_trainer_run_config(self, dataset_type: str, model_name: str, model_output_dir: str, run_name: str) -> List[ConfiguratorOutput]:
         config_outputs = []
         auto_llm_trainer_args = self.build_auto_llm_trainer_args(model_name=model_name)
 
         # full weights FT
+        curr_run_name = f"fft_{run_name}"
         config_output = self._build_trainer_config(
-            run_name=f"fft-{run_name}",
-            model_output_dir=model_output_dir,
+            run_name=curr_run_name,
+            model_output_dir=os.path.join(self.output_path, curr_run_name),
             auto_llm_trainer_args=auto_llm_trainer_args,
             dataset_type=dataset_type,
             peft_config=None,
@@ -126,9 +125,10 @@ class TrainEvalRunConfigurator:
 
         # PEFT fine tuning
         peft_config = self.build_peft_config()
+        curr_run_name = f"lora_{run_name}"
         config_output = self._build_trainer_config(
-            run_name=f"lora-{run_name}",
-            model_output_dir=model_output_dir,
+            run_name=curr_run_name,
+            model_output_dir=os.path.join(self.output_path, curr_run_name),
             auto_llm_trainer_args=auto_llm_trainer_args,
             dataset_type=dataset_type,
             peft_config=peft_config,
@@ -169,9 +169,7 @@ class TrainEvalRunConfigurator:
             priority=Priority.PRIORITY_TWO,
         )
 
-    def _generate_evaluator_config_outputs(
-        self, model_name: str = None, trainer_config_output: ConfiguratorOutput = None
-    ):
+    def _generate_evaluator_config_outputs(self, model_name: str = None, trainer_config_output: ConfiguratorOutput = None):
         run_name = None
         # TODO: set dataset_type based on the type of model
         dataset_type = SftDatasetType.PROMPT_COMPLETIONS
@@ -188,7 +186,7 @@ class TrainEvalRunConfigurator:
             if "lora" in trainer_config_output.run_name:
                 model_output_dir = trainer_config_output.config.get("trainer_args").get("output_dir")
                 model_name = trainer_config_output.config.get("auto_llm_trainer_args").get("model_name")
-                model_args = f"pretrained={model_name},peft={model_output_dir}"
+                model_args = f"pretrained={model_name},peft={model_output_dir},attn_implementation=flash_attention_2"
                 config_outputs = self.get_evaluator_run_config(
                     model_args=model_args,
                     run_name=run_name,
@@ -196,14 +194,14 @@ class TrainEvalRunConfigurator:
                 )
             elif "fft" in trainer_config_output.run_name:
                 model_output_dir = trainer_config_output.config.get("trainer_args").get("output_dir")
-                model_args = f"pretrained={model_output_dir}"
+                model_args = f"pretrained={model_output_dir},attn_implementation=flash_attention_2"
                 config_outputs = self.get_evaluator_run_config(
                     model_args=model_args,
                     run_name=run_name,
                     priority=Priority.PRIORITY_THREE,
                 )
         else:
-            model_args = f"pretrained={model_name}"
+            model_args = f"pretrained={model_name},attn_implementation=flash_attention_2"
             config_outputs = self.get_evaluator_run_config(
                 model_args=model_args,
                 run_name=run_name,
@@ -279,7 +277,7 @@ class TrainEvalRunConfigurator:
             input_template=self.input_template,
             output_template=self.output_template,
             instruction_input_separator="\n",
-            limit=100,  # for debug
+            # limit=100,  # for debug
         )
         return trainer_data_builder_config
 

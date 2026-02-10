@@ -47,7 +47,7 @@ class AutoLlmTrainerArgs(BaseModel):
         description="Name of the model to further train",
         title="Model Name",
         examples=["eager", "sdpa", "flash_attention_2", "flash_attention_3"],
-        default="eager",
+        default="flash_attention_2",
     )
     truncation: bool = Field(
         description="Sets truncation of the input sequences",
@@ -67,7 +67,7 @@ class TrainerArgs(BaseModel):
     max_length: int = Field(
         description="Maximum sequence length. This lets the tokenizer decide how long to pad and/or to truncate the input sequences",
         title="Maximum Length",
-        default=1024,
+        default=2048,
     )
     bf16: bool = Field(
         description="Whether to use bf16 16-bit (mixed) precision training instead of 32-bit training.",
@@ -120,7 +120,7 @@ class TrainerArgs(BaseModel):
     num_train_epochs: int = Field(
         description="Total number of training epochs to perform",
         title="Number of Training Epochs",
-        default=5,
+        default=1,
     )
     learning_rate: float = Field(
         description="The initial learning rate for the optimizer.",
@@ -184,7 +184,7 @@ class TrainerArgs(BaseModel):
     save_strategy: SaveStrategy = Field(
         description="The frequency of saving model checkpoints.",
         title="Save Strategy",
-        default=IntervalStrategy.STEPS,
+        default=IntervalStrategy.EPOCH,
     )
     save_steps: int | float = Field(
         description="Number of updates steps before two checkpoint saves if save_strategy=steps",

@@ -9,13 +9,7 @@ import yaml
 
 from auto_llm.automator.automator import Automator
 
-
-from auto_llm.registry.prompt_templates_registry import (
-    INSTRUCTION_TEMPLATES_MAPPING,
-    INPUT_TEMPLATES_MAPPING,
-    OUTPUT_TEMPLATES_MAPPING,
-)
-from auto_llm.configurator.config_executor import ConfigExecutor
+from auto_llm.configurator.config_executor import ConfigExecutor, SequentialConfigExecutor
 from auto_llm.configurator.config_generator import (
     TrainEvalRunConfigurator,
     ConfiguratorOutput,
@@ -148,8 +142,12 @@ def save_file(file_path: str, file_contents: str):
         raise gr.Error(f"YAML file is corrupt. Cannot save file: {file_path}")
 
 
-def execute_configs(configurator_outputs: List[ConfiguratorOutput]):
-    executor = ConfigExecutor(configurator_outputs=configurator_outputs)
+def execute_configs(job_id_to_attach: int, configurator_outputs: List[ConfiguratorOutput]):
+    if job_id_to_attach != -1:
+        executor = SequentialConfigExecutor(configurator_outputs=configurator_outputs, job_id_to_attach=job_id_to_attach)
+    else:
+        executor = ConfigExecutor(configurator_outputs=configurator_outputs)
+
     try:
         executor.execute()
         gr.Success("Your jobs are submitted!")
@@ -239,14 +237,23 @@ def update_estimates(config_path: str, gpu_name: str, gpu_count: int):
 
 
 def wandb_report(url):
-    iframe = f'<iframe src={url} style="border:none;height:1024px;width:100%">'
+    iframe = f'<iframe id="my-frame" src={url} style="border:none;height:1024px;width:100%"></iframe>'
+    refresh_script = """
+<script>
+    setInterval(function(){
+        document.getElementById('my-frame').src = document.getElementById('my-frame').src;
+    }, 5000); // Refreshes every 5 seconds
+</script>    
+    """
+
+    iframe = iframe + "\n" + refresh_script
     return gr.HTML(iframe)
 
 
 with gr.Blocks() as demo:
     with gr.Tabs() as tabs:
         with gr.TabItem("Configure", id=0):
-            with gr.Row():
+            with gr.Row(equal_height=True):
                 with gr.Column():
                     task = gr.Dropdown(
                         label="Task Name",
@@ -307,9 +314,7 @@ with gr.Blocks() as demo:
                     )
 
                     with gr.Accordion(label="Model Overview", open=False):
-                        gr.Markdown(
-                            "Based on results from [Open LLM Leaderboard](https://huggingface.co/spaces/open-llm-leaderboard/open_llm_leaderboard)."
-                        )
+                        gr.Markdown("Based on results from [Open LLM Leaderboard](https://huggingface.co/spaces/open-llm-leaderboard/open_llm_leaderboard).")
                         model_results = gr.Dataframe(
                             value=None,
                         )
@@ -372,6 +377,7 @@ with gr.Blocks() as demo:
 
         with gr.TabItem("Run", id=2):
             gr.Markdown("Run the configurations by clicking the button.")
+            job_id_to_attach = gr.Textbox(label="Job ID To Attach", value=-1)
             run_btn = gr.Button("✅ Run")
 
             gr.Markdown("You can see the status of the scheduled jobs here.")
@@ -429,9 +435,7 @@ with gr.Blocks() as demo:
             output_template,
         ],
         outputs=[configurator_outputs, configs_path],
-    ).success(fn=update_file_explorer, inputs=[configs_path], outputs=[config_explorer]).then(
-        fn=change_tab, inputs=[gr.State(1)], outputs=[tabs]
-    )
+    ).success(fn=update_file_explorer, inputs=[configs_path], outputs=[config_explorer]).then(fn=change_tab, inputs=[gr.State(1)], outputs=[tabs])
 
     config_explorer.change(fn=view_yaml_file, inputs=[config_explorer], outputs=[file_viewer]).success(
         fn=update_file_name, inputs=[config_explorer], outputs=[file_viewer]
@@ -448,7 +452,7 @@ with gr.Blocks() as demo:
         inputs=[config_explorer, file_viewer],
     )
 
-    run_btn.click(fn=execute_configs, inputs=[configurator_outputs])
+    run_btn.click(fn=execute_configs, inputs=[job_id_to_attach, configurator_outputs])
 
 if __name__ == "__main__":
     demo.launch()
