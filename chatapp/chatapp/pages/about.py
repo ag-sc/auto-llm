@@ -1,0 +1,36 @@
+"""The about page."""
+
+import reflex as rx
+
+from ..templates import template
+
+text = """<h1 align="center">
+AutoLLM
+</h1>
+
+<p align="center">
+    <strong>⚙️ Train and ⚖️ Evaluate your LMs effortlessly!</strong>
+</p>
+
+<p align="center">
+ <a href="https://llm4kmu.de/"><b>Website</b></a> 
+| <a href="https://wandb.ai/llm4kmu/projects"><b>Reports</b></a> 
+| <a href="https://www.linkedin.com/company/llm4kmu/"><b>LinkedIn</b></a>
+| <a href="https://github.com/ag-sc/auto-llm"><b>Code</b></a>
+
+</p>
+
+
+**AutoLLM** supports you in finding the **right** open source model, architecture and training method for your application. Inspired by "Auto-ML" methods, **AutoLLM** automatically determines the optimal LLM configuration for a problem, train and evaluate different LLMs for your application. You can choose from different open-source models, training techniques and evaluation metrics.
+
+The platform is part of the project "LLM4KMU". 
+
+
+> Optimierter Einsatz von Open Source Large Language Models (LLMs) in kleinen und mittelständischen Unternehmen (KMUs). Mit Mitteln der Europäischen Union gefördert. 
+> 
+> **#efre #efrenrw #EUinmyRegion**
+"""
+
+@template(route="/about", title="About")
+def about() -> rx.Component:
+    return rx.markdown(text,)

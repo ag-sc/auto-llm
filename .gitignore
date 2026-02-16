@@ -15,3 +15,15 @@ wandb/*
 *.gradio*
 *.egg*
 .logs
+
+
+*.states*
+assets/external/
+*.db
+*.py[cod]
+.cursorignore
+.venv/
+.vscode/
+*.web*
+__pycache__/
+venv/

@@ -1,0 +1,82 @@
+{
+    "NVIDIA H200 PCIe 141GB":{
+        "tdp":350,
+        "tflops":1513.0,
+        "memory":141
+    },
+    "NVIDIA H100 SXM5 80GB":{
+        "tdp":700,
+        "tflops":1979.0,
+        "memory":80
+    },
+    "NVIDIA H100 PCIe 80GB":{
+        "tdp":350,
+        "tflops":1513.0,
+        "memory":80
+    },
+    "NVIDIA V100 SXM2 32GB":{
+        "tdp":300,
+        "tflops":125.0,
+        "memory":32
+    },
+    "NVIDIA L40S":{
+        "tdp":350,
+        "tflops":733.0,
+        "memory":48
+    },
+    "NVIDIA A100 PCIe 80GB":{
+        "tdp":300,
+        "tflops":312.0,
+        "memory":80
+    },
+    "NVIDIA A100 SXM4 80GB":{
+        "tdp":400,
+        "tflops":312.0,
+        "memory":80
+    },
+    "NVIDIA A100 PCIe 40GB":{
+        "tdp":250,
+        "tflops":312.0,
+        "memory":40
+    },
+    "NVIDIA A40":{
+        "tdp":300,
+        "tflops":149.7,
+        "memory":48
+    },
+    "NVIDIA A6000":{
+        "tdp":300,
+        "tflops":309.7,
+        "memory":48
+    },
+    "NVIDIA RTX 4090":{
+        "tdp":450,
+        "tflops":661.0,
+        "memory":24
+    },
+    "NVIDIA RTX 3090":{
+        "tdp":350,
+        "tflops":285.0,
+        "memory":24
+    },
+    "NVIDIA GTX TITAN X":{
+        "tdp":250,
+        "tflops":0.35,
+        "memory":12
+    },
+    "NVIDIA GTX 1080 Ti":{
+        "tdp":250,
+        "tflops":0.18,
+        "memory":11
+    },
+    "NVIDIA GTX 1080":{
+        "tdp":180,
+        "tflops":0.08,
+        "memory":8
+    },
+    "NVIDIA GTX 750":{
+        "tdp":55,
+        "tflops":0.05,
+        "memory":1
+    }
+}
