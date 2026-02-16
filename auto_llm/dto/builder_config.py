@@ -49,15 +49,15 @@ class TrainerDataBuilderConfig(BaseModel):
     )
     instruction_template: str = Field(
         title="Instruction Template",
-        description="The template for the instruction. This is the text that goes to the ``system`` field in case of an instruction tuned model. You can also add placeholders to be replaced with input or examples. \nPossible placeholders: ``{{input}}``, ``{{examples}}``",
+        description="The template for the **instruction**. This is the text that goes to the ``system`` field in case of an instruction tuned model. You can also add placeholders to be replaced with input or examples.<br><br>Possible placeholders: ``{{input}}``, ``{{examples}}``",
     )
     input_template: str = Field(
         title="Input Template",
-        description="The template for the input text. This is the text that goes to the ``user`` field in case of an instruction tuned model. You can also add placeholders to be replaced with input or examples. \nPossible placeholders: ``{{input}}``, ``{{examples}}``",
+        description="The template for the **input text**. This is the text that goes to the ``user`` field in case of an instruction tuned model. You can also add placeholders to be replaced with input or examples.<br><br>Possible placeholders: ``{{input}}``, ``{{examples}}``",
     )
     output_template: str = Field(
         title="Output Template",
-        description="The template for the output text. This is the template for the expected response from the model. You can also add placeholders to be replaced with output. \nPossible placeholders: ``{{output}}``",
+        description="The template for the **output text**. This is the template for the expected response from the model. You can also add placeholders to be replaced with output.<br><br>Possible placeholders: ``{{output}}``",
     )
     dataset_type: Union[SftDatasetType, str] = Field(
         title="Dataset Type",

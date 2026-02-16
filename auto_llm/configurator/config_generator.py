@@ -60,7 +60,7 @@ class TrainEvalRunConfigurator:
         self.trainer_run_configs_path = os.path.join(self.configs_path, "trainer_run_configs")
         self.evaluator_run_configs_path = os.path.join(self.configs_path, "evaluator_run_configs")
 
-    def generate(self):
+    def generate(self) -> List[ConfiguratorOutput]:
         # create sub-folders, if they do not exist
         if not os.path.exists(self.trainer_run_configs_path):
             os.makedirs(self.trainer_run_configs_path)
