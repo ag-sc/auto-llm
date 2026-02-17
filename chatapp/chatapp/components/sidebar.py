@@ -3,6 +3,7 @@
 import reflex as rx
 
 from .. import styles
+from ..state.user import User
 
 
 def sidebar_header() -> rx.Component:
@@ -13,12 +14,10 @@ def sidebar_header() -> rx.Component:
 
     """
     return rx.hstack(
-        # The logo.
         rx.color_mode_cond(
             rx.image(src="/AutoLLM.png", height="5em"),
             rx.image(src="/AutoLLM.png", height="5em"),
         ),
-        # rx.heading("AutoLLM"),
         rx.spacer(),
         align="center",
         width="100%",
@@ -34,19 +33,30 @@ def sidebar_footer() -> rx.Component:
         The sidebar footer component.
 
     """
-    return rx.hstack(
+    return rx.vstack(
+        rx.hstack(
         rx.link(
             rx.text("Docs", size="3"),
             href="https://github.com/ag-sc/autollm/",
             color_scheme="gray",
-            underline="none",
+                underline="none",
+            ),
+            rx.spacer(),
+            rx.color_mode.button(style={"opacity": "0.8", "scale": "0.95"}, size="3"),
+            justify="start",
+            align="center",
+            width="100%",
+            padding="0.35em",
         ),
-        rx.spacer(),
-        rx.color_mode.button(style={"opacity": "0.8", "scale": "0.95"}),
-        justify="start",
-        align="center",
-        width="100%",
-        padding="0.35em",
+        rx.hstack(
+                rx.icon("user", size=16),
+            rx.text(User.username_display, weight="bold", size="2"),
+                rx.button(rx.icon("log_out", size=16), on_click=User.handle_sign_out),
+                align="center", spacing="2", justify="end", width="100%",
+
+        ),
+        width="100%", align_items="column",
+
     )
 
 
@@ -128,11 +138,11 @@ def sidebar() -> rx.Component:
     from reflex.page import DECORATED_PAGES
 
     ordered_page_routes = [
-        "/",
+        "/overview",
         "/configure",
         "/monitor",
         "/chat",
-        "/settings",
+        "/about",
     ]
 
     pages = [
@@ -159,7 +169,7 @@ def sidebar() -> rx.Component:
                         text=page.get("title", page["route"].strip("/").capitalize()),
                         url=page["route"],
                     )
-                    for page in ordered_pages
+                    for page in ordered_pages if page["route"] != "/"
                 ],
                 spacing="1",
                 width="100%",

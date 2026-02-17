@@ -2,6 +2,7 @@
 
 import reflex as rx
 
+from ..state.user import User
 from ..templates import template
 
 text = """<h1 align="center">
@@ -31,6 +32,6 @@ The platform is part of the project "LLM4KMU".
 > **#efre #efrenrw #EUinmyRegion**
 """
 
-@template(route="/about", title="About")
+@template(route="/about", title="About", on_load=User.check_logged_in)
 def about() -> rx.Component:
     return rx.markdown(text,)

@@ -1,5 +1,5 @@
 import datetime
-from typing import Optional, List, Tuple, Any
+from typing import Optional, List
 
 import pandas as pd
 import reflex as rx
@@ -311,14 +311,15 @@ def show_configuration(configurator_output: ConfiguratorOutput):
                 (Priority.PRIORITY_ONE, status_badge("1")),
                 (Priority.PRIORITY_TWO, status_badge("2")),
                 (Priority.PRIORITY_THREE, status_badge("3")),
-            )
+            ),
         ),
         rx.table.cell(
             rx.match(
                 configurator_output.mode,
                 (ConfigMode.TRAINER_RUN_CFG, status_badge(ConfigMode.TRAINER_RUN_CFG.name)),
                 (ConfigMode.EVALUATOR_RUN_CFG, status_badge(ConfigMode.EVALUATOR_RUN_CFG.name)),
-            )
+            ),
+            align="center",
         ),
         rx.table.cell(
             rx.hstack(
@@ -375,9 +376,9 @@ def show_configuration(configurator_output: ConfiguratorOutput):
                               gpu_count=FormState.hardware_count
                           )
                           ),
-                rx.text(ConfigState.est_runtime)
-            )
-
+                rx.text(ConfigState.est_runtime),
+            ),
+            align = "center"
         ),
         rx.table.cell(rx.text(ConfigState.est_emission)),
         rx.table.cell(
@@ -387,7 +388,8 @@ def show_configuration(configurator_output: ConfiguratorOutput):
                 ("2", status_badge("Pending")),
                 ("3", status_badge("Cancelled")),
                 status_badge("Pending"),
-            )
+            ),
+            align="center"
         ),
 
         # rx.table.cell(
