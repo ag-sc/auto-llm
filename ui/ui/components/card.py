@@ -1,6 +1,6 @@
 import reflex as rx
 
-from chatapp import styles
+from ui import styles
 
 
 def card(*children, **props):

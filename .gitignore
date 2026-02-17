@@ -1,3 +1,5 @@
+.web
+.states
 .idea
 *venv*
 .pytest_cache
@@ -10,11 +12,12 @@ LLMS.egg-info
 *.env*
 models
 *.out
-wandb/*
+*wandb/*
 .cache
 *.gradio*
 *.egg*
 .logs
+
 
 
 *.states*

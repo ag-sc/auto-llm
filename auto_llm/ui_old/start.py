@@ -1,6 +1,6 @@
 import gradio as gr
 
-from auto_llm.ui.pages import home, automate, train, eval, playground, define
+from auto_llm.ui_old.pages import home, automate, train, eval, playground, define
 
 with gr.Blocks(
     title="AutoLLM",

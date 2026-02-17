@@ -2,7 +2,6 @@ import reflex as rx
 
 from ..state.user import User
 
-
 @rx.page(route="/", title="Login", on_load=User.check_login)
 def login() -> rx.Component:
     return rx.center(

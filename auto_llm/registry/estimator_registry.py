@@ -7,5 +7,5 @@ CTX_LENGTH_KEYS = [
 ]
 
 
-MODEL_PARAMS_CACHE_PATH = "/vol/auto_llm/stats/model_params.json"
-GPU_PARAMS_CACHE_PATH = "/vol/auto_llm/stats/gpu_params.json"
+MODEL_PARAMS_CACHE_PATH = "assets/model_params.json"
+GPU_PARAMS_CACHE_PATH = "assets/gpu_params.json"

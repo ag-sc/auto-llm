@@ -3,7 +3,7 @@ from reflex.components.radix.themes.base import (
     LiteralAccentColor,
 )
 
-from chatapp import styles
+from ui import styles
 
 
 def notification(icon: str, color: LiteralAccentColor, count: int) -> rx.Component:
