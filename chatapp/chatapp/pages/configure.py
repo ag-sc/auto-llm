@@ -8,7 +8,11 @@ import yaml
 from auto_llm.automator.automator import Automator
 from auto_llm.configurator.config_generator import TrainEvalRunConfigurator, ConfiguratorOutput, ConfigMode, Priority
 from auto_llm.dto.builder_config import TrainerDataBuilderConfig
-from auto_llm.estimator.utils import get_gpu_params
+from auto_llm.estimator.emission_estimator import EmissionEstimator
+from auto_llm.estimator.inference_flops_estimator import InferenceFlopsEstimator
+from auto_llm.estimator.runtime_estimator import RuntimeEstimator
+from auto_llm.estimator.trainer_flops_estimator import TrainerFlopsEstimator
+from auto_llm.estimator.utils import get_gpu_params, get_model_params
 from auto_llm.tasks.registry import TASKS
 from ..components.status_badge import status_badge
 from ..templates import template
@@ -16,6 +20,80 @@ from ..templates import template
 GPU_PARAMS = get_gpu_params()
 CONFIGS_DIR = ".cache"
 OUTPUT_DIR = ".cache/sft_models/"
+
+
+class ConfigState(rx.State):
+    current_yaml_content: str = ""
+    current_path: str = ""
+
+    current_gpu_name: str = ""
+    current_gpu_count: int = 0
+
+    est_runtime: str = ""
+    est_emission: str = ""
+
+    def load_config(self, path: str):
+        self.current_path = path
+        try:
+            with open(path, "r") as f:
+                data = yaml.safe_load(f)
+                self.current_yaml_content = yaml.dump(data)
+        except Exception as e:
+            self.current_yaml_content = ""
+
+    def update_content(self, new_value: str):
+        """Update the state as the user types."""
+        self.current_yaml_content = new_value
+
+    def save_config(self):
+        """Optional: Save the edited changes back to the file."""
+        try:
+            with open(self.current_path, "w") as f:
+                f.write(self.current_yaml_content)
+            return rx.toast("File saved successfully!")
+        except Exception as e:
+            return rx.toast(f"Error saving: {e}")
+
+
+    def load_estimates(self, path: str, gpu_name: str, gpu_count: int):
+        self.current_path = path
+        self.current_gpu_name = gpu_name
+        self.current_gpu_count = gpu_count
+
+        models_meta = get_model_params()
+
+        if "eval" in self.current_path:
+            flops_estimator = InferenceFlopsEstimator(config_path=self.current_path, models_meta=models_meta)
+        elif "train" in self.current_path:
+            # TODO: models_meta is not updated with the requested model
+            flops_estimator = TrainerFlopsEstimator(config_path=self.current_path, models_meta=models_meta)
+        else:
+            self.est_runtime = f"-1 seconds"
+            self.est_emission = f"-1 grams"
+
+            return rx.toast(f"Error estimating.")
+
+        gpu_params = get_gpu_params()
+        runtime_estimator = RuntimeEstimator(
+            flops_estimator=flops_estimator,
+            gpu_params=gpu_params,
+            gpu_name=gpu_name,
+        )
+        runtime = runtime_estimator.estimate()
+
+        emission_estimator = EmissionEstimator(
+            runtime_estimator=runtime_estimator,
+            gpu_params=gpu_params,
+            gpu_name=gpu_name,
+        )
+
+        emission = emission_estimator.estimate()
+
+        self.est_runtime = f"{round(runtime, 2)} seconds"
+        self.est_emission = f"{round(emission, 2)} grams"
+
+        return None
+
 
 class FormState(rx.State):
     current_tab = "settings"
@@ -209,17 +287,6 @@ def _header_cell(text: str, icon: str):
         ),
     )
 
-def view_yaml_file(path: str):
-    print("path", path)
-    try:
-        with open(path, "r") as f:
-            data = yaml.safe_load(f)
-
-        data = yaml.dump(data)
-    except FileNotFoundError:
-        print("File not found", path)
-        data = ""
-    return data
 
 def dialog_popover(config_path: str, config_yaml: str):
     return rx.dialog.root(
@@ -237,23 +304,7 @@ def dialog_popover(config_path: str, config_yaml: str):
 def show_configuration(configurator_output: ConfiguratorOutput):
     """Show a customer in a table row."""
 
-    config_yaml = view_yaml_file(path=rx.text(configurator_output.config_path))
-
     return rx.table.row(
-        rx.table.cell(
-            rx.hstack(
-                rx.text(configurator_output.run_name),
-                dialog_popover(config_path=configurator_output.config_path, config_yaml=config_yaml),
-            )
-
-        ),
-        rx.table.cell(
-            rx.match(
-                configurator_output.mode,
-                (ConfigMode.TRAINER_RUN_CFG, status_badge(ConfigMode.TRAINER_RUN_CFG.name)),
-                (ConfigMode.EVALUATOR_RUN_CFG, status_badge(ConfigMode.EVALUATOR_RUN_CFG.name)),
-            )
-        ),
         rx.table.cell(
             rx.match(
                 configurator_output.priority,
@@ -264,6 +315,73 @@ def show_configuration(configurator_output: ConfiguratorOutput):
         ),
         rx.table.cell(
             rx.match(
+                configurator_output.mode,
+                (ConfigMode.TRAINER_RUN_CFG, status_badge(ConfigMode.TRAINER_RUN_CFG.name)),
+                (ConfigMode.EVALUATOR_RUN_CFG, status_badge(ConfigMode.EVALUATOR_RUN_CFG.name)),
+            )
+        ),
+        rx.table.cell(
+            rx.hstack(
+                # rx.text(configurator_output.run_name ),
+                rx.dialog.root(
+                    rx.dialog.trigger(rx.button(rx.text(configurator_output.run_name ), variant="outline", size="1", on_click=ConfigState.load_config(configurator_output.config_path))),
+                    rx.dialog.content(
+                        rx.vstack(
+                        rx.text(f"Path: {configurator_output.config_path}"),
+                            rx.text_area(
+                                value=ConfigState.current_yaml_content,
+                                on_change=ConfigState.update_content,
+
+                                # 1. Font & Alignment
+                                font_family="Source Code Pro, Menlo, Monaco, Lucide Console, monospace",
+                                font_size="13px",
+                                line_height="1.5",
+
+                                # 2. Sizing & Scrolling
+                                width="100%",
+                                height="500px",
+
+                                # 3. YAML Formatting Essentials (Custom CSS)
+                                style={
+                                    "white-space": "pre",  # Crucial: Preserves leading spaces/tabs
+                                    "overflow_x": "auto",  # Horizontal scroll for long lines
+                                    "tab_size": "2",  # YAML standard is 2 spaces
+                                    "resize": "vertical",  # Let users pull the box larger
+                                    "padding": "1rem",
+                                    "border": "1px solid var(--gray-5)",
+                                    "background": "var(--gray-2)",  # Suble gray background for code
+                                },
+                            ),
+                            rx.hstack(
+                                rx.dialog.close(rx.button("Cancel", variant="soft")),
+                                rx.button("Save Changes", on_click=ConfigState.save_config),
+                                justify="end",
+                                width="100%",
+                            ),
+                            spacing="2",
+                            padding="1rem",
+                        ),
+                        width="100%",
+                    ),
+                )
+            )
+        ),
+        rx.table.cell(
+            rx.hstack(
+                rx.button(rx.icon("view"), variant="soft", size="1",
+                          on_click=ConfigState.load_estimates(
+                              path=configurator_output.config_path,
+                              gpu_name=FormState.hardware_type,
+                              gpu_count=FormState.hardware_count
+                          )
+                          ),
+                rx.text(ConfigState.est_runtime)
+            )
+
+        ),
+        rx.table.cell(rx.text(ConfigState.est_emission)),
+        rx.table.cell(
+            rx.match(
                 configurator_output.priority,
                 ("1", status_badge("Delivered")),
                 ("2", status_badge("Pending")),
@@ -271,6 +389,7 @@ def show_configuration(configurator_output: ConfiguratorOutput):
                 status_badge("Pending"),
             )
         ),
+
         # rx.table.cell(
         #     rx.hstack(
         #         update_customer_dialog(user),
@@ -489,9 +608,11 @@ def configure() -> rx.Component:
     jobs_table =  rx.table.root(
             rx.table.header(
                 rx.table.row(
-                    _header_cell("Run Name", "fingerprint"),
-                    _header_cell("Mode", "beaker"),
                     _header_cell("Priority", "gauge"),
+                    _header_cell("Mode", "beaker"),
+                    _header_cell("Run Name", "fingerprint"),
+                    _header_cell("Est. Runtime", "hourglass"),
+                    _header_cell("Est. Co2 Emission", "leaf"),
                     _header_cell("Status", "cog"),
                 ),
             ),
