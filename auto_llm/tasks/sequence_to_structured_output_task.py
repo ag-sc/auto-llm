@@ -1,7 +1,7 @@
 import yaml
 
 from auto_llm.dto.trainer_run_config import TrainerRunConfig
-from auto_llm.tasks.task import BaseTask
+from auto_llm.tasks.task import TaskRegistry, Task
 
 description = """
 # Sequence To Structured Output Task
@@ -17,8 +17,8 @@ with open("config_files/trainer_configs/sample_configs/sample_sequence_to_struct
 
 sample_trainer_run_config = TrainerRunConfig.model_validate(config)
 
-SequenceToStructuredOutputTask = BaseTask(
-    name="sequence_to_structured_output",
-    description=description,
-    sample_trainer_run_config=sample_trainer_run_config,
-)
+@TaskRegistry.register("sequence_to_structured_output")
+class SequenceToStructuredOutputTask(Task):
+    name: str = "sequence_to_structured_output"
+    description: str = description
+    sample_trainer_run_config: TrainerRunConfig =sample_trainer_run_config

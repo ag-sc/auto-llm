@@ -1,7 +1,7 @@
 import yaml
 
 from auto_llm.dto.trainer_run_config import TrainerRunConfig
-from auto_llm.tasks.task import BaseTask
+from auto_llm.tasks.task import TaskRegistry, Task
 
 description = """
 # Sequence To Sequence Task
@@ -17,8 +17,8 @@ with open("config_files/trainer_configs/sample_configs/sample_sequence_to_sequen
 
 sample_trainer_run_config = TrainerRunConfig.model_validate(config)
 
-SequenceToSequenceTask = BaseTask(
-    name="sequence_to_sequence",
-    description=description,
-    sample_trainer_run_config=sample_trainer_run_config,
-)
+@TaskRegistry.register("sequence_to_sequence")
+class SequenceToSequenceTask(Task):
+    name: str = "sequence_to_sequence"
+    description: str = description
+    sample_trainer_run_config: TrainerRunConfig = sample_trainer_run_config
