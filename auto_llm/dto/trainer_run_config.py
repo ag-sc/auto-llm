@@ -61,6 +61,11 @@ class AutoLlmTrainerArgs(BaseModel):
         title="Completion Only Loss",
         default=True,
     )
+    energy_profiling: bool = Field(
+        default=False,
+        description="Enable CodeCarbon energy profiling to track energy consumption and CO₂ emissions during training.",
+        title="Energy Profiling",
+    )
 
 
 class TrainerArgs(BaseModel):

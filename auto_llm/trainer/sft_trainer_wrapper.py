@@ -19,6 +19,7 @@ from auto_llm.dto.trainer_run_config import TrainerRunConfig
 from auto_llm.pre_processor.sft_pre_procesor import SftPreProcessor
 from auto_llm.registry.estimator_registry import CTX_LENGTH_KEYS
 from auto_llm.registry.tracker_registry import WANDB_TRAIN_PROJECT
+from auto_llm.profiler.energy_profiler import EnergyProfiler
 from auto_llm.trainer.trainer_wrapper import TrainerWrapper
 
 accelerator = Accelerator()
@@ -174,6 +175,20 @@ class SftTrainerWrapper(TrainerWrapper):
 
         trainer.save_model(self.config.trainer_args.output_dir)
         tokenizer.save_pretrained(self.config.trainer_args.output_dir)
+        if self.config.auto_llm_trainer_args.energy_profiling:
+            with EnergyProfiler(
+                output_dir=self.config.trainer_args.output_dir,
+                project_name=WANDB_TRAIN_PROJECT,
+                experiment_name=self.config.trainer_args.run_name,
+                is_main_process=accelerator.is_main_process,
+            ):
+                trainer.train()
+                trainer.save_model(self.config.trainer_args.output_dir)
+                tokenizer.save_pretrained(self.config.trainer_args.output_dir)
+        else:
+            trainer.train()
+            trainer.save_model(self.config.trainer_args.output_dir)
+            tokenizer.save_pretrained(self.config.trainer_args.output_dir)
 
         self.logger.info(
             f"Model and Tokenizer saved in the path: {self.config.trainer_args.output_dir}"
