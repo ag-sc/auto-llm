@@ -1,5 +1,5 @@
 import csv
-from accelerate.logging import get_logger
+import logging
 import os
 from pathlib import Path
 from codecarbon import EmissionsTracker
@@ -7,7 +7,7 @@ import wandb
 
 
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 EMISSIONS_CSV_FILENAME = "emissions.csv"
 
