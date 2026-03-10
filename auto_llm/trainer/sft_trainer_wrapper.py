@@ -154,8 +154,6 @@ class SftTrainerWrapper(TrainerWrapper):
         for key, value in ds_dict["train"][0].items():
             self.logger.info(f"{key}\n{value}")
 
-        trainer.train()
-
         # from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
         #
         # full_state_dict_config = FullStateDictConfig(
@@ -173,8 +171,6 @@ class SftTrainerWrapper(TrainerWrapper):
         #     state_dict=state_dict,
         # )
 
-        trainer.save_model(self.config.trainer_args.output_dir)
-        tokenizer.save_pretrained(self.config.trainer_args.output_dir)
         if self.config.auto_llm_trainer_args.energy_profiling:
             with EnergyProfiler(
                 output_dir=self.config.trainer_args.output_dir,
