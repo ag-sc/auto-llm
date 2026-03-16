@@ -8,6 +8,7 @@ import reflex as rx
 import yaml
 
 from auto_llm.automator.automator import Automator
+from auto_llm.configurator.config_executor import SequentialConfigExecutor
 from auto_llm.configurator.config_generator import TrainEvalRunConfigurator, ConfiguratorOutput, ConfigMode, Priority
 from auto_llm.dto.builder_config import TrainerDataBuilderConfig
 from auto_llm.estimator.emission_estimator import EmissionEstimator
@@ -125,6 +126,8 @@ class FormState(rx.State):
     configurator_outputs: Optional[List[ConfiguratorOutput]] = []
     configs_path: Optional[str] = ""
 
+    start_execution: bool = False
+
     @rx.event
     def reset_state(self):
         self.current_tab = "settings"
@@ -213,6 +216,11 @@ class FormState(rx.State):
     @rx.event
     async def handle_validation_submit(self, form_data: dict):
         self.current_tab = "validate"
+        self.start_execution = True
+
+        job_id_to_attach = ""
+        executor = SequentialConfigExecutor(configurator_outputs=self.configurator_outputs, job_id_to_attach=job_id_to_attach)
+        executor.execute()
 
     @rx.event
     async def set_current_tab(self, value: str):
@@ -417,12 +425,19 @@ def dialog_popover(config_path: str, config_yaml: str):
 def execute_configs_dialog():
     return (
         rx.dialog.root(
-            rx.dialog.trigger(rx.button("Execute", variant="soft", size="1")),
+            rx.dialog.trigger(rx.button("Execute", variant="soft", size="3")),
             rx.dialog.content(
-                rx.heading("Configuration Execution"),
-                rx.description(f"Are you sure you want to execute these configurations? This will start the runs on your specified hardware and may incur costs."),
-                rx.dialog.close(rx.button("Close", mt="4")),
-                size="4",
+                rx.vstack(
+                    rx.heading("Execution"),
+                    rx.text(f"Are you sure you want to execute these configurations? This will start the runs on your specified hardware and may incur costs."),
+                    rx.hstack(
+                        rx.button("Yes, Continue.", variant="soft", size="3", on_click=FormState.handle_validation_submit),
+                        rx.dialog.close(rx.button("Close", size="3")),
+                        justify="center",
+                    ),
+                    size="4",
+                    align="center",
+                )
             ),
             width="300px",
         ),
@@ -737,6 +752,8 @@ def configure() -> rx.Component:
             width="100%",
         ),
         execute_configs_dialog(),
+        align="center",
+        spacing="2",
     )
 
     return rx.tabs.root(
