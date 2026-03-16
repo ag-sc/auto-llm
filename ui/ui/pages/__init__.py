@@ -6,7 +6,3 @@ from .chat import chat
 from .login import login
 
 __all__ = ["index", "configure", "monitor", "chat", "about"]
-
-
-CONFIGS_DIR = ".cache"
-OUTPUT_DIR = ".cache/sft_models/"

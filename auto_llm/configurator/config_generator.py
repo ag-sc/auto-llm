@@ -1,6 +1,6 @@
 import enum
 import os
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import uuid
 import yaml
 from pydantic import BaseModel
@@ -28,7 +28,7 @@ class ConfigMode(enum.Enum):
 
 class ConfiguratorOutput(BaseModel):
     run_name: str
-    run_id: str = None
+    run_id: Optional[str] = None
     config_path: str
     mode: ConfigMode
     config: Dict[str, Any]
@@ -255,7 +255,7 @@ class TrainEvalRunConfigurator:
         trainer_data_builder_config: TrainerDataBuilderConfig,
         peft_config: LoraConfig = None,
     ):
-        unique_run_id = uuid.uuid4().hex
+        unique_run_id = str(uuid.uuid4().hex)
         trainer_run_config = TrainerRunConfig(
             auto_llm_trainer_args=auto_llm_trainer_args,
             trainer_args=trainer_args,

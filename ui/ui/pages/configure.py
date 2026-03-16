@@ -1,7 +1,8 @@
+import asyncio
 import datetime
 import json
 import os
-from typing import Optional, List
+from typing import Dict, Optional, List
 
 import pandas as pd
 import reflex as rx
@@ -27,6 +28,164 @@ from ..backend.wandb_client import Client
 GPU_PARAMS = get_gpu_params()
 
 
+class FormState(rx.State):
+    current_tab = "settings"
+
+    is_loading: bool = False
+    model_choices: list[str] = []
+    model_results: pd.DataFrame = pd.DataFrame()
+
+    # settings tab
+    dataset_path: Optional[str] = ""
+    task_category: Optional[str] = ""
+    hardware_type: Optional[str] = ""
+    hardware_count: Optional[str] = ""
+
+    # models tab
+    selected_model: Optional[str] = ""
+
+    # prompts tab
+    instruction_template: Optional[str] = ""
+    input_template: Optional[str] = ""
+    output_template: Optional[str] = ""
+
+    configurator_outputs: Optional[List[ConfiguratorOutput]] = []
+    configs_path: Optional[str] = ""
+
+    start_execution: bool = False
+
+    @rx.event
+    def reset_state(self):
+        self.current_tab = "settings"
+
+        self.is_loading: bool = False
+        self.model_choices: list[str] = []
+        self.model_results: pd.DataFrame = pd.DataFrame()
+
+        # settings tab
+        self.dataset_path: Optional[str] = ""
+        self.task_category: Optional[str] = ""
+        self.hardware_type: Optional[str] = ""
+        self.hardware_count: Optional[str] = ""
+
+        # models tab
+        self.selected_model: Optional[str] = ""
+
+        # prompts tab
+        self.instruction_template: Optional[str] = ""
+        self.input_template: Optional[str] = ""
+        self.output_template: Optional[str] = ""
+
+        self.configurator_outputs: Optional[List[ConfiguratorOutput]] = []
+        self.configs_path: Optional[str] = ""
+
+        self.start_execution: bool = False
+
+    @rx.var
+    def dataset_options_markdown(self) -> str:
+        datasets = Automator.get_datasets()
+        prefix = "https://huggingface.co/datasets"
+        return "\n".join([f"* [`{d}`]({prefix}/{d})" for d in datasets])
+
+    @rx.event
+    async def handle_submit(self, form_data: dict):
+        if not all([form_data.get("dataset_path"), form_data.get("task_category"), form_data.get("hardware_type")]):
+            yield rx.window_alert("Please fill in all required fields!")
+
+        self.is_loading = True
+        yield
+
+        # Logic to fetch models
+        model_names, results_df = update_models(task=self.task_category, dataset=self.dataset_path, hardware_type=self.hardware_type, hardware_count=int(self.hardware_count))
+
+        self.model_choices = model_names
+        self.model_results = results_df
+        self.is_loading = False
+        self.current_tab = "models"
+
+        configured_task = TASKS.get(self.task_category)
+
+        self.instruction_template = configured_task.sample_trainer_run_config.trainer_data_builder_config.instruction_template
+        self.input_template = configured_task.sample_trainer_run_config.trainer_data_builder_config.input_template
+        self.output_template = configured_task.sample_trainer_run_config.trainer_data_builder_config.output_template
+
+    @rx.event
+    async def handle_models_submit(self, form_data: dict):
+        self.current_tab = "prompts"
+
+    @rx.event
+    async def handle_prompts_submit(self, form_data: dict):
+        timestamp = datetime.datetime.now()
+        timestamp_str = timestamp.strftime("%Y-%m-%d_%H-%M-%S")
+        configs_path = f"{CONFIGS_DIR}/{timestamp_str}_configs"
+
+        configurator_outputs = generate_configs(
+            model_names=[self.selected_model],
+            task=self.task_category,
+            dataset_path=self.dataset_path,
+            instruction_template=self.instruction_template,
+            input_template=self.input_template,
+            output_template=self.output_template,
+            configs_path=configs_path,
+        )
+
+        save_form_state(form_state=self, path=configs_path, timestamp=timestamp_str)
+
+        sorted_configurator_outputs = []
+        for p in [Priority.PRIORITY_ONE, Priority.PRIORITY_TWO, Priority.PRIORITY_THREE]:
+            for co in configurator_outputs:
+                if co.priority == p:
+                    sorted_configurator_outputs.append(co)
+
+        self.configurator_outputs = sorted_configurator_outputs
+
+        self.current_tab = "validate"
+
+    @rx.event
+    async def handle_validation_submit(self, form_data: dict):
+        self.current_tab = "validate"
+
+        if not self.start_execution:
+            self.start_execution = True
+            job_id_to_attach = 194473
+            executor = SequentialConfigExecutor(configurator_outputs=self.configurator_outputs, job_id_to_attach=job_id_to_attach)
+            executor.execute()
+            yield rx.toast.success("Your jobs are successfully submitted!")
+
+    @rx.event
+    async def set_current_tab(self, value: str):
+        self.current_tab = value
+
+    def _get_serializable_dict(self):
+        """Converts the state into a JSON-ready dictionary."""
+        # Define fields to exclude (like is_loading or computed rx.vars)
+        exclude = ["is_loading", "model_choices", "parent_state", "router_data", "substates", "dirty_vars", "dirty_substates", "router", "is_hydrated"]
+
+        state_dict = {}
+        for key, value in self.__dict__.items():
+            if key.startswith("_"):
+                continue
+
+            if key in exclude:
+                continue
+
+            # 1. Convert Sets to Lists
+            if isinstance(value, set):
+                state_dict[key] = list(value)
+
+            # 2. Convert DataFrames
+            elif isinstance(value, pd.DataFrame):
+                state_dict[key] = value.to_dict(orient="records")
+
+            # 3. Handle Custom Objects
+            elif key == "configurator_outputs" and value:
+                state_dict[key] = [obj.dict() if hasattr(obj, "dict") else str(obj) for obj in value]
+            else:
+                state_dict[key] = value
+
+        return state_dict
+
+
 class ConfigState(rx.State):
     current_yaml_content: str = ""
     current_path: str = ""
@@ -38,6 +197,10 @@ class ConfigState(rx.State):
     est_emission: str = ""
 
     current_html_content: str = ""
+
+    is_polling: bool = False
+
+    config_statuses: Dict[str, str] = {}
 
     def load_config(self, configurator_output: ConfiguratorOutput):
         self.current_path = configurator_output.config_path
@@ -104,159 +267,36 @@ class ConfigState(rx.State):
             run = Client.get_run_details(run_name=configurator_output.run_name, project_name="llm4kmu-train", dt_object=datetime.datetime.now(), user_name="viju-sudhi")
             self.current_html_content = Client.get_run_plot_html(run)
 
+    def load_config_state(self, configurator_output: ConfiguratorOutput):
+        if configurator_output.run_id:
+            state = Client.get_run_state(run_id=configurator_output.run_id, project_name="llm4kmu-train")
+            self.current_config_state = state
+        else:
+            self.current_config_state = "pending"
 
-class FormState(rx.State):
-    current_tab = "settings"
+    async def start_polling(self):
+        """This starts the loop if it's not already running."""
+        if self.is_polling:
+            return
+        self.is_polling = True
 
-    is_loading: bool = False
-    model_choices: list[str] = []
-    model_results: pd.DataFrame = pd.DataFrame()
+        # We manually create a background task
+        asyncio.create_task(self.poll_loop())
 
-    # settings tab
-    dataset_path: Optional[str] = ""
-    task_category: Optional[str] = ""
-    hardware_type: Optional[str] = ""
-    hardware_count: Optional[str] = ""
+    async def poll_loop(self):
+        while self.is_polling:
+            # Sync with the State to update variables safely
+            async with self:
+                form_state = await self.get_state(FormState)
+                for cfg in form_state.configurator_outputs:
+                    try:
+                        state = Client.get_run_state(run_id=cfg.run_id, project_name="llm4kmu-train")
+                        self.config_statuses[cfg.run_id] = state
+                    except Exception:
+                        self.config_statuses[cfg.run_id] = "pending"
 
-    # models tab
-    selected_model: Optional[str] = ""
-
-    # prompts tab
-    instruction_template: Optional[str] = ""
-    input_template: Optional[str] = ""
-    output_template: Optional[str] = ""
-
-    configurator_outputs: Optional[List[ConfiguratorOutput]] = []
-    configs_path: Optional[str] = ""
-
-    start_execution: bool = False
-
-    @rx.event
-    def reset_state(self):
-        self.current_tab = "settings"
-
-        self.is_loading: bool = False
-        self.model_choices: list[str] = []
-        self.model_results: pd.DataFrame = pd.DataFrame()
-
-        # settings tab
-        self.dataset_path: Optional[str] = ""
-        self.task_category: Optional[str] = ""
-        self.hardware_type: Optional[str] = ""
-        self.hardware_count: Optional[str] = ""
-
-        # models tab
-        self.selected_model: Optional[str] = ""
-
-        # prompts tab
-        self.instruction_template: Optional[str] = ""
-        self.input_template: Optional[str] = ""
-        self.output_template: Optional[str] = ""
-
-        self.configurator_outputs: Optional[List[ConfiguratorOutput]] = []
-        self.configs_path: Optional[str] = ""
-
-    @rx.var
-    def dataset_options_markdown(self) -> str:
-        datasets = Automator.get_datasets()
-        prefix = "https://huggingface.co/datasets"
-        return "\n".join([f"* [`{d}`]({prefix}/{d})" for d in datasets])
-
-    @rx.event
-    async def handle_submit(self, form_data: dict):
-        if not all([form_data.get("dataset_path"), form_data.get("task_category"), form_data.get("hardware_type")]):
-            yield rx.window_alert("Please fill in all required fields!")
-
-        self.is_loading = True
-        yield
-
-        # Logic to fetch models
-        model_names, results_df = update_models(task=self.task_category, dataset=self.dataset_path, hardware_type=self.hardware_type, hardware_count=int(self.hardware_count))
-
-        self.model_choices = model_names
-        self.model_results = results_df
-        self.is_loading = False
-        self.current_tab = "models"
-
-        configured_task = TASKS.get(self.task_category)
-
-        self.instruction_template = configured_task.sample_trainer_run_config.trainer_data_builder_config.instruction_template
-        self.input_template = configured_task.sample_trainer_run_config.trainer_data_builder_config.input_template
-        self.output_template = configured_task.sample_trainer_run_config.trainer_data_builder_config.output_template
-
-    @rx.event
-    async def handle_models_submit(self, form_data: dict):
-        self.current_tab = "prompts"
-
-    @rx.event
-    async def handle_prompts_submit(self, form_data: dict):
-        timestamp = datetime.datetime.now()
-        timestamp_str = timestamp.strftime("%Y-%m-%d_%H-%M-%S")
-        configs_path = f"{CONFIGS_DIR}/{timestamp_str}_configs"
-
-        configurator_outputs = generate_configs(
-            model_names=[self.selected_model],
-            task=self.task_category,
-            dataset_path=self.dataset_path,
-            instruction_template=self.instruction_template,
-            input_template=self.input_template,
-            output_template=self.output_template,
-            configs_path=configs_path,
-        )
-
-        save_form_state(form_state=self, path=configs_path, timestamp=timestamp_str)
-
-        sorted_configurator_outputs = []
-        for p in [Priority.PRIORITY_ONE, Priority.PRIORITY_TWO, Priority.PRIORITY_THREE]:
-            for co in configurator_outputs:
-                if co.priority == p:
-                    sorted_configurator_outputs.append(co)
-
-        self.configurator_outputs = sorted_configurator_outputs
-
-        self.current_tab = "validate"
-
-    @rx.event
-    async def handle_validation_submit(self, form_data: dict):
-        self.current_tab = "validate"
-        self.start_execution = True
-
-        job_id_to_attach = 194473
-        executor = SequentialConfigExecutor(configurator_outputs=self.configurator_outputs, job_id_to_attach=job_id_to_attach)
-        executor.execute()
-
-    @rx.event
-    async def set_current_tab(self, value: str):
-        self.current_tab = value
-
-    def _get_serializable_dict(self):
-        """Converts the state into a JSON-ready dictionary."""
-        # Define fields to exclude (like is_loading or computed rx.vars)
-        exclude = ["is_loading", "model_choices", "parent_state", "router_data", "substates", "dirty_vars", "dirty_substates", "router", "is_hydrated"]
-
-        state_dict = {}
-        for key, value in self.__dict__.items():
-            if key.startswith("_"):
-                continue
-
-            if key in exclude:
-                continue
-
-            # 1. Convert Sets to Lists
-            if isinstance(value, set):
-                state_dict[key] = list(value)
-
-            # 2. Convert DataFrames
-            elif isinstance(value, pd.DataFrame):
-                state_dict[key] = value.to_dict(orient="records")
-
-            # 3. Handle Custom Objects
-            elif key == "configurator_outputs" and value:
-                state_dict[key] = [obj.dict() if hasattr(obj, "dict") else str(obj) for obj in value]
-            else:
-                state_dict[key] = value
-
-        return state_dict
+            # Wait for 30 seconds
+            await asyncio.sleep(15)
 
 
 def update_models(task: str, dataset: str, hardware_type: str, hardware_count: int):
@@ -434,7 +474,7 @@ def execute_configs_dialog():
                     rx.heading("Execution"),
                     rx.text(f"Are you sure you want to execute these configurations? This will start the runs on your specified hardware and may incur costs."),
                     rx.hstack(
-                        rx.button("Yes, Continue.", variant="soft", size="3", on_click=FormState.handle_validation_submit),
+                        rx.dialog.close(rx.button("Yes, Continue.", variant="soft", size="3", on_click=FormState.handle_validation_submit)),
                         rx.dialog.close(rx.button("Close", size="3")),
                         justify="center",
                     ),
@@ -448,6 +488,7 @@ def execute_configs_dialog():
 
 
 def show_configuration(configurator_output: ConfiguratorOutput):
+    current_status = ConfigState.config_statuses[configurator_output.run_id]
     return rx.table.row(
         rx.table.cell(
             rx.match(
@@ -481,17 +522,29 @@ def show_configuration(configurator_output: ConfiguratorOutput):
         rx.table.cell(rx.text(ConfigState.est_emission)),
         rx.table.cell(
             rx.hstack(
+                # rx.fragment(
+                #     # Triggers every 30 seconds (30000 ms)
+                #     rx.button(
+                #         size="1",
+                #         on_blur=ConfigState.load_config_state(configurator_output),
+                #         on_mouse_enter=ConfigState.load_config_state(configurator_output),
+                #         on_mouse_over=ConfigState.load_config_state(configurator_output),
+                #     )
+                # ),
                 rx.match(
-                    configurator_output.priority,
-                    ("1", status_badge("Delivered")),
-                    ("2", status_badge("Pending")),
-                    ("3", status_badge("Cancelled")),
-                    status_badge("Pending"),
+                    current_status,
+                    ("running", status_badge("running")),
+                    ("finished", status_badge("finished")),
+                    ("failed", status_badge("failed")),
+                    ("crashed", status_badge("crashed")),
+                    ("killed", status_badge("killed")),
+                    ("pending", status_badge("pending")),
                 ),
                 config_html_dialog(configurator_output),
             ),
             align="center",
         ),
+        on_mount=ConfigState.start_polling,
         style={"_hover": {"bg": rx.color("gray", 3)}},
         align="center",
     )

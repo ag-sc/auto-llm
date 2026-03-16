@@ -216,7 +216,6 @@ class TrainerRunConfig(BaseModel):
         title="PEFT Config",
         default=None,
     )
-
     run_id: Optional[str] = Field(
         description="The W&B run ID associated with this training run. This is used to fetch the training metrics and plots from W&B after the run is completed.",
         title="Run ID",

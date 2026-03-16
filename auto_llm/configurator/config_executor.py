@@ -15,6 +15,9 @@ from auto_llm.registry.configurator_registry import (
 # TODO: Implement python-based config executor
 
 
+ROOT_DIR = Path(__file__).resolve().parent.parent.parent
+
+
 class ConfigExecutor:
     """
     Slurm based Config Executor adding dependencies based on priority.
@@ -171,6 +174,10 @@ class SequentialConfigExecutor:
         with open(run_script_path, "w") as f:
             text = f"""
 #!/bin/bash
+ROOT_DIR={ROOT_DIR}
+cd $ROOT_DIR
+exho $pwd
+
 JOB_ID={self.job_id_to_attach}
 set -e
             """

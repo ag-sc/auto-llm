@@ -62,13 +62,26 @@ class WandbClient:
         fig = px.line(history, title=f"Loss for {run.name}")
         return fig.to_html(full_html=False, include_plotlyjs="cdn")
 
-    def get_loss_plot(self, run_id: str, project_name: str):
+    def get_run(self, run_id: str, project_name: str):
         run = self.api.run(path=f"{self.entity}/{project_name}/{run_id}")
-        df = run.history(keys=["_step", "eval/loss", "train/loss"])
+        return run
+
+    def get_run_state(self, run_id: str, project_name: str):
+        run = self.get_run(run_id=run_id, project_name=project_name)
+        return run.state
+
+    def get_loss_plot(self, run_id: str, project_name: str):
+        run = self.get_run(run_id=run_id, project_name=project_name)
+        df = run.history()
 
         fig = go.Figure()
-        fig.add_trace(go.Scatter(x=df["_step"], y=df["train/loss"], name="Train Loss"))
-        fig.add_trace(go.Scatter(x=df["_step"], y=df["eval/loss"], name="Eval Loss"))
+        train_df = df.dropna(subset=["train/loss"])
+        if not train_df.empty:
+            fig.add_trace(go.Scatter(x=train_df["_step"], y=train_df["train/loss"], name="Train Loss", mode="lines+markers"))
 
-        fig.update_layout(title="Loss Curves", xaxis_title="Step", yaxis_title="Loss", template="plotly_dark")
-        return fig
+        eval_df = df.dropna(subset=["eval/loss"])
+        if not eval_df.empty:
+            fig.add_trace(go.Scatter(x=eval_df["_step"], y=eval_df["eval/loss"], name="Eval Loss", mode="lines+markers", line=dict(color="red")))
+
+        fig.update_layout(title="Loss Curves", xaxis_title="Step", yaxis_title="Loss")
+        return fig.to_html(full_html=False, include_plotlyjs="cdn")
