@@ -98,8 +98,11 @@ class ConfigState(rx.State):
         return None
 
     def load_config_html(self, configurator_output: ConfiguratorOutput):
-        run = Client.get_run_details(run_name=configurator_output.run_name, project_name="llm4kmu-train", dt_object=datetime.datetime.now(), user_name="viju-sudhi")
-        self.current_html_content = Client.get_run_plot_html(run)
+        if configurator_output.run_id:
+            self.current_html_content = Client.get_loss_plot(run_id=configurator_output.run_id, project_name="llm4kmu-train")
+        else:
+            run = Client.get_run_details(run_name=configurator_output.run_name, project_name="llm4kmu-train", dt_object=datetime.datetime.now(), user_name="viju-sudhi")
+            self.current_html_content = Client.get_run_plot_html(run)
 
 
 class FormState(rx.State):
@@ -218,7 +221,7 @@ class FormState(rx.State):
         self.current_tab = "validate"
         self.start_execution = True
 
-        job_id_to_attach = ""
+        job_id_to_attach = 194473
         executor = SequentialConfigExecutor(configurator_outputs=self.configurator_outputs, job_id_to_attach=job_id_to_attach)
         executor.execute()
 

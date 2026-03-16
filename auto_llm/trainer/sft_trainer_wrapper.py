@@ -123,12 +123,10 @@ class SftTrainerWrapper(TrainerWrapper):
 
         if self.config.trainer_args.report_to == "wandb":
             import wandb
-            import uuid
 
-            unique_run_id = uuid.uuid4().hex
-
+            unique_run_id = self.config.run_id if self.config.run_id else None
             os.environ["WANDB_PROJECT"] = WANDB_TRAIN_PROJECT
-            wandb.init(project=WANDB_TRAIN_PROJECT, id=unique_run_id)
+            wandb.init(project=WANDB_TRAIN_PROJECT, id=unique_run_id, name=self.config.trainer_args.run_name, resume="allow", config=self.config.model_dump())
 
         peft_config = None
         if self.config.peft_config:
