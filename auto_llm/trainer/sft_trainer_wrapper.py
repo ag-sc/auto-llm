@@ -124,9 +124,14 @@ class SftTrainerWrapper(TrainerWrapper):
         if self.config.trainer_args.report_to == "wandb":
             import wandb
 
-            unique_run_id = self.config.run_id if self.config.run_id else None
             os.environ["WANDB_PROJECT"] = WANDB_TRAIN_PROJECT
-            wandb.init(project=WANDB_TRAIN_PROJECT, id=unique_run_id, name=self.config.trainer_args.run_name, resume="allow", config=self.config.model_dump())
+            wandb.init(
+                project=self.config.tracker_config.wandb_project if self.config.tracker_config.wandb_project else WANDB_TRAIN_PROJECT,
+                name=self.config.tracker_config.wandb_run_name if self.config.tracker_config.wandb_run_name else None,
+                id=self.config.tracker_config.wandb_run_id if self.config.tracker_config.wandb_run_id else None,
+                group=self.config.tracker_config.wandb_run_group if self.config.tracker_config.wandb_run_group else None,
+                config=self.config.model_dump(),
+            )
 
         peft_config = None
         if self.config.peft_config:

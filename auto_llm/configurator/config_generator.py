@@ -7,12 +7,14 @@ from pydantic import BaseModel
 
 from auto_llm.dto.builder_config import TrainerDataBuilderConfig, SftDatasetType
 from auto_llm.dto.trainer_run_config import (
+    TrackerConfig,
     TrainerArgs,
     AutoLlmTrainerArgs,
     LoraConfig,
     TrainerRunConfig,
 )
 from auto_llm.registry.evaluator_registry import LM_EVAL_HARNESS_CUSTOM_TASKS_PATH
+from auto_llm.registry.tracker_registry import WANDB_TRAIN_PROJECT, WANDB_EVAL_PROJECT
 
 
 class Priority(enum.Enum):
@@ -51,6 +53,9 @@ class TrainEvalRunConfigurator:
         self.task = task
         self.dataset_path = dataset_path
         self.dataset_name = self.dataset_path.split("/")[-1]
+
+        group_id = str(uuid.uuid4().hex)
+        self.run_group = self.dataset_name + "_" + group_id
 
         self.output_path = output_path
         self.configs_path = configs_path
@@ -146,7 +151,7 @@ class TrainEvalRunConfigurator:
         dataset_type: str,
         peft_config: LoraConfig = None,
     ) -> ConfiguratorOutput:
-        trainer_args = self.build_trainer_args(model_output_dir=model_output_dir, run_name=run_name)
+        trainer_args = self.build_trainer_args(model_output_dir=model_output_dir)
         trainer_data_builder_config = self.build_trainer_data_builder_config(dataset_type=dataset_type)
 
         trainer_run_config = self.build_trainer_run_config(
@@ -154,6 +159,7 @@ class TrainEvalRunConfigurator:
             trainer_args=trainer_args,
             trainer_data_builder_config=trainer_data_builder_config,
             peft_config=peft_config,
+            run_name=run_name,
         )
         config = trainer_run_config.model_dump(mode="json")
         config_path = self.save_config_yaml(
@@ -164,7 +170,7 @@ class TrainEvalRunConfigurator:
 
         return ConfiguratorOutput(
             run_name=run_name,
-            run_id=trainer_run_config.run_id,
+            run_id=trainer_run_config.tracker_config.wandb_run_id,
             config_path=config_path,
             mode=ConfigMode.TRAINER_RUN_CFG,
             config=config,
@@ -215,13 +221,21 @@ class TrainEvalRunConfigurator:
     def get_evaluator_run_config(self, model_args: str, run_name: str, priority: Priority) -> List[ConfiguratorOutput]:
         config_outputs = []
 
+        unique_run_id = str(uuid.uuid4().hex)
+
+        wandb_project = f"project={WANDB_EVAL_PROJECT}"
+        wandb_run_name = f"name={run_name}"
+        wandb_run_id = f"id={unique_run_id}"
+        wandb_group = f"group={self.run_group}"
+        wandb_args = f"{wandb_project},{wandb_run_name},{wandb_run_id},{wandb_group}"
+
         # TODO: evaluator can also take different parameters, including few-shots, etc. Handle this.
         task = f"{self.dataset_name}"
         eval_config = {
             "model": "hf",
             "tasks": task,
             "model_args": model_args,
-            "wandb_args": f"project=llm4kmu-eval,name={run_name}",
+            "wandb_args": wandb_args,
             "write_out": True,
             "log_samples": True,
             "output_path": "/vol/auto_llm/eval_results",
@@ -236,6 +250,7 @@ class TrainEvalRunConfigurator:
         config_outputs.append(
             ConfiguratorOutput(
                 run_name=run_name,
+                run_id=unique_run_id,
                 config_path=config_path,
                 mode=ConfigMode.EVALUATOR_RUN_CFG,
                 config=eval_config,
@@ -254,22 +269,27 @@ class TrainEvalRunConfigurator:
         trainer_args: TrainerArgs,
         trainer_data_builder_config: TrainerDataBuilderConfig,
         peft_config: LoraConfig = None,
+        run_name: str = None,
     ):
         unique_run_id = str(uuid.uuid4().hex)
+        tracker_config = TrackerConfig(
+            wandb_project=WANDB_TRAIN_PROJECT,
+            wandb_run_name=run_name,
+            wandb_run_id=unique_run_id,
+            wandb_run_group=self.run_group,
+        )
+
         trainer_run_config = TrainerRunConfig(
             auto_llm_trainer_args=auto_llm_trainer_args,
             trainer_args=trainer_args,
             trainer_data_builder_config=trainer_data_builder_config,
             peft_config=peft_config,
-            run_id=unique_run_id,
+            tracker_config=tracker_config,
         )
         return trainer_run_config
 
-    def build_trainer_args(self, model_output_dir: str, run_name: str):
-        trainer_args = TrainerArgs(
-            run_name=run_name,
-            output_dir=model_output_dir,
-        )
+    def build_trainer_args(self, model_output_dir: str):
+        trainer_args = TrainerArgs(output_dir=model_output_dir)
         return trainer_args
 
     def build_trainer_data_builder_config(self, dataset_type: str):

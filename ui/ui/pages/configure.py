@@ -261,11 +261,17 @@ class ConfigState(rx.State):
         return None
 
     def load_config_html(self, configurator_output: ConfiguratorOutput):
-        if configurator_output.run_id:
-            self.current_html_content = Client.get_loss_plot(run_id=configurator_output.run_id, project_name="llm4kmu-train")
-        else:
-            run = Client.get_run_details(run_name=configurator_output.run_name, project_name="llm4kmu-train", dt_object=datetime.datetime.now(), user_name="viju-sudhi")
-            self.current_html_content = Client.get_run_plot_html(run)
+        # if configurator_output.run_id:
+        #     self.current_html_content = Client.get_loss_plot(run_id=configurator_output.run_id, project_name="llm4kmu-train")
+        # else:
+        #     run = Client.get_run_details(run_name=configurator_output.run_name, project_name="llm4kmu-train", dt_object=datetime.datetime.now(), user_name="viju-sudhi")
+        #     self.current_html_content = Client.get_run_plot_html(run)
+
+        run_html = Client.get_run_url(
+            run_id=configurator_output.run_id,
+            project_name="llm4kmu-train" if configurator_output.mode == ConfigMode.TRAINER_RUN_CFG else "llm4kmu-eval",
+        )
+        self.current_html_content = f'<iframe src="{run_html}" ' f'style="width:100%; height:80vh; border:none; display:block;" ' f"allowfullscreen></iframe>"
 
     def load_config_state(self, configurator_output: ConfiguratorOutput):
         if configurator_output.run_id:
@@ -300,7 +306,6 @@ class ConfigState(rx.State):
 
 
 def update_models(task: str, dataset: str, hardware_type: str, hardware_count: int):
-    # This remains similar to your logic but ensures clean data for the table
     configured_task = TASKS.get(task)
     automator = Automator(
         task_type=configured_task.name,
@@ -309,7 +314,6 @@ def update_models(task: str, dataset: str, hardware_type: str, hardware_count: i
         hardware_count=hardware_count,
     )
     df = automator.get_models_df()
-    # Clean up DF columns for display
     cols = [df.columns[0]] + list(df.columns[2:])
 
     df = df.round(2)
@@ -347,7 +351,6 @@ def generate_configs(
 
 
 def info_popover(title: str, content: str):
-    """Refactored helper for clean info popovers."""
     return rx.popover.root(
         rx.popover.trigger(rx.icon("info", size=16, color_scheme="gray", cursor="pointer")),
         rx.popover.content(
@@ -371,10 +374,10 @@ def config_html_dialog(configurator_output: ConfiguratorOutput):
                 rx.card(
                     rx.el.iframe(
                         src_doc=ConfigState.current_html_content,
-                        width="80%",
+                        width="100%",
                         height="100%",
                     ),
-                    width="80%",
+                    width="100%",
                     height="100%",
                 ),
                 rx.hstack(

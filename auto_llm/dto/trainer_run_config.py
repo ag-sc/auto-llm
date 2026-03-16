@@ -149,10 +149,6 @@ class TrainerArgs(BaseModel):
         title="Report To",
         default="wandb",
     )
-    run_name: str = Field(
-        description="The run name in the tracker.",
-        title="Run Name",
-    )
     logging_steps: int | float = Field(
         description="The frequency of tracking and logging.",
         title="Logging Steps",
@@ -198,6 +194,29 @@ class TrainerArgs(BaseModel):
     )
 
 
+class TrackerConfig(BaseModel):
+    wandb_project: Optional[str] = Field(
+        description="The W&B project name to which this training run belongs. This is used to group multiple training runs together in W&B for better organization and comparison.",
+        title="W&B Project",
+        default=None,
+    )
+    wandb_run_name: Optional[str] = Field(
+        description="The W&B run name for this training run. This is used to identify the training run in W&B.",
+        title="W&B Run Name",
+        default=None,
+    )
+    wandb_run_id: Optional[str] = Field(
+        description="The W&B run ID associated with this training run. This is used to fetch the training metrics and plots from W&B after the run is completed.",
+        title="W&B Run ID",
+        default=None,
+    )
+    wandb_run_group: Optional[str] = Field(
+        description="The W&B run group name to which this training run belongs. This is used to group multiple training runs together in W&B for better organization and comparison.",
+        title="W&B Run Group",
+        default=None,
+    )
+
+
 class TrainerRunConfig(BaseModel):
     auto_llm_trainer_args: AutoLlmTrainerArgs = Field(
         description="Args specific to AutoLLM Trainer",
@@ -216,8 +235,8 @@ class TrainerRunConfig(BaseModel):
         title="PEFT Config",
         default=None,
     )
-    run_id: Optional[str] = Field(
-        description="The W&B run ID associated with this training run. This is used to fetch the training metrics and plots from W&B after the run is completed.",
-        title="Run ID",
+    tracker_config: Optional[TrackerConfig] = Field(
+        description="Configuration for experiment trackers like W&B",
+        title="Tracker Config",
         default=None,
     )

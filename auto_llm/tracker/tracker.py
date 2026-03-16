@@ -66,6 +66,9 @@ class WandbClient:
         run = self.api.run(path=f"{self.entity}/{project_name}/{run_id}")
         return run
 
+    def get_run_url(self, run_id: str, project_name: str):
+        return f"https://wandb.ai/{self.entity}/{project_name}/runs/{run_id}"
+
     def get_run_state(self, run_id: str, project_name: str):
         run = self.get_run(run_id=run_id, project_name=project_name)
         return run.state
