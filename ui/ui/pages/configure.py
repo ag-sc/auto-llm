@@ -212,7 +212,7 @@ class FormState(rx.State):
 
     @rx.event
     async def handle_validation_submit(self, form_data: dict):
-        self.current_tab = "execute"
+        self.current_tab = "validate"
 
     @rx.event
     async def set_current_tab(self, value: str):
@@ -408,6 +408,21 @@ def dialog_popover(config_path: str, config_yaml: str):
             rx.dialog.trigger(rx.button(rx.icon("view"), variant="soft", size="1")),
             rx.dialog.content(
                 rx.heading("Configuration Viewer"), rx.markdown(f"Path: **{config_path}**"), rx.code_block(config_yaml), rx.dialog.close(rx.button("Close", mt="4")), size="4"
+            ),
+            width="300px",
+        ),
+    )
+
+
+def execute_configs_dialog():
+    return (
+        rx.dialog.root(
+            rx.dialog.trigger(rx.button("Execute", variant="soft", size="1")),
+            rx.dialog.content(
+                rx.heading("Configuration Execution"),
+                rx.description(f"Are you sure you want to execute these configurations? This will start the runs on your specified hardware and may incur costs."),
+                rx.dialog.close(rx.button("Close", mt="4")),
+                size="4",
             ),
             width="300px",
         ),
@@ -704,7 +719,7 @@ def configure() -> rx.Component:
         on_submit=FormState.handle_prompts_submit,
     )
 
-    jobs_table = (
+    jobs_table = rx.vstack(
         rx.table.root(
             rx.table.header(
                 rx.table.row(
@@ -721,6 +736,7 @@ def configure() -> rx.Component:
             size="3",
             width="100%",
         ),
+        execute_configs_dialog(),
     )
 
     return rx.tabs.root(
