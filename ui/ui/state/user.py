@@ -1,17 +1,55 @@
-from typing import Dict
+import os
 
 import reflex as rx
 
-AUTH = [
-    ("admin", "admin"),
-]
 
-USERNAMES = [x[0] for x in AUTH]
+import reflex as rx
+from passlib.hash import argon2
+
+
+class UserModel(rx.Model, table=True):
+    username: str = rx.Field()
+    password_hash: str
+    is_enabled: bool = True
+
+    @staticmethod
+    def hash_password(password: str):
+        return argon2.hash(password)
+
+    def verify_password(self, password: str):
+        return argon2.verify(password, self.password_hash)
+
 
 class User(rx.State):
+    username: str
+    password: str
     logged_in: bool = False
-    username: str = ""
-    password: str = ""
+
+    def handle_sign_up(self):
+        with rx.session() as session:
+            if self.username is None or self.password is None:
+                return rx.toast.error("Please fill the fileds to continue!")
+
+            # Check if user exists
+            user = session.exec(UserModel.select().where(UserModel.username == self.username)).first()
+            if user:
+                return rx.toast.error("Username already exists!")
+
+            # Create and save new user
+            new_user = UserModel(username=self.username, password_hash=UserModel.hash_password(self.password))
+            session.add(new_user)
+            session.commit()
+            return rx.toast.success("Registration Successful!")
+
+    def handle_sign_in(self):
+        with rx.session() as session:
+            user = session.exec(UserModel.select().where(UserModel.username == self.username)).first()
+            if user and user.verify_password(self.password):
+                self.logged_in = True
+                os.environ["autollm_user"] = self.username
+                return rx.redirect("/overview")
+            else:
+                return rx.toast.error("Invalid username or password.")
 
     @rx.event
     def check_login(self):
@@ -25,31 +63,13 @@ class User(rx.State):
             return rx.redirect("/")
         return None
 
-    def set_error(self):
-        rx.window_alert("Invalid username or password")
-        self.logged_in = False
-        return rx.toast.error(
-            "Invalid username or password. Please try again!",
-            position="top-center",
-            duration=4000,
-        )
+    @rx.var
+    def username_display(self) -> str:
+        if not self.logged_in:
+            return ""
 
-    @rx.event
-    def handle_sign_in(self, form_data: Dict[str, str]):
-        try:
-            idx = USERNAMES.index(self.username)
-        except ValueError:
-            idx = -1
-
-        if idx != -1:
-            password = AUTH[idx][1]
-            if password == self.password:
-                self.logged_in = True
-                return rx.redirect("/")
-            else:
-                return self.set_error()
-        else:
-            return self.set_error()
+        n = " ".join([x.title() for x in self.username.split("_")]).strip()
+        return n
 
     @rx.event
     def handle_sign_out(self):
@@ -61,13 +81,3 @@ class User(rx.State):
         self.logged_in = False
         self.username = ""
         self.password = ""
-
-    @rx.var
-    def username_display(self) -> str:
-        if not self.logged_in:
-            return ""
-
-        n = " ".join([x.title() for x in self.username.split("_")]).strip()
-        return n
-
-

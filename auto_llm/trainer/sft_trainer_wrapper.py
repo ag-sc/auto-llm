@@ -39,9 +39,7 @@ class SftTrainerWrapper(TrainerWrapper):
         self.config = config
 
     def run(self):
-        hf_model_config = AutoConfig.from_pretrained(
-            self.config.auto_llm_trainer_args.model_name
-        ).to_dict()
+        hf_model_config = AutoConfig.from_pretrained(self.config.auto_llm_trainer_args.model_name).to_dict()
 
         model = AutoModelForCausalLM.from_pretrained(
             pretrained_model_name_or_path=self.config.auto_llm_trainer_args.model_name,
@@ -95,9 +93,7 @@ class SftTrainerWrapper(TrainerWrapper):
                 # for non-conversational dataset, use TRL's dataset prep.
                 # TODO: decide if this is needed or custom pre-processor suffices
                 completion_only_loss = True
-                self.logger.info(
-                    "Using custom preprocessor for Non-conversational dataset"
-                )
+                self.logger.info("Using custom preprocessor for Non-conversational dataset")
                 ds_dict = ds_dict.map(
                     function=pre_processor.pre_process,
                     fn_kwargs=dict(
@@ -126,7 +122,13 @@ class SftTrainerWrapper(TrainerWrapper):
         )
 
         if self.config.trainer_args.report_to == "wandb":
+            import wandb
+            import uuid
+
+            unique_run_id = uuid.uuid4().hex
+
             os.environ["WANDB_PROJECT"] = WANDB_TRAIN_PROJECT
+            wandb.init(project=WANDB_TRAIN_PROJECT, id=unique_run_id)
 
         peft_config = None
         if self.config.peft_config:
@@ -175,9 +177,7 @@ class SftTrainerWrapper(TrainerWrapper):
         trainer.save_model(self.config.trainer_args.output_dir)
         tokenizer.save_pretrained(self.config.trainer_args.output_dir)
 
-        self.logger.info(
-            f"Model and Tokenizer saved in the path: {self.config.trainer_args.output_dir}"
-        )
+        self.logger.info(f"Model and Tokenizer saved in the path: {self.config.trainer_args.output_dir}")
 
     @staticmethod
     def get_max_length(
@@ -200,23 +200,11 @@ class SftTrainerWrapper(TrainerWrapper):
 
     @staticmethod
     def get_trainer_data_builder(config: TrainerRunConfig) -> TrainerDataBuilder:
-        if (
-            config.trainer_data_builder_config.dataset_type
-            == SftDatasetType.CONVERSATIONAL
-        ):
-            builder = ConversationalSftDataBuilder(
-                **config.trainer_data_builder_config.model_dump()
-            )
-        elif (
-            config.trainer_data_builder_config.dataset_type
-            == SftDatasetType.PROMPT_COMPLETIONS
-        ):
-            builder = PromptCompletionsSftDataBuilder(
-                **config.trainer_data_builder_config.model_dump()
-            )
+        if config.trainer_data_builder_config.dataset_type == SftDatasetType.CONVERSATIONAL:
+            builder = ConversationalSftDataBuilder(**config.trainer_data_builder_config.model_dump())
+        elif config.trainer_data_builder_config.dataset_type == SftDatasetType.PROMPT_COMPLETIONS:
+            builder = PromptCompletionsSftDataBuilder(**config.trainer_data_builder_config.model_dump())
         else:
-            raise Exception(
-                f"Invalid dataset_type: {config.trainer_data_builder_config.dataset_type}"
-            )
+            raise Exception(f"Invalid dataset_type: {config.trainer_data_builder_config.dataset_type}")
 
         return builder

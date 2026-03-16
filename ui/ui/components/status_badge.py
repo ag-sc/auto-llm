@@ -13,12 +13,10 @@ def _badge(icon: str, text: str, color_scheme: str):
 
 
 def status_badge(status: str):
-    print("status", status)
     badge_mapping = {
         "1": ("info", "Prio 1", "green"),
         "2": ("info", "Prio 2", "amber"),
         "3": ("info", "Prio 3", "crimson"),
-
         "TRAINER_RUN_CFG": ("beaker", "TRAIN", "green"),
         "EVALUATOR_RUN_CFG": ("beaker", "EVAL", "blue"),
     }

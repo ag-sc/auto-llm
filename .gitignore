@@ -3,7 +3,7 @@
 .idea
 *venv*
 .pytest_cache
-__pycache__
+*__pycache__*
 src/outputs
 outputs
 build
@@ -30,3 +30,6 @@ assets/external/
 *.web*
 __pycache__/
 venv/
+
+
+*alembic*

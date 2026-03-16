@@ -12,7 +12,7 @@ Output: Sequence
 Example tasks: Question Answering (generative), Summarization, Machine Translation
 """
 
-with open("config_files/trainer_configs/sample_configs/sample_sequence_to_sequence_trainer_run.yaml", "r") as f:
+with open("../config_files/trainer_configs/sample_configs/sample_sequence_to_sequence_trainer_run.yaml", "r") as f:
     config = yaml.safe_load(f.read())
 
 sample_trainer_run_config = TrainerRunConfig.model_validate(config)
