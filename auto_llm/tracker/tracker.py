@@ -82,6 +82,9 @@ class WandbClient:
             if run.job_type != "evaluation":
                 continue
 
+            if run.group != group:
+                continue
+
             for key in run.summary.keys():
                 if "stderr" in key:
                     metric_name = key.replace("_stderr", "")
@@ -89,6 +92,9 @@ class WandbClient:
 
                     results.append({"run": run.name, metric_name: metric_value})
                     break
+
+        if len(results) == 0:
+            return
 
         df = pd.DataFrame(results)
         df = df.drop_duplicates(subset="run", keep="last")
@@ -103,12 +109,28 @@ class WandbClient:
             color="run",
         )
 
-        # 4. Improve layout for long labels
+        fig.update_traces(texttemplate="%{y:.2f}", textposition="outside")
+
         fig.update_layout(
-            xaxis_tickangle=-45,
-            showlegend=False,
-            margin=dict(t=50, l=50, r=50, b=150),  # Add bottom margin for labels
-            height=500,
+            showlegend=True,
+            yaxis=dict(
+                showticklabels=True,  # Hides "0.1, 0.2, 0.3..."
+                showline=True,  # Keeps the vertical axis line
+                ticks="outside",  # Keeps the little marker dashes
+                linecolor="black",
+                title="Accuracy",  # Keeps the axis title
+            ),
+            xaxis=dict(
+                showticklabels=False,  # Hides the "pre_pubmed_mcqa..." text
+                showline=True,  # Keeps the horizontal axis line
+                ticks="outside",  # Keeps the little marker dashes
+                linecolor="black",
+                title="Run Configuration",
+            ),
+            # 3. Adjust margins now that labels are gone
+            margin=dict(t=60, l=60, r=20, b=40),
+            height=400,
+            autosize=True,
         )
 
         return fig.to_html(full_html=False, include_plotlyjs="cdn")

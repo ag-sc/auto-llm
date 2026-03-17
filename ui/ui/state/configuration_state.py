@@ -36,6 +36,24 @@ class ConfigurationState(rx.State):
 
     config_statuses: Dict[str, str] = {}
 
+    @rx.event
+    def reset_state(self):
+        self.current_yaml_content: str = ""
+        self.current_path: str = ""
+
+        self.current_gpu_name: str = ""
+        self.current_gpu_count: int = 0
+
+        self.est_runtime: str = ""
+        self.est_emission: str = ""
+
+        self.current_html_content: str = ""
+        self.result_fig: str = ""
+
+        self.is_polling: bool = False
+
+        self.config_statuses: Dict[str, str] = {}
+
     def load_config(self, configurator_output: ConfiguratorOutput):
         self.current_path = configurator_output.config_path
         with open(configurator_output.config_path, "r") as f:
@@ -108,21 +126,8 @@ class ConfigurationState(rx.State):
         self.current_html_content = f'<iframe src="{run_html}" ' f'style="width:100%; height:80vh; border:none; display:block;" ' f"allowfullscreen></iframe>"
 
     def load_config_group_results(self, group: str):
-        result_fig = Client.get_eval_runs_of_group(
-            group=group,
-            project_name=WANDB_PROJECT,
-        )
-
-        self.result_fig = f'<iframe src="{result_fig}" ' f'style="width:100%; height:80vh; border:none; display:block;" ' f"allowfullscreen></iframe>"
-
-    def load_config_group(self, configurator_output: ConfiguratorOutput):
-        # if configurator_output.run_id:
-        #     self.current_html_content = Client.get_loss_plot(run_id=configurator_output.run_id, project_name="llm4kmu-train")
-        # else:
-        #     run = Client.get_run_details(run_name=configurator_output.run_name, project_name="llm4kmu-train", dt_object=datetime.datetime.now(), user_name="viju-sudhi")
-        #     self.current_html_content = Client.get_run_plot_html(run)
-
-        ...
+        result_fig = Client.get_eval_runs_of_group(group=group, project_name=WANDB_PROJECT)
+        self.result_fig = result_fig
 
     async def start_polling(self):
         """This starts the loop if it's not already running."""

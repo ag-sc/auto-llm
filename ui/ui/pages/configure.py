@@ -493,20 +493,33 @@ def configure() -> rx.Component:
     results_tab = rx.card(
         rx.vstack(
             rx.hstack(
-                rx.icon("layout-template", size=20),
-                rx.text("Results", weight="bold"),
+                rx.hstack(rx.icon("folder-kanban", size=25), rx.heading("Results", size="5", weight="bold"), align="center"),
+                rx.button(
+                    rx.icon(
+                        tag="refresh-cw",
+                        size=20,
+                    ),
+                    variant="soft",
+                    on_click=ConfigurationState.load_config_group_results(AppState.run_group),
+                ),
+                width="100%",
+                justify="between",
+                align="center",
             ),
             rx.el.iframe(
                 src_doc=ConfigurationState.result_fig,
                 width="100%",
                 height="100%",
+                style={"border": "none", "display": "block", "overflow": "hidden"},
             ),
             width="100%",
             height="100%",
         ),
         on_mount=ConfigurationState.load_config_group_results(AppState.run_group),
-        spacing="2",
-        align="center",
+        spacing="5",
+        size="3",
+        width="60vw",
+        height="80vh",
     )
 
     return rx.tabs.root(
