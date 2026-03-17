@@ -94,7 +94,7 @@ class WandbClient:
                     break
 
         if len(results) == 0:
-            return
+            return ""
 
         df = pd.DataFrame(results)
         df = df.drop_duplicates(subset="run", keep="last")
