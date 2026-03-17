@@ -1,24 +1,12 @@
-"""The overview page of the app."""
-
-import os
-
 import reflex as rx
 
 
-from .. import styles
 from ..state.user import User
 from ..templates import template
 from ..views.project_stats import stats_card, stats_cards
 from ..views.workbench_stats import workbench_stats_card
 
-from ..backend.workbench import Workbench
 from ..backend.wandb_client import Client
-
-from auto_llm.tracker.tracker import WandbClient
-
-
-class IndexState(rx.State):
-    project: str = ""
 
 
 def overview() -> rx.Component:

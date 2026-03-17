@@ -1,4 +1,5 @@
 import enum
+import json
 import os
 from typing import List, Dict, Any, Optional
 import uuid
@@ -14,16 +15,16 @@ from auto_llm.dto.trainer_run_config import (
     TrainerRunConfig,
 )
 from auto_llm.registry.evaluator_registry import LM_EVAL_HARNESS_CUSTOM_TASKS_PATH
-from auto_llm.registry.tracker_registry import WANDB_TRAIN_PROJECT, WANDB_EVAL_PROJECT
+from auto_llm.registry.tracker_registry import WANDB_PROJECT
 
 
-class Priority(enum.Enum):
-    PRIORITY_ONE = 1
-    PRIORITY_TWO = 2
-    PRIORITY_THREE = 3
+class Priority(str, enum.Enum):
+    PRIORITY_ONE = "1"
+    PRIORITY_TWO = "2"
+    PRIORITY_THREE = "3"
 
 
-class ConfigMode(enum.Enum):
+class ConfigMode(str, enum.Enum):
     TRAINER_RUN_CFG = "trainer_run_cfg"
     EVALUATOR_RUN_CFG = "evaluator_run_cfg"
 
@@ -54,14 +55,17 @@ class TrainEvalRunConfigurator:
         self.dataset_path = dataset_path
         self.dataset_name = self.dataset_path.split("/")[-1]
 
-        group_id = str(uuid.uuid4().hex)
-        self.run_group = self.dataset_name + "_" + group_id
-
         self.output_path = output_path
         self.configs_path = configs_path
+        os.makedirs(self.configs_path, exist_ok=True)
+
         self.instruction_template = instruction_template
         self.input_template = input_template
         self.output_template = output_template
+
+        group_id = str(uuid.uuid4().hex)
+        self.run_group = self.dataset_name + "_" + group_id
+        self.save_config_group()
 
         self.trainer_run_configs_path = os.path.join(self.configs_path, "trainer_run_configs")
         self.evaluator_run_configs_path = os.path.join(self.configs_path, "evaluator_run_configs")
@@ -223,11 +227,12 @@ class TrainEvalRunConfigurator:
 
         unique_run_id = str(uuid.uuid4().hex)
 
-        wandb_project = f"project={WANDB_EVAL_PROJECT}"
+        wandb_project = f"project={WANDB_PROJECT}"
         wandb_run_name = f"name={run_name}"
         wandb_run_id = f"id={unique_run_id}"
         wandb_group = f"group={self.run_group}"
-        wandb_args = f"{wandb_project},{wandb_run_name},{wandb_run_id},{wandb_group}"
+        wandb_job_type = f"job_type=evaluation"
+        wandb_args = f"{wandb_project},{wandb_run_name},{wandb_run_id},{wandb_group},{wandb_job_type}"
 
         # TODO: evaluator can also take different parameters, including few-shots, etc. Handle this.
         task = f"{self.dataset_name}"
@@ -273,7 +278,7 @@ class TrainEvalRunConfigurator:
     ):
         unique_run_id = str(uuid.uuid4().hex)
         tracker_config = TrackerConfig(
-            wandb_project=WANDB_TRAIN_PROJECT,
+            wandb_project=WANDB_PROJECT,
             wandb_run_name=run_name,
             wandb_run_id=unique_run_id,
             wandb_run_group=self.run_group,
@@ -315,3 +320,10 @@ class TrainEvalRunConfigurator:
             yaml.dump(config, f)
         print(f"Saved configuration: {config_path}")
         return config_path
+
+    def save_config_group(self):
+        run_group_dict = {"run_group": self.run_group}
+        run_group_path = os.path.join(self.configs_path, "run_group.json")
+        with open(run_group_path, "w+") as f:
+            json.dump(run_group_dict, f)
+        print(f"Saved Run Group Dict: {run_group_path}")

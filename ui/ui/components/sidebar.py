@@ -1,5 +1,3 @@
-"""Sidebar component for the app."""
-
 import reflex as rx
 
 from .. import styles
@@ -7,12 +5,7 @@ from ..state.user import User
 
 
 def sidebar_header() -> rx.Component:
-    """Sidebar header.
-
-    Returns:
-        The sidebar header component.
-
-    """
+    """Sidebar header."""
     return rx.hstack(
         rx.color_mode_cond(
             rx.image(src="/AutoLLM.png", height="5em"),
@@ -35,10 +28,10 @@ def sidebar_footer() -> rx.Component:
     """
     return rx.vstack(
         rx.hstack(
-        rx.link(
-            rx.text("Docs", size="3"),
-            href="https://github.com/ag-sc/autollm/",
-            color_scheme="gray",
+            rx.link(
+                rx.text("Docs", size="3"),
+                href="https://github.com/ag-sc/autollm/",
+                color_scheme="gray",
                 underline="none",
             ),
             rx.spacer(),
@@ -49,14 +42,16 @@ def sidebar_footer() -> rx.Component:
             padding="0.35em",
         ),
         rx.hstack(
-                rx.icon("user", size=16),
+            rx.icon("user", size=16),
             rx.text(User.username_display, weight="bold", size="2"),
-                rx.button(rx.icon("log_out", size=16), on_click=User.handle_sign_out),
-                align="center", spacing="2", justify="end", width="100%",
-
+            rx.button(rx.icon("log_out", size=16), on_click=User.handle_sign_out),
+            align="center",
+            spacing="2",
+            justify="end",
+            width="100%",
         ),
-        width="100%", align_items="column",
-
+        width="100%",
+        align_items="column",
     )
 
 
@@ -76,9 +71,7 @@ def sidebar_item(text: str, url: str) -> rx.Component:
 
     """
     # Whether the item is active.
-    active = (rx.State.router.page.path == url.lower()) | (
-        (rx.State.router.page.path == "/") & text == "Overview"
-    )
+    active = (rx.State.router.page.path == url.lower()) | ((rx.State.router.page.path == "/") & text == "Overview")
 
     return rx.link(
         rx.hstack(
@@ -145,19 +138,11 @@ def sidebar() -> rx.Component:
         "/about",
     ]
 
-    pages = [
-        page_dict
-        for page_list in DECORATED_PAGES.values()
-        for _, page_dict in page_list
-    ]
+    pages = [page_dict for page_list in DECORATED_PAGES.values() for _, page_dict in page_list]
 
     ordered_pages = sorted(
         pages,
-        key=lambda page: (
-            ordered_page_routes.index(page["route"])
-            if page["route"] in ordered_page_routes
-            else len(ordered_page_routes)
-        ),
+        key=lambda page: (ordered_page_routes.index(page["route"]) if page["route"] in ordered_page_routes else len(ordered_page_routes)),
     )
 
     return rx.flex(
@@ -169,7 +154,8 @@ def sidebar() -> rx.Component:
                         text=page.get("title", page["route"].strip("/").capitalize()),
                         url=page["route"],
                     )
-                    for page in ordered_pages if page["route"] != "/"
+                    for page in ordered_pages
+                    if page["route"] != "/"
                 ],
                 spacing="1",
                 width="100%",

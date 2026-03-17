@@ -18,7 +18,7 @@ from auto_llm.dto.builder_config import SftDatasetType, DatasetSplit
 from auto_llm.dto.trainer_run_config import TrainerRunConfig
 from auto_llm.pre_processor.sft_pre_procesor import SftPreProcessor
 from auto_llm.registry.estimator_registry import CTX_LENGTH_KEYS
-from auto_llm.registry.tracker_registry import WANDB_TRAIN_PROJECT
+from auto_llm.registry.tracker_registry import WANDB_PROJECT
 from auto_llm.trainer.trainer_wrapper import TrainerWrapper
 
 accelerator = Accelerator()
@@ -124,12 +124,13 @@ class SftTrainerWrapper(TrainerWrapper):
         if self.config.trainer_args.report_to == "wandb":
             import wandb
 
-            os.environ["WANDB_PROJECT"] = WANDB_TRAIN_PROJECT
+            os.environ["WANDB_PROJECT"] = WANDB_PROJECT
             wandb.init(
-                project=self.config.tracker_config.wandb_project if self.config.tracker_config.wandb_project else WANDB_TRAIN_PROJECT,
+                project=self.config.tracker_config.wandb_project if self.config.tracker_config.wandb_project else WANDB_PROJECT,
                 name=self.config.tracker_config.wandb_run_name if self.config.tracker_config.wandb_run_name else None,
                 id=self.config.tracker_config.wandb_run_id if self.config.tracker_config.wandb_run_id else None,
                 group=self.config.tracker_config.wandb_run_group if self.config.tracker_config.wandb_run_group else None,
+                job_type=self.config.tracker_config.wandb_run_type if self.config.tracker_config.wandb_run_type else None,
                 config=self.config.model_dump(),
             )
 

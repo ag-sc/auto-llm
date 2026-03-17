@@ -1,12 +1,10 @@
-import asyncio
-from datetime import datetime
+import json
 from typing import Any, Dict, List
 
 import reflex as rx
-from reflex.components.radix.themes.base import LiteralAccentColor
 
+from ..pages.configure import AppState
 from ..backend.workbench import Workbench
-
 from .. import styles
 
 
@@ -17,7 +15,25 @@ class WorkbenchState(rx.State):
     @rx.event
     def get_jobs(self):
         self.jobs = Workbench().get_jobs()
-        print("jobs", self.jobs)
+
+    @rx.event
+    async def view_job_details(self, job_path: str):
+        print("Viewing job details for:", job_path)
+        configure_state_path = f"{job_path}/configure_state.json"
+
+        try:
+            with open(configure_state_path, "r") as f:
+                configure_state = json.load(f)
+
+            app_state = await self.get_state(AppState)
+            app_state.load_from_json(configure_state)
+
+            yield
+            yield rx.redirect("/configure")
+
+        except Exception as e:
+            print(f"Error loading job: {e}")
+            yield rx.window_alert("Could not load job details.")
 
 
 def render_individual_job(job):
@@ -30,7 +46,7 @@ def render_individual_job(job):
             rx.text(job["job_path"]),
             rx.spacer(),
             rx.moment(job["timestamp"], from_now=True),
-            rx.button(rx.icon("eye"), variant="soft", size="1"),
+            rx.button(rx.icon("eye"), variant="soft", size="1", on_click=lambda: WorkbenchState.view_job_details(job["job_path"])),
             width="100%",
             align="center",
         ),
@@ -60,4 +76,5 @@ def workbench_stats_card() -> rx.Component:
         ),
         width="80%",
         box_shadow=styles.box_shadow_style,
+        on_mount=WorkbenchState.get_jobs,
     )

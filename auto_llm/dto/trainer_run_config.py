@@ -215,6 +215,11 @@ class TrackerConfig(BaseModel):
         title="W&B Run Group",
         default=None,
     )
+    wandb_run_type: Optional[str] = Field(
+        description="The W&B run job type.",
+        title="W&B Run Group",
+        default="training",
+    )
 
 
 class TrainerRunConfig(BaseModel):

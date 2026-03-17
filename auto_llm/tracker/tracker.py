@@ -1,5 +1,6 @@
 import datetime
 from typing import Any, Dict, List
+import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import wandb
@@ -72,6 +73,45 @@ class WandbClient:
     def get_run_state(self, run_id: str, project_name: str):
         run = self.get_run(run_id=run_id, project_name=project_name)
         return run.state
+
+    def get_eval_runs_of_group(self, group: str, project_name: str):
+        runs = self.api.runs(path=f"{self.entity}/{project_name}")
+
+        results = []
+        for run in runs:
+            if run.job_type != "evaluation":
+                continue
+
+            for key in run.summary.keys():
+                if "stderr" in key:
+                    metric_name = key.replace("_stderr", "")
+                    metric_value = run.summary[metric_name]
+
+                    results.append({"run": run.name, metric_name: metric_value})
+                    break
+
+        df = pd.DataFrame(results)
+        df = df.drop_duplicates(subset="run", keep="last")
+
+        fig = px.bar(
+            df,
+            x="run",
+            y="pubmed_mcqa/acc",
+            title="PubMed MCQA Accuracy",
+            labels={"run": "Run Configuration", "pubmed_mcqa/acc": "Accuracy"},
+            template="plotly_white",
+            color="run",
+        )
+
+        # 4. Improve layout for long labels
+        fig.update_layout(
+            xaxis_tickangle=-45,
+            showlegend=False,
+            margin=dict(t=50, l=50, r=50, b=150),  # Add bottom margin for labels
+            height=500,
+        )
+
+        return fig.to_html(full_html=False, include_plotlyjs="cdn")
 
     def get_loss_plot(self, run_id: str, project_name: str):
         run = self.get_run(run_id=run_id, project_name=project_name)
