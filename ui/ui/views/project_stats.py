@@ -70,17 +70,22 @@ def stats_cards(list_stats_cards) -> rx.Component:
     return rx.card(
         rx.vstack(
             rx.hstack(rx.icon("panels-top-left", size=25), rx.heading("Projects", size="5", weight="bold"), align="center"),
-            rx.grid(
-                list_stats_cards,
-                gap="1rem",
-                grid_template_columns=[
-                    "1fr",
-                    "repeat(1, 1fr)",
-                    "repeat(2, 1fr)",
-                    "repeat(3, 1fr)",
-                    "repeat(3, 1fr)",
-                ],
-                width="100%",
+            rx.scroll_area(
+                rx.grid(
+                    list_stats_cards,
+                    gap="1rem",
+                    grid_template_columns=[
+                        "1fr",
+                        "repeat(1, 1fr)",
+                        "repeat(2, 1fr)",
+                        "repeat(3, 1fr)",
+                        "repeat(3, 1fr)",
+                    ],
+                    width="100%",
+                ),
+                type="always",
+                scrollbars="vertical",
+                height="30vh",
             ),
         ),
         width="80%",

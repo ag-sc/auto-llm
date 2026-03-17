@@ -69,7 +69,7 @@ def workbench_stats_card() -> rx.Component:
                 rx.foreach(WorkbenchState.jobs, render_individual_job),
                 type="always",
                 scrollbars="vertical",
-                height="40vh",
+                height="30vh",
             ),
             spacing="3",
             width="100%",

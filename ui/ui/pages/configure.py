@@ -160,9 +160,9 @@ def show_configuration(configurator_output: ConfiguratorOutput):
         rx.table.cell(
             rx.match(
                 configurator_output.priority,
-                (Priority.PRIORITY_ONE.name, status_badge("1")),
-                (Priority.PRIORITY_TWO.name, status_badge("2")),
-                (Priority.PRIORITY_THREE.name, status_badge("3")),
+                (Priority.PRIORITY_ONE, status_badge("1")),
+                (Priority.PRIORITY_TWO, status_badge("2")),
+                (Priority.PRIORITY_THREE, status_badge("3")),
             ),
         ),
         rx.table.cell(
