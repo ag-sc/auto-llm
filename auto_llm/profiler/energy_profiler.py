@@ -19,9 +19,11 @@ class EnergyProfiler:
     Args:
         output_dir: Directory where the ``emissions.csv`` file is written.
         project_name: Label stored in the CSV ``project_name`` column.
-            Passed to ``EmissionsTracker.project_name``.
-        experiment_name: Human-readable experiment label used only in log
-            messages (not written to the CSV by CodeCarbon).
+            Passed to ``EmissionsTracker.project_name``. Also used as the
+            wandb project when ``log_to_wandb`` is ``True``.
+        experiment_name: Human-readable experiment label used in log
+            messages and as the base for the dedicated wandb run name
+            (suffixed with ``-energy``).
         is_main_process: When ``False`` the profiler is a no-op. Set this to
             ``accelerator.is_main_process`` in multi-GPU setups so that only
             rank-0 tracks emissions.
@@ -29,6 +31,10 @@ class EnergyProfiler:
             readings. Passed to ``EmissionsTracker.measure_power_secs``.
             Lower values give finer granularity at the cost of higher
             overhead.
+        log_to_wandb: When ``True`` a **dedicated** wandb run is created in
+            ``__exit__`` to log emission metrics. The run is named
+            ``{experiment_name}-energy`` and placed in ``project_name``.
+            Defaults to ``False`` (no wandb logging).
 
     Usage::
 
@@ -38,11 +44,17 @@ class EnergyProfiler:
             project_name="my-project",
             experiment_name="sft-run-1",
             is_main_process=accelerator.is_main_process,
+            log_to_wandb=True,
         ):
             trainer.train()
 
         # Evaluation
-        with EnergyProfiler(output_dir="/out/eval"):
+        with EnergyProfiler(
+            output_dir="/out/eval",
+            project_name="llm4kmu-eval",
+            experiment_name="pico-run",
+            log_to_wandb=True,
+        ):
             cli_evaluate(args=lm_eval_args)
     """
 
@@ -53,12 +65,14 @@ class EnergyProfiler:
         experiment_name: str = "run",
         is_main_process: bool = True,
         measure_power_secs: int = 15,
+        log_to_wandb: bool = False,
     ):
         self.output_dir = output_dir
         self.project_name = project_name
         self.experiment_name = experiment_name
         self.is_main_process = is_main_process
         self.measure_power_secs = measure_power_secs
+        self.log_to_wandb = log_to_wandb
         self._tracker = None
 
     def __enter__(self):
@@ -107,15 +121,28 @@ class EnergyProfiler:
 
    
     def _log_to_wandb(self):
-        """Read the last row of the emissions CSV and push it to wandb.run.summary."""
+        """Create a dedicated wandb run and log emissions metrics to its summary.
+        """
 
-        if wandb.run is None:
-            logger.warning("No active wandb run — skipping emissions logging to wandb.")
+        if not self.log_to_wandb:
+            logger.info("wandb logging disabled — skipping emissions logging.")
             return
 
         emissions_data = self._read_last_emissions_row()
         if emissions_data is None:
             logger.warning("Could not read emissions CSV — skipping wandb logging.")
+            return
+
+        try:
+            run = wandb.init(
+                project=self.project_name,
+                name=f"{self.experiment_name}-energy",
+                job_type="energy-profiling",
+                tags=["energy-profiling"],
+                reinit=True,
+            )
+        except Exception as e:
+            logger.warning("Failed to initialise dedicated wandb run: %s", e)
             return
 
         # Map CSV columns → wandb summary keys
@@ -136,18 +163,21 @@ class EnergyProfiler:
             "gpu_model": "emissions/gpu_model",
         }
 
-        for csv_col, wandb_key in key_map.items():
-            value = emissions_data.get(csv_col)
-            if value is None or value == "":
-                continue
-            # Try to cast numeric values
-            try:
-                value = float(value)
-            except (ValueError, TypeError):
-                pass
-            wandb.run.summary[wandb_key] = value
+        try:
+            for csv_col, wandb_key in key_map.items():
+                value = emissions_data.get(csv_col)
+                if value is None or value == "":
+                    continue
+                # Try to cast numeric values
+                try:
+                    value = float(value)
+                except (ValueError, TypeError):
+                    pass
+                run.summary[wandb_key] = value
 
-        logger.info("Emissions metrics logged to wandb run '%s'.", wandb.run.name)
+            logger.info("Emissions metrics logged to dedicated wandb run '%s'.", run.name)
+        finally:
+            run.finish()
 
 
     def _read_last_emissions_row(self) -> dict | None:

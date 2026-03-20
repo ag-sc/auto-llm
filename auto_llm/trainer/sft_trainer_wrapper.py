@@ -177,6 +177,7 @@ class SftTrainerWrapper(TrainerWrapper):
                 project_name=WANDB_TRAIN_PROJECT,
                 experiment_name=self.config.trainer_args.run_name,
                 is_main_process=accelerator.is_main_process,
+                log_to_wandb=(self.config.trainer_args.report_to == "wandb"),
             ):
                 trainer.train()
                 trainer.save_model(self.config.trainer_args.output_dir)
