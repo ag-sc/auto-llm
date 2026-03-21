@@ -1,15 +1,13 @@
-import csv
+import dataclasses
 import logging
 import os
-from pathlib import Path
 from codecarbon import EmissionsTracker
 import wandb
 
+from auto_llm.constants import EMISSIONS_CSV_FILENAME
 
 
 logger = logging.getLogger(__name__)
-
-EMISSIONS_CSV_FILENAME = "emissions.csv"
 
 
 class EnergyProfiler:
@@ -74,6 +72,17 @@ class EnergyProfiler:
         self.measure_power_secs = measure_power_secs
         self.log_to_wandb = log_to_wandb
         self._tracker = None
+        self._final_emissions: dict = None
+
+    @property
+    def final_emissions_data(self) -> dict:
+        """Actual emissions as a plain dict (available after ``__exit__``).
+
+        Populated from ``EmissionsTracker.final_emissions_data`` via
+        ``dataclasses.asdict`` so that all values are native Python types.
+        Returns ``None`` if the profiler hasn't run or was a no-op.
+        """
+        return self._final_emissions
 
     def __enter__(self):
         if not self.is_main_process:
@@ -97,6 +106,7 @@ class EnergyProfiler:
             measure_power_secs=self.measure_power_secs,
             save_to_file=True,
             save_to_api=False,
+            allow_multiple_runs=True,
             log_level="warning",
         )
         self._tracker.start()
@@ -107,7 +117,7 @@ class EnergyProfiler:
         )
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type, exc_value, tb):
         if self._tracker is None:
             return False
 
@@ -116,21 +126,34 @@ class EnergyProfiler:
             "Energy profiling stopped — total emissions: %.6f kg CO₂eq",
             emissions_total,
         )
+
+        # Capture final data as a plain dict for downstream consumers
+        raw = getattr(self._tracker, "final_emissions_data", None)
+        if raw is not None:
+            self._final_emissions = dataclasses.asdict(raw)
+
         self._log_to_wandb()
         return False  # do not suppress exceptions
 
-   
     def _log_to_wandb(self):
-        """Create a dedicated wandb run and log emissions metrics to its summary.
+        """Create a dedicated wandb run and log emissions metrics.
+
+        Reads metrics directly from ``EmissionsTracker.final_emissions_data``
+        (an ``EmissionsData`` dataclass populated by ``tracker.stop()``) rather
+        than re-parsing the CSV file. This is faster, avoids file-I/O race
+        conditions, and preserves native Python types (no string casting).
         """
 
         if not self.log_to_wandb:
             logger.info("wandb logging disabled — skipping emissions logging.")
             return
 
-        emissions_data = self._read_last_emissions_row()
+        emissions_data = self._final_emissions
         if emissions_data is None:
-            logger.warning("Could not read emissions CSV — skipping wandb logging.")
+            logger.warning(
+                "EmissionsTracker did not produce final_emissions_data — "
+                "skipping wandb logging."
+            )
             return
 
         try:
@@ -145,34 +168,55 @@ class EnergyProfiler:
             logger.warning("Failed to initialise dedicated wandb run: %s", e)
             return
 
-        # Map CSV columns → wandb summary keys
+        # Map EmissionsData fields → wandb summary keys.
+        # Uses the in-memory dataclass directly (no CSV parsing needed).
         key_map = {
+            # Energy & emissions
             "energy_consumed": "emissions/energy_consumed_kWh",
             "emissions": "emissions/emissions_kg",
             "emissions_rate": "emissions/emissions_rate_kg_per_s",
+            "cpu_energy": "emissions/cpu_energy_kWh",
+            "gpu_energy": "emissions/gpu_energy_kWh",
+            "ram_energy": "emissions/ram_energy_kWh",
+            "water_consumed": "emissions/water_consumed_L",
+            # Power draw (mean)
             "cpu_power": "emissions/cpu_power_W",
             "gpu_power": "emissions/gpu_power_W",
             "ram_power": "emissions/ram_power_W",
+            # Duration
             "duration": "emissions/duration_s",
+            # Utilization
+            "cpu_utilization_percent": "emissions/cpu_utilization_percent",
+            "gpu_utilization_percent": "emissions/gpu_utilization_percent",
+            "ram_utilization_percent": "emissions/ram_utilization_percent",
+            "ram_used_gb": "emissions/ram_used_gb",
+            # Location
+            "country_name": "emissions/country_name",
             "country_iso_code": "emissions/country_iso_code",
             "region": "emissions/region",
             "cloud_provider": "emissions/cloud_provider",
             "cloud_region": "emissions/cloud_region",
+            "on_cloud": "emissions/on_cloud",
+            # Hardware
             "cpu_count": "emissions/cpu_count",
+            "cpu_model": "emissions/cpu_model",
             "gpu_count": "emissions/gpu_count",
             "gpu_model": "emissions/gpu_model",
+            "ram_total_size": "emissions/ram_total_size_GB",
+            # Tracking config
+            "tracking_mode": "emissions/tracking_mode",
+            "pue": "emissions/pue",
+            # System info
+            "os": "emissions/os",
+            "python_version": "emissions/python_version",
+            "codecarbon_version": "emissions/codecarbon_version",
         }
 
         try:
-            for csv_col, wandb_key in key_map.items():
-                value = emissions_data.get(csv_col)
+            for field, wandb_key in key_map.items():
+                value = emissions_data.get(field)
                 if value is None or value == "":
                     continue
-                # Try to cast numeric values
-                try:
-                    value = float(value)
-                except (ValueError, TypeError):
-                    pass
                 run.summary[wandb_key] = value
 
             logger.info("Emissions metrics logged to dedicated wandb run '%s'.", run.name)
@@ -180,18 +224,4 @@ class EnergyProfiler:
             run.finish()
 
 
-    def _read_last_emissions_row(self) -> dict | None:
-        """Return the last row of the emissions CSV as a dict, or None on failure."""
-        csv_path = Path(self.output_dir) / EMISSIONS_CSV_FILENAME
-        if not csv_path.exists():
-            return None
-        try:
-            with open(csv_path, newline="") as f:
-                reader = csv.DictReader(f)
-                rows = list(reader)
-            if not rows:
-                return None
-            return rows[-1]
-        except Exception as e:
-            logger.warning("Failed to parse emissions CSV: %s", e)
-            return None
+

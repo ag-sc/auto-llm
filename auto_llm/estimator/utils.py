@@ -1,5 +1,9 @@
 import json
-from typing import List, Dict, Any
+import logging
+import os
+import torch
+
+from typing import List, Dict, Any, Optional
 
 from transformers import AutoModel, AutoConfig
 
@@ -8,6 +12,8 @@ from auto_llm.registry.estimator_registry import (
     MODEL_PARAMS_CACHE_PATH,
     GPU_PARAMS_CACHE_PATH,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def cache_model_params(model_name: str):
@@ -62,3 +68,73 @@ def get_gpu_params(
         gpu_params = json.load(f)
 
     return gpu_params
+
+
+def resolve_gpu_name(
+    gpu_name: Optional[str] = None,
+    gpu_params: Optional[Dict[str, Any]] = None,
+) -> Optional[str]:
+    """Resolve the GPU name to use for estimation.
+
+    Uses a hybrid approach: if *gpu_name* is provided **and** matches a key in
+    *gpu_params*, it is returned directly.  Otherwise the function falls back
+    to auto-detection via ``torch.cuda.get_device_name(0)`` and matches the
+    result against the *gpu_params* keys by case-insensitive substring.
+
+    Args:
+        gpu_name: Explicit GPU name supplied by the user/config.  When
+            ``None`` (the default), auto-detection is used immediately.
+        gpu_params: Dictionary of known GPU specifications keyed by name.
+            Loaded from the GPU params cache when ``None``.
+
+    Returns:
+        The matching *gpu_params* key, or ``None`` when no match is found or
+        no CUDA device is available.
+    """
+    if gpu_params is None:
+        try:
+            gpu_params = get_gpu_params()
+        except Exception as exc:
+            logger.warning("Could not load GPU params cache: %s", exc)
+            return None
+
+    # --- try explicit name first ---
+    if gpu_name:
+        # exact key match
+        if gpu_name in gpu_params:
+            return gpu_name
+        # case-insensitive match
+        for key in gpu_params:
+            if key.lower() == gpu_name.lower():
+                return key
+        logger.warning(
+            "Explicit gpu_name '%s' not found in gpu_params — "
+            "falling back to auto-detection.",
+            gpu_name,
+        )
+
+    # --- auto-detection via torch.cuda ---
+    try:
+
+        if not torch.cuda.is_available():
+            logger.warning("No CUDA device available — cannot auto-detect GPU.")
+            return None
+
+        device_name = torch.cuda.get_device_name(0)
+        logger.info("Auto-detected GPU device: %s", device_name)
+
+        # case-insensitive substring match against known keys
+        device_lower = device_name.lower()
+        for key in gpu_params:
+            if key.lower() in device_lower or device_lower in key.lower():
+                logger.info("Matched GPU device to params key: %s", key)
+                return key
+
+        logger.warning(
+            "Auto-detected GPU '%s' does not match any key in gpu_params.",
+            device_name,
+        )
+        return None
+    except Exception as exc:
+        logger.warning("GPU auto-detection failed: %s", exc)
+        return None

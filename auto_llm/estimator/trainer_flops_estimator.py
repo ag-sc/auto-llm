@@ -1,4 +1,4 @@
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 import yaml
 from datasets import DatasetDict
@@ -9,10 +9,29 @@ from auto_llm.estimator.estimator import Estimator
 
 
 class TrainerFlopsEstimator(Estimator):
-    def __init__(self, config_path: str, models_meta: Dict[str, Any]):
-        with open(config_path, "r") as f:
-            config = yaml.safe_load(f)
-        self.config: TrainerRunConfig = TrainerRunConfig.model_validate(config)
+    """Estimate training FLOPs using the ``6 x N x D`` formula.
+
+    Accepts either a ``config_path`` (YAML file) **or** a pre-built
+    ``TrainerRunConfig`` via the *config* parameter.  When both are
+    supplied, *config* takes precedence.
+    """
+
+    def __init__(
+        self,
+        models_meta: Dict[str, Any],
+        config_path: Optional[str] = None,
+        config: Optional[TrainerRunConfig] = None,
+    ):
+        if config is not None:
+            self.config = config
+        elif config_path is not None:
+            with open(config_path, "r") as f:
+                raw = yaml.safe_load(f)
+            self.config = TrainerRunConfig.model_validate(raw)
+        else:
+            raise ValueError(
+                "Either config_path or config must be provided."
+            )
         self.models_meta = models_meta
 
     def estimate(self) -> int:

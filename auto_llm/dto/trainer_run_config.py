@@ -66,6 +66,13 @@ class AutoLlmTrainerArgs(BaseModel):
         description="Enable CodeCarbon energy profiling to track energy consumption and CO₂ emissions during training.",
         title="Energy Profiling",
     )
+    gpu_name: Optional[str] = Field(
+        default=None,
+        description="GPU name used for energy estimation (must match a key in the GPU "
+        "params cache). When ``None``, the GPU is auto-detected at runtime "
+        "via ``torch.cuda.get_device_name``.",
+        title="GPU Name",
+    )
 
 
 class TrainerArgs(BaseModel):

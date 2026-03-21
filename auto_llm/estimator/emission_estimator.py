@@ -17,6 +17,16 @@ class EmissionEstimator(Estimator):
         self.gpu_params = gpu_params
         self.gpu_name = gpu_name
 
+    def estimate_energy_kwh(self) -> float:
+        """Return estimated energy consumption in kWh (TDP × runtime)."""
+        runtime = self.runtime_estimator.estimate()
+        runtime_in_h = runtime / 3600.0
+        try:
+            tdp = self.gpu_params[self.gpu_name].get("tdp")
+        except KeyError:
+            raise Exception("GPU name not found!")
+        return tdp * runtime_in_h
+
     def estimate(self) -> float:
         # https://huggingface.co/docs/leaderboards/en/open_llm_leaderboard/emissions
         # https://mlco2.github.io/impact/
@@ -37,7 +47,7 @@ class EmissionEstimator(Estimator):
 
         # TODO: take region as an argument and compute carbon_intensity_g_per_kWh based on this argument
         # Source: https://www.nowtricity.com/country/germany/
-        carbon_intensity_g_per_kWh = 321
+        carbon_intensity_g_per_kWh = 328 # average carbon intensity in Germany in 2025
 
         co2_emissions_g = energy_consumption_kWh * carbon_intensity_g_per_kWh
 
