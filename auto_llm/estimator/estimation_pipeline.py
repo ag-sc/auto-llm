@@ -109,7 +109,10 @@ class EstimationPipeline:
                 "Could not resolve GPU name — energy estimation aborted."
             )
 
-        models_meta = get_model_params()
+        model_name = self._resolve_model_name()
+        models_meta = get_model_params(
+            model_names=[model_name] if model_name else None
+        )
         flops_estimator = self._build_flops_estimator(models_meta)
 
         runtime_estimator = RuntimeEstimator(
@@ -210,3 +213,34 @@ class EstimationPipeline:
         raise ValueError(
             "Either config or config_path is required for training estimation."
         )
+
+    def _resolve_model_name(self) -> Optional[str]:
+        """Extract the model name from the available configuration."""
+        # Training: config object has the model name directly
+        if self.config is not None:
+            return self.config.auto_llm_trainer_args.model_name
+
+        # Training or eval: read from YAML
+        if self.config_path is not None:
+            try:
+                import yaml
+
+                with open(self.config_path, "r") as f:
+                    raw = yaml.safe_load(f)
+
+                # Training YAML: nested under auto_llm_trainer_args
+                model_name = (raw.get("auto_llm_trainer_args") or {}).get(
+                    "model_name"
+                )
+                if model_name:
+                    return model_name
+
+                # Eval YAML: model name in model_args "pretrained=X,..."
+                model_args = raw.get("model_args", "")
+                for part in model_args.split(","):
+                    if part.startswith("pretrained="):
+                        return part.replace("pretrained=", "")
+            except Exception as exc:
+                logger.warning("Could not extract model name from config: %s", exc)
+
+        return None
