@@ -4,7 +4,7 @@ import logging
 import os
 import yaml
 
-from typing import Any, Dict, Optional, TYPE_CHECKING
+from typing import Any, Dict, Optional
 
 from auto_llm.constants import (
     DEFAULT_CARBON_INTENSITY_G_PER_KWH,
@@ -13,9 +13,7 @@ from auto_llm.constants import (
 from auto_llm.estimator.emission_estimator import EmissionEstimator
 from auto_llm.estimator.runtime_estimator import RuntimeEstimator
 from auto_llm.estimator.utils import get_gpu_params, get_model_params, resolve_gpu_name
-
-if TYPE_CHECKING:
-    from auto_llm.dto.trainer_run_config import TrainerRunConfig
+from auto_llm.dto.trainer_run_config import TrainerRunConfig
 
 logger = logging.getLogger(__name__)
 
