@@ -1,45 +1,9 @@
-"""Orchestrates the full FLOPs → Runtime → Emission estimator chain.
-
-``EstimationPipeline`` replaces the old procedural ``run_and_save_estimate()``
-function.  It builds the three-stage estimator chain, runs all estimates, and
-optionally persists the result as ``emission_estimate.json``.
-
-Usage::
-
-    # From the trainer (passing a TrainerRunConfig object):
-    pipeline = EstimationPipeline(
-        output_dir="/out/model",
-        gpu_name="NVIDIA A40",
-        is_eval=False,
-        config=trainer_run_config,
-    )
-    result = pipeline.run()   # estimate + save (best-effort)
-
-    # From the evaluator (passing a YAML path):
-    pipeline = EstimationPipeline(
-        output_dir="/out/eval",
-        gpu_name=None,          # auto-detect
-        is_eval=True,
-        config_path="config.yaml",
-    )
-    result = pipeline.run()
-
-    # From the UI (estimate only, no persistence):
-    pipeline = EstimationPipeline(
-        output_dir=None,
-        gpu_name="NVIDIA A40",
-        is_eval=False,
-        config_path="config.yaml",
-    )
-    estimate = pipeline.estimate()
-"""
-
-from __future__ import annotations
-
 import datetime
 import json
 import logging
 import os
+import yaml
+
 from typing import Any, Dict, Optional, TYPE_CHECKING
 
 from auto_llm.constants import (
@@ -72,6 +36,35 @@ class EstimationPipeline:
         config_path: Path to the YAML config file (evaluator or trainer).
         config: A ``TrainerRunConfig`` instance — used by the trainer
             wrapper to avoid re-reading the YAML from disk.
+
+            Usage::
+
+    # From the trainer (passing a TrainerRunConfig object):
+    pipeline = EstimationPipeline(
+        output_dir="/out/model",
+        gpu_name="NVIDIA A40",
+        is_eval=False,
+        config=trainer_run_config,
+    )
+    result = pipeline.run()   # estimate + save (best-effort)
+
+    # From the evaluator (passing a YAML path):
+    pipeline = EstimationPipeline(
+        output_dir="/out/eval",
+        gpu_name=None,          # auto-detect
+        is_eval=True,
+        config_path="config.yaml",
+    )
+    result = pipeline.run()
+
+    # From the UI (estimate only, no persistence):
+    pipeline = EstimationPipeline(
+        output_dir=None,
+        gpu_name="NVIDIA A40",
+        is_eval=False,
+        config_path="config.yaml",
+    )
+    estimate = pipeline.estimate()
     """
 
     def __init__(
@@ -177,9 +170,6 @@ class EstimationPipeline:
             logger.warning("Energy estimation failed (best-effort) — %s", exc)
             return None
 
-    # ------------------------------------------------------------------
-    # Internal helpers
-    # ------------------------------------------------------------------
 
     def _build_flops_estimator(self, models_meta: Dict[str, Any]):
         """Construct the appropriate FLOPs estimator."""
@@ -223,7 +213,6 @@ class EstimationPipeline:
         # Training or eval: read from YAML
         if self.config_path is not None:
             try:
-                import yaml
 
                 with open(self.config_path, "r") as f:
                     raw = yaml.safe_load(f)
