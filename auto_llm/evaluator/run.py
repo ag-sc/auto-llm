@@ -33,6 +33,11 @@ if __name__ == "__main__":
     # Allow custom dataset code (e.g. bigbio/pubmed_qa) before any task loading
     if config.get("trust_remote_code"):
         os.environ["HF_DATASETS_TRUST_REMOTE_CODE"] = "true"
+        try:
+            import datasets.config
+            datasets.config.HF_DATASETS_TRUST_REMOTE_CODE = True
+        except (ImportError, AttributeError):
+            pass
 
     # Read (but don't pop) wandb_args — lm-eval-harness still needs them.
     wandb_args = parse_wandb_args(config.get("wandb_args"))
