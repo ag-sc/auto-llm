@@ -1,12 +1,13 @@
 #!/bin/bash
 #SBATCH --job-name=autollm-eval
 #SBATCH --partition=study
-#SBATCH --gres=gpu:1
+#SBATCH --gres=gpu:a40:1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=100G
-#SBATCH --time=03:00:00
+#SBATCH --time=10:00:00
 #SBATCH --tmp=20G
 #SBATCH --mail-type=BEGIN,FAIL,END
+#SBATCH --exclusive
 #SBATCH --output=/vol/auto_llm/logs/%x-%u-%j.out
 
 CONFIG_PATH=$1
