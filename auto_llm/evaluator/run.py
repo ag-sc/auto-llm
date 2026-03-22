@@ -1,5 +1,6 @@
 import argparse
 import shutil
+import os
 
 import yaml
 from lm_eval.__main__ import cli_evaluate
@@ -28,6 +29,10 @@ if __name__ == "__main__":
     # Pop energy_profiling and gpu_name before forwarding config to lm-eval-harness
     energy_profiling = config.pop("energy_profiling", False)
     gpu_name = config.pop("gpu_name", None)
+    
+    # Allow custom dataset code (e.g. bigbio/pubmed_qa) before any task loading
+    if config.get("trust_remote_code"):
+        os.environ["HF_DATASETS_TRUST_REMOTE_CODE"] = "true"
 
     # Read (but don't pop) wandb_args — lm-eval-harness still needs them.
     wandb_args = parse_wandb_args(config.get("wandb_args"))
