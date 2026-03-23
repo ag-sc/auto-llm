@@ -161,12 +161,42 @@ class EstimationPipeline:
             The estimate dict on success, or ``None`` on failure.
         """
         try:
-            estimate = self.estimate()
-            self.save(estimate)
-            return estimate
+            result = self.estimate()
+            self._last_estimate = result
+            self.save(result)
+            return result
         except Exception as exc:
             logger.warning("Energy estimation failed (best-effort) — %s", exc)
             return None
+
+    # Map estimate dict keys → wandb summary keys.
+    _WANDB_KEY_MAP = {
+        "estimated_flops": "emissions/estimate/estimated_flops",
+        "estimated_runtime_s": "emissions/estimate/estimated_runtime_s",
+        "estimated_co2_g": "emissions/estimate/estimated_co2_g",
+        "estimated_energy_kwh": "emissions/estimate/estimated_energy_kwh",
+        "gpu_name": "emissions/estimate/gpu_name",
+        "carbon_intensity_g_per_kWh": "emissions/estimate/carbon_intensity_g_per_kWh",
+    }
+
+    def get_wandb_metrics(self) -> Optional[Dict[str, Any]]:
+        """Return estimation results as a wandb-ready ``{wandb_key: value}`` dict.
+
+        Returns ``None`` if :meth:`run` / :meth:`estimate` has not been
+        called or failed.  This method does **not** create a wandb run —
+        pass the result to
+        :meth:`~auto_llm.profiler.wandb_energy_logger.WandbEnergyLogger.log`.
+        """
+        estimate = getattr(self, "_last_estimate", None)
+        if estimate is None:
+            return None
+
+        metrics: Dict[str, Any] = {}
+        for src_key, wandb_key in self._WANDB_KEY_MAP.items():
+            value = estimate.get(src_key)
+            if value is not None:
+                metrics[wandb_key] = value
+        return metrics
 
 
     def _build_flops_estimator(self, models_meta: Dict[str, Any]):

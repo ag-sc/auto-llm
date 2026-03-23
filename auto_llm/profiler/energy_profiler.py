@@ -1,8 +1,8 @@
 import dataclasses
 import logging
 import os
+from typing import Any, Dict, Optional
 from codecarbon import EmissionsTracker
-import wandb
 
 from auto_llm.constants import EMISSIONS_CSV_FILENAME
 
@@ -14,14 +14,16 @@ class EnergyProfiler:
     """Context manager wrapping CodeCarbon's ``EmissionsTracker`` to profile
     energy consumption and CO₂ emissions during training or evaluation.
 
+    After the context manager exits, call :meth:`get_wandb_metrics` to
+    retrieve a ``{wandb_key: value}`` dict suitable for logging via
+    :class:`~auto_llm.profiler.wandb_energy_logger.WandbEnergyLogger`.
+
     Args:
         output_dir: Directory where the ``emissions.csv`` file is written.
         project_name: Label stored in the CSV ``project_name`` column.
-            Passed to ``EmissionsTracker.project_name``. Also used as the
-            wandb project when ``log_to_wandb`` is ``True``.
+            Passed to ``EmissionsTracker.project_name``.
         experiment_name: Human-readable experiment label used in log
-            messages and as the base for the dedicated wandb run name
-            (suffixed with ``-energy``).
+            messages.
         is_main_process: When ``False`` the profiler is a no-op. Set this to
             ``accelerator.is_main_process`` in multi-GPU setups so that only
             rank-0 tracks emissions.
@@ -29,31 +31,18 @@ class EnergyProfiler:
             readings. Passed to ``EmissionsTracker.measure_power_secs``.
             Lower values give finer granularity at the cost of higher
             overhead.
-        log_to_wandb: When ``True`` a **dedicated** wandb run is created in
-            ``__exit__`` to log emission metrics. The run is named
-            ``{experiment_name}-energy`` and placed in ``project_name``.
-            Defaults to ``False`` (no wandb logging).
 
     Usage::
 
-        # Training
         with EnergyProfiler(
             output_dir="/out/model",
             project_name="my-project",
             experiment_name="sft-run-1",
             is_main_process=accelerator.is_main_process,
-            log_to_wandb=True,
-        ):
+        ) as profiler:
             trainer.train()
 
-        # Evaluation
-        with EnergyProfiler(
-            output_dir="/out/eval",
-            project_name="llm4kmu-eval",
-            experiment_name="pico-run",
-            log_to_wandb=True,
-        ):
-            cli_evaluate(args=lm_eval_args)
+        metrics = profiler.get_wandb_metrics()  # pass to WandbEnergyLogger
     """
 
     def __init__(
@@ -63,14 +52,12 @@ class EnergyProfiler:
         experiment_name: str = "run",
         is_main_process: bool = True,
         measure_power_secs: int = 15,
-        log_to_wandb: bool = False,
     ):
         self.output_dir = output_dir
         self.project_name = project_name
         self.experiment_name = experiment_name
         self.is_main_process = is_main_process
         self.measure_power_secs = measure_power_secs
-        self.log_to_wandb = log_to_wandb
         self._tracker = None
         self._final_emissions: dict = None
 
@@ -132,96 +119,66 @@ class EnergyProfiler:
         if raw is not None:
             self._final_emissions = dataclasses.asdict(raw)
 
-        self._log_to_wandb()
         return False  # do not suppress exceptions
 
-    def _log_to_wandb(self):
-        """Create a dedicated wandb run and log emissions metrics.
+    def get_wandb_metrics(self) -> Optional[Dict[str, Any]]:
+        """Return emissions data as a wandb-ready ``{wandb_key: value}`` dict.
 
-        Reads metrics directly from ``EmissionsTracker.final_emissions_data``
-        (an ``EmissionsData`` dataclass populated by ``tracker.stop()``) rather
-        than re-parsing the CSV file. This is faster, avoids file-I/O race
-        conditions, and preserves native Python types (no string casting).
+        Returns ``None`` if no emissions data is available (profiler hasn't
+        run or was a no-op).  This method does **not** create a wandb run —
+        pass the result to
+        :meth:`~auto_llm.profiler.wandb_energy_logger.WandbEnergyLogger.log`.
         """
-
-        if not self.log_to_wandb:
-            logger.info("wandb logging disabled — skipping emissions logging.")
-            return
-
         emissions_data = self._final_emissions
         if emissions_data is None:
-            logger.warning(
-                "EmissionsTracker did not produce final_emissions_data — "
-                "skipping wandb logging."
-            )
-            return
+            return None
 
-        try:
-            run = wandb.init(
-                project=self.project_name,
-                name=f"{self.experiment_name}-energy",
-                job_type="energy-profiling",
-                tags=["energy-profiling"],
-                reinit=True,
-            )
-        except Exception as e:
-            logger.warning("Failed to initialise dedicated wandb run: %s", e)
-            return
+        summary: Dict[str, Any] = {}
+        for field, wandb_key in self._EMISSIONS_KEY_MAP.items():
+            value = emissions_data.get(field)
+            if value is not None and value != "":
+                summary[wandb_key] = value
+        return summary
 
-        # Map EmissionsData fields → wandb summary keys.
-        # Uses the in-memory dataclass directly (no CSV parsing needed).
-        key_map = {
-            # Energy & emissions
-            "energy_consumed": "emissions/energy_consumed_kWh",
-            "emissions": "emissions/emissions_kg",
-            "emissions_rate": "emissions/emissions_rate_kg_per_s",
-            "cpu_energy": "emissions/cpu_energy_kWh",
-            "gpu_energy": "emissions/gpu_energy_kWh",
-            "ram_energy": "emissions/ram_energy_kWh",
-            "water_consumed": "emissions/water_consumed_L",
-            # Power draw (mean)
-            "cpu_power": "emissions/cpu_power_W",
-            "gpu_power": "emissions/gpu_power_W",
-            "ram_power": "emissions/ram_power_W",
-            # Duration
-            "duration": "emissions/duration_s",
-            # Utilization
-            "cpu_utilization_percent": "emissions/cpu_utilization_percent",
-            "gpu_utilization_percent": "emissions/gpu_utilization_percent",
-            "ram_utilization_percent": "emissions/ram_utilization_percent",
-            "ram_used_gb": "emissions/ram_used_gb",
-            # Location
-            "country_name": "emissions/country_name",
-            "country_iso_code": "emissions/country_iso_code",
-            "region": "emissions/region",
-            "cloud_provider": "emissions/cloud_provider",
-            "cloud_region": "emissions/cloud_region",
-            "on_cloud": "emissions/on_cloud",
-            # Hardware
-            "cpu_count": "emissions/cpu_count",
-            "cpu_model": "emissions/cpu_model",
-            "gpu_count": "emissions/gpu_count",
-            "gpu_model": "emissions/gpu_model",
-            "ram_total_size": "emissions/ram_total_size_GB",
-            # Tracking config
-            "tracking_mode": "emissions/tracking_mode",
-            "pue": "emissions/pue",
-            # System info
-            "os": "emissions/os",
-            "python_version": "emissions/python_version",
-            "codecarbon_version": "emissions/codecarbon_version",
-        }
-
-        try:
-            for field, wandb_key in key_map.items():
-                value = emissions_data.get(field)
-                if value is None or value == "":
-                    continue
-                run.summary[wandb_key] = value
-
-            logger.info("Emissions metrics logged to dedicated wandb run '%s'.", run.name)
-        finally:
-            run.finish()
-
-
-
+    # Map EmissionsData fields → wandb summary keys.
+    _EMISSIONS_KEY_MAP = {
+        # Energy & emissions
+        "energy_consumed": "emissions/energy_consumed_kWh",
+        "emissions": "emissions/emissions_kg",
+        "emissions_rate": "emissions/emissions_rate_kg_per_s",
+        "cpu_energy": "emissions/cpu_energy_kWh",
+        "gpu_energy": "emissions/gpu_energy_kWh",
+        "ram_energy": "emissions/ram_energy_kWh",
+        "water_consumed": "emissions/water_consumed_L",
+        # Power draw (mean)
+        "cpu_power": "emissions/cpu_power_W",
+        "gpu_power": "emissions/gpu_power_W",
+        "ram_power": "emissions/ram_power_W",
+        # Duration
+        "duration": "emissions/duration_s",
+        # Utilization
+        "cpu_utilization_percent": "emissions/cpu_utilization_percent",
+        "gpu_utilization_percent": "emissions/gpu_utilization_percent",
+        "ram_utilization_percent": "emissions/ram_utilization_percent",
+        "ram_used_gb": "emissions/ram_used_gb",
+        # Location
+        "country_name": "emissions/country_name",
+        "country_iso_code": "emissions/country_iso_code",
+        "region": "emissions/region",
+        "cloud_provider": "emissions/cloud_provider",
+        "cloud_region": "emissions/cloud_region",
+        "on_cloud": "emissions/on_cloud",
+        # Hardware
+        "cpu_count": "emissions/cpu_count",
+        "cpu_model": "emissions/cpu_model",
+        "gpu_count": "emissions/gpu_count",
+        "gpu_model": "emissions/gpu_model",
+        "ram_total_size": "emissions/ram_total_size_GB",
+        # Tracking config
+        "tracking_mode": "emissions/tracking_mode",
+        "pue": "emissions/pue",
+        # System info
+        "os": "emissions/os",
+        "python_version": "emissions/python_version",
+        "codecarbon_version": "emissions/codecarbon_version",
+    }

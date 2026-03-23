@@ -8,6 +8,7 @@ from lm_eval.__main__ import cli_evaluate
 from auto_llm.evaluator.utils import parse_lm_eval_config
 
 from auto_llm.profiler.energy_profiler import EnergyProfiler
+from auto_llm.profiler.wandb_energy_logger import WandbEnergyLogger
 from auto_llm.profiler.utils import parse_wandb_args
 from auto_llm.estimator.estimation_pipeline import EstimationPipeline
 from auto_llm.estimator.emission_comparator import EmissionComparator
@@ -52,28 +53,37 @@ if __name__ == "__main__":
         log_to_wandb = bool(wandb_args)
 
         # Pre-run: persist energy estimate (best-effort)
-        EstimationPipeline(
+        pipeline = EstimationPipeline(
             output_dir=output_dir,
             gpu_name=gpu_name,
             is_eval=True,
             config_path=args.config_path,
-        ).run()
+        )
+        pipeline.run()
 
         with EnergyProfiler(
             output_dir=output_dir,
             project_name=wandb_project,
             experiment_name=wandb_name,
-            log_to_wandb=log_to_wandb,
         ) as profiler:
             cli_evaluate(args=lm_eval_args)
 
         # Post-run: compare estimated vs actual (best-effort)
-        EmissionComparator(
+        comparator = EmissionComparator(
             output_dir=output_dir,
             actual_emissions=profiler.final_emissions_data,
-            log_to_wandb=log_to_wandb,
-            wandb_project=wandb_project,
-            wandb_name=wandb_name,
-        ).compare()
+        )
+        comparator.compare()
+
+        # Log all energy metrics to a single wandb run
+        if log_to_wandb:
+            wandb_logger = WandbEnergyLogger(
+                project=wandb_project,
+                name=wandb_name,
+            )
+            wandb_logger.log(pipeline.get_wandb_metrics())
+            wandb_logger.log(profiler.get_wandb_metrics())
+            wandb_logger.log(comparator.get_wandb_metrics())
+            wandb_logger.flush()
     else:
         cli_evaluate(args=lm_eval_args)

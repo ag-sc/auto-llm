@@ -20,6 +20,7 @@ from auto_llm.pre_processor.sft_pre_procesor import SftPreProcessor
 from auto_llm.registry.estimator_registry import CTX_LENGTH_KEYS
 from auto_llm.registry.tracker_registry import WANDB_TRAIN_PROJECT
 from auto_llm.profiler.energy_profiler import EnergyProfiler
+from auto_llm.profiler.wandb_energy_logger import WandbEnergyLogger
 from auto_llm.estimator.estimation_pipeline import EstimationPipeline
 from auto_llm.estimator.emission_comparator import EmissionComparator
 from auto_llm.trainer.trainer_wrapper import TrainerWrapper
@@ -178,32 +179,41 @@ class SftTrainerWrapper(TrainerWrapper):
             output_dir = self.config.trainer_args.output_dir
 
             # Pre-run: persist energy estimate
-            EstimationPipeline(
+            pipeline = EstimationPipeline(
                 output_dir=output_dir,
                 gpu_name=self.config.auto_llm_trainer_args.gpu_name,
                 is_eval=False,
                 config=self.config,
-            ).run()
+            )
+            pipeline.run()
 
             with EnergyProfiler(
                 output_dir=output_dir,
                 project_name=WANDB_TRAIN_PROJECT,
                 experiment_name=self.config.trainer_args.run_name,
                 is_main_process=accelerator.is_main_process,
-                log_to_wandb=log_to_wandb,
             ) as profiler:
                 trainer.train()
                 trainer.save_model(output_dir)
                 tokenizer.save_pretrained(output_dir)
 
             # Post-run: compare estimated vs actual
-            EmissionComparator(
+            comparator = EmissionComparator(
                 output_dir=output_dir,
                 actual_emissions=profiler.final_emissions_data,
-                log_to_wandb=log_to_wandb,
-                wandb_project=WANDB_TRAIN_PROJECT,
-                wandb_name=self.config.trainer_args.run_name,
-            ).compare()
+            )
+            comparator.compare()
+
+            # Log all energy metrics to a single wandb run
+            if log_to_wandb:
+                wandb_logger = WandbEnergyLogger(
+                    project=WANDB_TRAIN_PROJECT,
+                    name=self.config.trainer_args.run_name,
+                )
+                wandb_logger.log(pipeline.get_wandb_metrics())
+                wandb_logger.log(profiler.get_wandb_metrics())
+                wandb_logger.log(comparator.get_wandb_metrics())
+                wandb_logger.flush()
         else:
             trainer.train()
             trainer.save_model(self.config.trainer_args.output_dir)

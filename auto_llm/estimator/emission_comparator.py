@@ -1,6 +1,5 @@
 import json
 import logging
-import wandb
 import os
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -31,6 +30,10 @@ class EmissionComparator:
     data is read directly from CodeCarbon's ``emissions.csv`` — no
     intermediate JSON file is needed.
 
+    After calling :meth:`compare`, use :meth:`get_wandb_metrics` to retrieve
+    a ``{wandb_key: value}`` dict for logging via
+    :class:`~auto_llm.profiler.wandb_energy_logger.WandbEnergyLogger`.
+
     Args:
         output_dir: Directory containing ``emission_estimate.json`` and
             ``emissions.csv``.
@@ -40,38 +43,44 @@ class EmissionComparator:
             CSV.  Accepts both the typed dict produced by
             ``dataclasses.asdict(EmissionsData)`` and the string-valued dict
             from ``csv.DictReader``.
-        log_to_wandb: When ``True`` a dedicated wandb run is created to log
-            comparison metrics under the ``emissions/comparison/`` prefix.
-        wandb_project: Wandb project name for the comparison run.
-        wandb_name: Base name for the comparison wandb run (suffixed with
-            ``-comparison``).
 
-    
     Example::
 
-    comparator = EmissionComparator(
-        output_dir="/out/model",
-        log_to_wandb=True,
-        wandb_project="my-project",
-        wandb_name="sft-run-1",
-    )
-    result = comparator.compare()
-    # result is a dict with error-% metrics, or None if files are missing.
+        comparator = EmissionComparator(
+            output_dir="/out/model",
+            actual_emissions=profiler.final_emissions_data,
+        )
+        result = comparator.compare()
+        metrics = comparator.get_wandb_metrics()  # pass to WandbEnergyLogger
     """
+
+    # Map comparison dict keys → wandb summary keys.
+    _WANDB_KEY_MAP = {
+        "runtime_error_pct": "emissions/comparison/runtime_error_pct",
+        "co2_error_pct": "emissions/comparison/co2_error_pct",
+        "energy_error_pct": "emissions/comparison/energy_error_pct",
+        "estimated_vs_actual_runtime_ratio": "emissions/comparison/runtime_ratio",
+        "estimated_vs_actual_co2_ratio": "emissions/comparison/co2_ratio",
+        "estimated_vs_actual_energy_ratio": "emissions/comparison/energy_ratio",
+        "estimated_runtime_s": "emissions/comparison/estimated_runtime_s",
+        "actual_runtime_s": "emissions/comparison/actual_runtime_s",
+        "estimated_co2_g": "emissions/comparison/estimated_co2_g",
+        "actual_co2_g": "emissions/comparison/actual_co2_g",
+        "estimated_energy_kwh": "emissions/comparison/estimated_energy_kwh",
+        "actual_energy_kwh": "emissions/comparison/actual_energy_kwh",
+        "actual_gpu_power_w": "emissions/comparison/actual_gpu_power_w",
+        "actual_cpu_power_w": "emissions/comparison/actual_cpu_power_w",
+        "actual_ram_power_w": "emissions/comparison/actual_ram_power_w",
+    }
 
     def __init__(
         self,
         output_dir: str,
         actual_emissions: Optional[Dict[str, Any]] = None,
-        log_to_wandb: bool = False,
-        wandb_project: str = "auto-llm",
-        wandb_name: str = "run",
     ):
         self.output_dir = output_dir
         self.actual_emissions = actual_emissions
-        self.log_to_wandb = log_to_wandb
-        self.wandb_project = wandb_project
-        self.wandb_name = wandb_name
+        self._last_comparison: Optional[Dict[str, Any]] = None
 
     
     def compare(self) -> Optional[Dict[str, Any]]:
@@ -100,11 +109,9 @@ class EmissionComparator:
                 return None
 
             comparison = self._compute(estimate, actual)
+            self._last_comparison = comparison
             self._save_json(comparison)
             self._log_comparison(comparison)
-
-            if self.log_to_wandb:
-                self._log_comparison_to_wandb(comparison)
 
             return comparison
 
@@ -248,47 +255,20 @@ class EmissionComparator:
             f"{co2_err:.1f}%" if co2_err is not None else "N/A",
         )
 
-    def _log_comparison_to_wandb(self, comparison: Dict[str, Any]) -> None:
-        try:
+    def get_wandb_metrics(self) -> Optional[Dict[str, Any]]:
+        """Return comparison metrics as a wandb-ready ``{wandb_key: value}`` dict.
 
-            run = wandb.init(
-                project=self.wandb_project,
-                name=f"{self.wandb_name}-comparison",
-                job_type="emission-comparison",
-                tags=["emission-comparison"],
-                reinit=True,
-            )
-        except Exception as exc:
-            logger.warning(
-                "Failed to initialise wandb run for comparison: %s", exc
-            )
-            return
+        Returns ``None`` if :meth:`compare` has not been called or returned
+        ``None``.  This method does **not** create a wandb run — pass the
+        result to
+        :meth:`~auto_llm.profiler.wandb_energy_logger.WandbEnergyLogger.log`.
+        """
+        if self._last_comparison is None:
+            return None
 
-        try:
-            wandb_keys = {
-                "runtime_error_pct": "emissions/comparison/runtime_error_pct",
-                "co2_error_pct": "emissions/comparison/co2_error_pct",
-                "energy_error_pct": "emissions/comparison/energy_error_pct",
-                "estimated_vs_actual_runtime_ratio": "emissions/comparison/runtime_ratio",
-                "estimated_vs_actual_co2_ratio": "emissions/comparison/co2_ratio",
-                "estimated_vs_actual_energy_ratio": "emissions/comparison/energy_ratio",
-                "estimated_runtime_s": "emissions/comparison/estimated_runtime_s",
-                "actual_runtime_s": "emissions/comparison/actual_runtime_s",
-                "estimated_co2_g": "emissions/comparison/estimated_co2_g",
-                "actual_co2_g": "emissions/comparison/actual_co2_g",
-                "estimated_energy_kwh": "emissions/comparison/estimated_energy_kwh",
-                "actual_energy_kwh": "emissions/comparison/actual_energy_kwh",
-                "actual_gpu_power_w": "emissions/comparison/actual_gpu_power_w",
-                "actual_cpu_power_w": "emissions/comparison/actual_cpu_power_w",
-                "actual_ram_power_w": "emissions/comparison/actual_ram_power_w",
-            }
-            for src_key, wandb_key in wandb_keys.items():
-                value = comparison.get(src_key)
-                if value is not None:
-                    run.summary[wandb_key] = value
-
-            logger.info(
-                "Emission comparison logged to wandb run '%s'.", run.name
-            )
-        finally:
-            run.finish()
+        metrics: Dict[str, Any] = {}
+        for src_key, wandb_key in self._WANDB_KEY_MAP.items():
+            value = self._last_comparison.get(src_key)
+            if value is not None:
+                metrics[wandb_key] = value
+        return metrics
