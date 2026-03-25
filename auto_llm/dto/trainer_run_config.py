@@ -73,6 +73,35 @@ class AutoLlmTrainerArgs(BaseModel):
         "via ``torch.cuda.get_device_name``.",
         title="GPU Name",
     )
+    tracking_mode: Literal["machine", "process"] = Field(
+        default="process",
+        description=(
+            "CodeCarbon tracking mode. 'process' tracks only the current "
+            "process tree (recommended on shared clusters without exclusive "
+            "node access). 'machine' reads whole-node power draw (use when "
+            "the job owns the entire node)."
+        ),
+        title="Tracking Mode",
+    )
+    force_cpu_power: Optional[int] = Field(
+        default=None,
+        description=(
+            "Override CPU TDP (watts) used by CodeCarbon when RAPL is "
+            "unavailable. Set to the CPU's TDP (e.g. 240 for AMD EPYC "
+            "7713) to prevent inflated readings. ``None`` means auto-detect."
+        ),
+        title="Force CPU Power",
+    )
+    force_ram_power: Optional[int] = Field(
+        default=None,
+        description=(
+            "Override RAM power consumption (watts). Estimate with "
+            "``sudo lshw -C memory -short | grep DIMM`` then multiply "
+            "number of slots × 5 W. ``None`` means use CodeCarbon's "
+            "heuristic."
+        ),
+        title="Force RAM Power",
+    )
 
 
 class TrainerArgs(BaseModel):

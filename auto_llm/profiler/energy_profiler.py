@@ -10,6 +10,14 @@ from auto_llm.constants import EMISSIONS_CSV_FILENAME
 logger = logging.getLogger(__name__)
 
 
+# Threshold above which cpu_power is considered suspicious and a
+# warning is emitted.  Most single-socket server CPUs have a TDP
+# well below 500 W; values above this usually indicate CodeCarbon's
+# CPU-load fallback is reading whole-machine load instead of per-
+# process load (e.g. RAPL files not accessible).
+_CPU_POWER_SANITY_THRESHOLD_W = 500
+
+
 class EnergyProfiler:
     """Context manager wrapping CodeCarbon's ``EmissionsTracker`` to profile
     energy consumption and CO₂ emissions during training or evaluation.
@@ -31,6 +39,31 @@ class EnergyProfiler:
             readings. Passed to ``EmissionsTracker.measure_power_secs``.
             Lower values give finer granularity at the cost of higher
             overhead.
+        tracking_mode: One of ``"process"`` or ``"machine"``.
+
+            * ``"process"`` (default) — tracks only the current process and
+              its children via ``psutil.Process.cpu_times()``.  Recommended
+              on **shared clusters** (e.g. SLURM without ``--exclusive``)
+              where the job does not own the entire node.
+            * ``"machine"`` — reads total power draw for the whole node.
+              Use this only when the job has exclusive access to the machine.
+
+            .. note::
+               ``tracking_mode`` only affects **CPU power** measurement
+               when RAPL is unavailable and CodeCarbon falls back to
+               "CPU-load" mode.  **GPU** tracking always uses NVML
+               regardless of this setting (scope GPUs via
+               ``CUDA_VISIBLE_DEVICES`` or CodeCarbon's ``gpu_ids``).
+               **RAM** uses a DIMM-count heuristic in both modes —
+               override with ``force_ram_power`` if needed.
+
+        force_cpu_power: Override CPU TDP (watts) used by CodeCarbon's
+            fallback CPU-load estimator.  Useful when RAPL is not
+            available and the auto-detected TDP is wrong.  ``None``
+            means auto-detect.
+        force_ram_power: Override RAM power (watts).  Estimate with
+            ``sudo lshw -C memory -short | grep DIMM`` then multiply
+            slots × 5 W.  ``None`` means use CodeCarbon's heuristic.
 
     Usage::
 
@@ -52,12 +85,18 @@ class EnergyProfiler:
         experiment_name: str = "run",
         is_main_process: bool = True,
         measure_power_secs: int = 15,
+        tracking_mode: str = "process",
+        force_cpu_power: Optional[int] = None,
+        force_ram_power: Optional[int] = None,
     ):
         self.output_dir = output_dir
         self.project_name = project_name
         self.experiment_name = experiment_name
         self.is_main_process = is_main_process
         self.measure_power_secs = measure_power_secs
+        self.tracking_mode = tracking_mode
+        self.force_cpu_power = force_cpu_power
+        self.force_ram_power = force_ram_power
         self._tracker = None
         self._final_emissions: dict = None
 
@@ -78,24 +117,32 @@ class EnergyProfiler:
         os.makedirs(self.output_dir, exist_ok=True)
 
         # EmissionsTracker configuration:
-        #   tracking_mode="machine" — reads total power draw from all GPUs
-        #       on the node via the driver (nvidia-smi / NVML), rather than
-        #       isolating per-process consumption. Preferred for full-node
-        #       training/eval jobs.
+        #   tracking_mode — "process" scopes CPU measurement to this
+        #       process tree (recommended on shared clusters where RAPL
+        #       is unavailable); "machine" reads whole-node power
+        #       (use only when the job has exclusive node access).
+        #   force_cpu_power / force_ram_power — optional user overrides
+        #       for CPU TDP and RAM power when auto-detection is wrong.
         #   save_to_file=True  — persist results to the CSV.
         #   save_to_api=False  — do not push to the CodeCarbon dashboard.
         #   log_level="warning" — suppress CodeCarbon's verbose INFO logs.
-        self._tracker = EmissionsTracker(
+        tracker_kwargs = dict(
             project_name=self.project_name,
             output_dir=self.output_dir,
             output_file=EMISSIONS_CSV_FILENAME,
-            tracking_mode="machine",
+            tracking_mode=self.tracking_mode,
             measure_power_secs=self.measure_power_secs,
             save_to_file=True,
             save_to_api=False,
             allow_multiple_runs=True,
             log_level="warning",
         )
+        if self.force_cpu_power is not None:
+            tracker_kwargs["force_cpu_power"] = self.force_cpu_power
+        if self.force_ram_power is not None:
+            tracker_kwargs["force_ram_power"] = self.force_ram_power
+
+        self._tracker = EmissionsTracker(**tracker_kwargs)
         self._tracker.start()
         logger.info(
             "Energy profiling started (project=%s, experiment=%s)",
@@ -118,6 +165,25 @@ class EnergyProfiler:
         raw = getattr(self._tracker, "final_emissions_data", None)
         if raw is not None:
             self._final_emissions = dataclasses.asdict(raw)
+
+        # Sanity-check: warn about suspiciously high CPU power which
+        # typically indicates that RAPL was unavailable and CodeCarbon's
+        # CPU-load fallback is reading whole-machine load.
+        if self._final_emissions is not None:
+            cpu_power = self._final_emissions.get("cpu_power")
+            if (
+                cpu_power is not None
+                and cpu_power > _CPU_POWER_SANITY_THRESHOLD_W
+            ):
+                logger.warning(
+                    "Measured CPU power (%.1f W) exceeds %d W — this "
+                    "usually means RAPL is unavailable and CodeCarbon "
+                    "fell back to CPU-load mode on the whole machine. "
+                    "Consider setting tracking_mode='process' or "
+                    "providing force_cpu_power to cap the TDP.",
+                    cpu_power,
+                    _CPU_POWER_SANITY_THRESHOLD_W,
+                )
 
         return False  # do not suppress exceptions
 

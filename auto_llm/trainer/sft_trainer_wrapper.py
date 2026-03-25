@@ -192,6 +192,9 @@ class SftTrainerWrapper(TrainerWrapper):
                 project_name=WANDB_TRAIN_PROJECT,
                 experiment_name=self.config.trainer_args.run_name,
                 is_main_process=accelerator.is_main_process,
+                tracking_mode=self.config.auto_llm_trainer_args.tracking_mode,
+                force_cpu_power=self.config.auto_llm_trainer_args.force_cpu_power,
+                force_ram_power=self.config.auto_llm_trainer_args.force_ram_power,
             ) as profiler:
                 trainer.train()
                 trainer.save_model(output_dir)

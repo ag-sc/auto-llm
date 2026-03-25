@@ -27,9 +27,13 @@ if __name__ == "__main__":
     with open(args.config_path, "r") as f:
         config = yaml.safe_load(f)
 
-    # Pop energy_profiling and gpu_name before forwarding config to lm-eval-harness
+    # Pop energy_profiling and profiler options before forwarding config
+    # to lm-eval-harness (it doesn't recognise these keys).
     energy_profiling = config.pop("energy_profiling", False)
     gpu_name = config.pop("gpu_name", None)
+    tracking_mode = config.pop("tracking_mode", "process")
+    force_cpu_power = config.pop("force_cpu_power", None)
+    force_ram_power = config.pop("force_ram_power", None)
     
     # Allow custom dataset code (e.g. bigbio/pubmed_qa) before any task loading
     if config.get("trust_remote_code"):
@@ -65,6 +69,9 @@ if __name__ == "__main__":
             output_dir=output_dir,
             project_name=wandb_project,
             experiment_name=wandb_name,
+            tracking_mode=tracking_mode,
+            force_cpu_power=force_cpu_power,
+            force_ram_power=force_ram_power,
         ) as profiler:
             cli_evaluate(args=lm_eval_args)
 
