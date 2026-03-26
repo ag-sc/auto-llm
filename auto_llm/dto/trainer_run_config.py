@@ -74,12 +74,13 @@ class AutoLlmTrainerArgs(BaseModel):
         title="GPU Name",
     )
     tracking_mode: Literal["machine", "process"] = Field(
-        default="process",
+        default="machine",
         description=(
-            "CodeCarbon tracking mode. 'process' tracks only the current "
-            "process tree (recommended on shared clusters without exclusive "
-            "node access). 'machine' reads whole-node power draw (use when "
-            "the job owns the entire node)."
+            "CodeCarbon tracking mode. 'machine' (default) reads whole-node "
+            "CPU load and scales by TDP — always bounded, recommended with "
+            "force_cpu_power on virtualised clusters. 'process' tracks only "
+            "the current process tree but can produce unbounded values on "
+            "cgroup-restricted SLURM jobs."
         ),
         title="Tracking Mode",
     )
@@ -87,8 +88,9 @@ class AutoLlmTrainerArgs(BaseModel):
         default=None,
         description=(
             "Override CPU TDP (watts) used by CodeCarbon when RAPL is "
-            "unavailable. Set to the CPU's TDP (e.g. 240 for AMD EPYC "
-            "7713) to prevent inflated readings. ``None`` means auto-detect."
+            "unavailable. Essential on clusters where lscpu reports a "
+            "virtualised socket count (e.g. 450 for 2× AMD EPYC 7713 "
+            "at 225 W each). ``None`` means auto-detect."
         ),
         title="Force CPU Power",
     )

@@ -39,14 +39,21 @@ class EnergyProfiler:
             readings. Passed to ``EmissionsTracker.measure_power_secs``.
             Lower values give finer granularity at the cost of higher
             overhead.
-        tracking_mode: One of ``"process"`` or ``"machine"``.
+        tracking_mode: One of ``"machine"`` or ``"process"``.
 
-            * ``"process"`` (default) — tracks only the current process and
-              its children via ``psutil.Process.cpu_times()``.  Recommended
-              on **shared clusters** (e.g. SLURM without ``--exclusive``)
-              where the job does not own the entire node.
-            * ``"machine"`` — reads total power draw for the whole node.
-              Use this only when the job has exclusive access to the machine.
+            * ``"machine"`` (default) — reads whole-node CPU load via
+              ``psutil.cpu_percent()`` and scales by TDP.  The load
+              factor is bounded (0–100 %), so reported power never
+              exceeds the configured TDP.  **Strongly recommended**
+              when combined with ``force_cpu_power`` on clusters where
+              ``lscpu`` reports a virtualised socket count.
+            * ``"process"`` — tracks only the current process tree via
+              ``psutil.Process.cpu_times()``.  Can produce unbounded
+              power values when child processes accumulate more CPU
+              time than wall-clock time (common with data-loader
+              workers on cgroup-restricted SLURM jobs).  Use only on
+              bare-metal single-user machines with accurate
+              ``cpu_count``.
 
             .. note::
                ``tracking_mode`` only affects **CPU power** measurement
@@ -85,7 +92,7 @@ class EnergyProfiler:
         experiment_name: str = "run",
         is_main_process: bool = True,
         measure_power_secs: int = 15,
-        tracking_mode: str = "process",
+        tracking_mode: str = "machine",
         force_cpu_power: Optional[int] = None,
         force_ram_power: Optional[int] = None,
     ):

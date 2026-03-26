@@ -4,3 +4,5 @@ model_args: pretrained=google/gemma-3-1b-pt
 wandb_args: project=open-medical-llm-energy,entity=llm4kmu,name=pre-gemma-3-1b-pt
 trust_remote_code: true
 energy_profiling: true
+force_cpu_power: 450 # 2× AMD EPYC 7713 @ 225W
+force_ram_power: 80

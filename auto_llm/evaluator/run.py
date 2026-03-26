@@ -31,7 +31,7 @@ if __name__ == "__main__":
     # to lm-eval-harness (it doesn't recognise these keys).
     energy_profiling = config.pop("energy_profiling", False)
     gpu_name = config.pop("gpu_name", None)
-    tracking_mode = config.pop("tracking_mode", "process")
+    tracking_mode = config.pop("tracking_mode", "machine")
     force_cpu_power = config.pop("force_cpu_power", None)
     force_ram_power = config.pop("force_ram_power", None)
     
