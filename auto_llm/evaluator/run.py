@@ -63,7 +63,7 @@ if __name__ == "__main__":
             is_eval=True,
             config_path=args.config_path,
         )
-        pipeline.run()
+        estimate = pipeline.run()
 
         with EnergyProfiler(
             output_dir=output_dir,
@@ -77,10 +77,12 @@ if __name__ == "__main__":
 
         # Post-run: compare estimated vs actual (best-effort)
         comparator = EmissionComparator(
-            output_dir=output_dir,
+            estimated_emissions=estimate or {},
             actual_emissions=profiler.final_emissions_data,
         )
-        comparator.compare()
+        comparison = comparator.compare()
+        if comparison:
+            EmissionComparator.save_comparison(comparison, output_dir)
 
         # Log all energy metrics to a single wandb run
         if log_to_wandb:

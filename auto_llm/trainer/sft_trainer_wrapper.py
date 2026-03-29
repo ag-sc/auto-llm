@@ -185,7 +185,7 @@ class SftTrainerWrapper(TrainerWrapper):
                 is_eval=False,
                 config=self.config,
             )
-            pipeline.run()
+            estimate = pipeline.run()
 
             with EnergyProfiler(
                 output_dir=output_dir,
@@ -202,10 +202,12 @@ class SftTrainerWrapper(TrainerWrapper):
 
             # Post-run: compare estimated vs actual
             comparator = EmissionComparator(
-                output_dir=output_dir,
+                estimated_emissions=estimate or {},
                 actual_emissions=profiler.final_emissions_data,
             )
-            comparator.compare()
+            comparison = comparator.compare()
+            if comparison:
+                EmissionComparator.save_comparison(comparison, output_dir)
 
             # Log all energy metrics to a single wandb run
             if log_to_wandb:

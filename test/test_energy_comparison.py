@@ -1,4 +1,4 @@
-"""Tests for GPU name resolution, the estimate writer, and the emission comparator."""
+"""Tests for GPU name resolution and the emission comparator."""
 
 import csv
 import json
@@ -90,26 +90,9 @@ class TestEmissionComparator:
     """Tests for the estimated-vs-actual emission comparator."""
 
     @staticmethod
-    def _write_json(directory: str, filename: str, data: dict):
-        path = os.path.join(directory, filename)
-        with open(path, "w") as f:
-            json.dump(data, f)
-
-    @staticmethod
-    def _write_csv(directory: str, rows: list[dict]):
-        """Write a CodeCarbon-style emissions.csv with the given rows."""
-        if not rows:
-            return
-        path = os.path.join(directory, "emissions.csv")
-        fieldnames = list(rows[0].keys())
-        with open(path, "w", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
-            writer.writeheader()
-            writer.writerows(rows)
-
-    def test_compare_success(self, tmp_path):
-        """Happy path: estimate JSON and emissions CSV present, comparison computed correctly."""
-        estimate = {
+    def _make_estimate(**overrides):
+        """Build a sample estimate dict with sensible defaults."""
+        base = {
             "estimated_flops": 1_000_000,
             "estimated_runtime_s": 100.0,
             "estimated_co2_g": 50.0,
@@ -117,24 +100,33 @@ class TestEmissionComparator:
             "carbon_intensity_g_per_kWh": 328,
             "timestamp": "2026-01-01T00:00:00+00:00",
         }
-        # CSV row — CodeCarbon reports CO₂ in kg
-        csv_row = {
-            "duration": "120.0",
-            "emissions": "0.060",  # 60 grams
-            "energy_consumed": "0.5",
-            "gpu_power": "280.0",
-            "cpu_power": "100.0",
-            "ram_power": "20.0",
-            "gpu_model": "NVIDIA A40",
-            "gpu_count": "1",
-            "country_iso_code": "DEU",
-            "region": "NRW",
-            "timestamp": "2026-01-01T01:00:00",
-        }
-        self._write_json(str(tmp_path), "emission_estimate.json", estimate)
-        self._write_csv(str(tmp_path), [csv_row])
+        base.update(overrides)
+        return base
 
-        comparator = EmissionComparator(output_dir=str(tmp_path))
+    @staticmethod
+    def _make_actual(**overrides):
+        """Build a sample actual-emissions dict (typed, not CSV strings)."""
+        base = {
+            "duration": 120.0,
+            "emissions": 0.060,  # 60 g (CodeCarbon uses kg)
+            "energy_consumed": 0.5,
+            "gpu_power": 280.0,
+            "cpu_power": 100.0,
+            "ram_power": 20.0,
+            "gpu_model": "NVIDIA A40",
+        }
+        base.update(overrides)
+        return base
+
+    def test_compare_success(self):
+        """Happy path: both dicts provided, comparison computed correctly."""
+        estimate = self._make_estimate()
+        actual = self._make_actual()
+
+        comparator = EmissionComparator(
+            estimated_emissions=estimate,
+            actual_emissions=actual,
+        )
         result = comparator.compare()
 
         assert result is not None
@@ -147,49 +139,80 @@ class TestEmissionComparator:
         # CO₂ ratio: 50 / 60 = 0.833...
         assert round(result["estimated_vs_actual_co2_ratio"], 3) == 0.833
 
-        # Check that the comparison JSON was written
+    def test_compare_missing_estimate(self):
+        """Returns None when estimated_emissions is empty."""
+        comparator = EmissionComparator(
+            estimated_emissions={},
+            actual_emissions=self._make_actual(),
+        )
+        assert comparator.compare() is None
+
+    def test_compare_missing_actual(self):
+        """Returns None when actual_emissions is empty."""
+        comparator = EmissionComparator(
+            estimated_emissions=self._make_estimate(),
+            actual_emissions={},
+        )
+        assert comparator.compare() is None
+
+    def test_compare_zero_actuals(self):
+        """Error percentages are None when actuals are zero (no division by zero)."""
+        actual = self._make_actual(duration=0.0, emissions=0.0)
+
+        comparator = EmissionComparator(
+            estimated_emissions=self._make_estimate(),
+            actual_emissions=actual,
+        )
+        result = comparator.compare()
+        assert result is not None
+        assert result["runtime_error_pct"] is None
+        assert result["co2_error_pct"] is None
+
+    def test_save_comparison(self, tmp_path):
+        """save_comparison writes emission_comparison.json correctly."""
+        estimate = self._make_estimate()
+        actual = self._make_actual()
+
+        comparator = EmissionComparator(
+            estimated_emissions=estimate,
+            actual_emissions=actual,
+        )
+        result = comparator.compare()
+        assert result is not None
+
+        EmissionComparator.save_comparison(result, str(tmp_path))
+
         comparison_path = tmp_path / "emission_comparison.json"
         assert comparison_path.exists()
         with open(comparison_path) as f:
             written = json.load(f)
         assert written["runtime_error_pct"] == result["runtime_error_pct"]
 
-    def test_compare_missing_estimate(self, tmp_path):
-        """Returns None when emission_estimate.json is missing."""
-        csv_row = {"duration": "120.0", "emissions": "0.06"}
-        self._write_csv(str(tmp_path), [csv_row])
-
-        comparator = EmissionComparator(output_dir=str(tmp_path))
-        assert comparator.compare() is None
-
-    def test_compare_missing_actual(self, tmp_path):
-        """Returns None when emissions.csv is missing."""
-        estimate = {"estimated_runtime_s": 100.0, "estimated_co2_g": 50.0}
-        self._write_json(str(tmp_path), "emission_estimate.json", estimate)
-
-        comparator = EmissionComparator(output_dir=str(tmp_path))
-        assert comparator.compare() is None
-
-    def test_compare_missing_both(self, tmp_path):
-        """Returns None when both files are missing."""
-        comparator = EmissionComparator(output_dir=str(tmp_path))
-        assert comparator.compare() is None
-
-    def test_compare_zero_actuals(self, tmp_path):
-        """Error percentages are None when actuals are zero (no division by zero)."""
-        estimate = {
-            "estimated_runtime_s": 100.0,
-            "estimated_co2_g": 50.0,
-        }
+    def test_normalize_csv_row(self):
+        """normalize_csv_row converts string CSV values to typed floats."""
         csv_row = {
-            "duration": "0.0",
-            "emissions": "0.0",
+            "duration": "120.0",
+            "emissions": "0.060",
+            "energy_consumed": "0.5",
+            "gpu_power": "280.0",
+            "cpu_power": "100.0",
+            "ram_power": "20.0",
+            "gpu_model": "NVIDIA A40",
         }
-        self._write_json(str(tmp_path), "emission_estimate.json", estimate)
-        self._write_csv(str(tmp_path), [csv_row])
+        normalised = EmissionComparator.normalize_csv_row(csv_row)
+        assert normalised["duration"] == 120.0
+        assert normalised["emissions"] == 0.060
+        assert normalised["gpu_model"] == "NVIDIA A40"  # non-numeric stays string
 
-        comparator = EmissionComparator(output_dir=str(tmp_path))
-        result = comparator.compare()
-        assert result is not None
-        assert result["runtime_error_pct"] is None
-        assert result["co2_error_pct"] is None
+    def test_get_wandb_metrics(self):
+        """get_wandb_metrics returns None before compare, dict after."""
+        comparator = EmissionComparator(
+            estimated_emissions=self._make_estimate(),
+            actual_emissions=self._make_actual(),
+        )
+        assert comparator.get_wandb_metrics() is None
+
+        comparator.compare()
+        metrics = comparator.get_wandb_metrics()
+        assert metrics is not None
+        assert "emissions/comparison/runtime_error_pct" in metrics

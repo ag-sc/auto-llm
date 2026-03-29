@@ -35,35 +35,45 @@ class EstimationPipeline:
         config: A ``TrainerRunConfig`` instance — used by the trainer
             wrapper to avoid re-reading the YAML from disk.
 
-            Usage::
+    Usage::
 
-    # From the trainer (passing a TrainerRunConfig object):
-    pipeline = EstimationPipeline(
-        output_dir="/out/model",
-        gpu_name="NVIDIA A40",
-        is_eval=False,
-        config=trainer_run_config,
-    )
-    result = pipeline.run()   # estimate + save (best-effort)
+        # From the trainer (passing a TrainerRunConfig object):
+        pipeline = EstimationPipeline(
+            output_dir="/out/model",
+            gpu_name="NVIDIA A40",
+            is_eval=False,
+            config=trainer_run_config,
+        )
+        result = pipeline.run()   # estimate + save (best-effort)
 
-    # From the evaluator (passing a YAML path):
-    pipeline = EstimationPipeline(
-        output_dir="/out/eval",
-        gpu_name=None,          # auto-detect
-        is_eval=True,
-        config_path="config.yaml",
-    )
-    result = pipeline.run()
+        # From the evaluator (passing a YAML path):
+        pipeline = EstimationPipeline(
+            output_dir="/out/eval",
+            gpu_name=None,          # auto-detect
+            is_eval=True,
+            config_path="config.yaml",
+        )
+        result = pipeline.run()
 
-    # From the UI (estimate only, no persistence):
-    pipeline = EstimationPipeline(
-        output_dir=None,
-        gpu_name="NVIDIA A40",
-        is_eval=False,
-        config_path="config.yaml",
-    )
-    estimate = pipeline.estimate()
+        # From the UI (estimate only, no persistence):
+        pipeline = EstimationPipeline(
+            output_dir=None,
+            gpu_name="NVIDIA A40",
+            is_eval=False,
+            config_path="config.yaml",
+        )
+        estimate = pipeline.estimate()
     """
+
+    # Map estimate dict keys → wandb summary keys.
+    _WANDB_KEY_MAP = {
+        "estimated_flops": "emissions/estimate/estimated_flops",
+        "estimated_runtime_s": "emissions/estimate/estimated_runtime_s",
+        "estimated_co2_g": "emissions/estimate/estimated_co2_g",
+        "estimated_energy_kwh": "emissions/estimate/estimated_energy_kwh",
+        "gpu_name": "emissions/estimate/gpu_name",
+        "carbon_intensity_g_per_kWh": "emissions/estimate/carbon_intensity_g_per_kWh",
+    }
 
     def __init__(
         self,
@@ -169,16 +179,6 @@ class EstimationPipeline:
             logger.warning("Energy estimation failed (best-effort) — %s", exc)
             return None
 
-    # Map estimate dict keys → wandb summary keys.
-    _WANDB_KEY_MAP = {
-        "estimated_flops": "emissions/estimate/estimated_flops",
-        "estimated_runtime_s": "emissions/estimate/estimated_runtime_s",
-        "estimated_co2_g": "emissions/estimate/estimated_co2_g",
-        "estimated_energy_kwh": "emissions/estimate/estimated_energy_kwh",
-        "gpu_name": "emissions/estimate/gpu_name",
-        "carbon_intensity_g_per_kWh": "emissions/estimate/carbon_intensity_g_per_kWh",
-    }
-
     def get_wandb_metrics(self) -> Optional[Dict[str, Any]]:
         """Return estimation results as a wandb-ready ``{wandb_key: value}`` dict.
 
@@ -240,24 +240,33 @@ class EstimationPipeline:
 
         # Training or eval: read from YAML
         if self.config_path is not None:
-            try:
+            return self._model_name_from_yaml(self.config_path)
 
-                with open(self.config_path, "r") as f:
-                    raw = yaml.safe_load(f)
+        return None
 
-                # Training YAML: nested under auto_llm_trainer_args
-                model_name = (raw.get("auto_llm_trainer_args") or {}).get(
-                    "model_name"
-                )
-                if model_name:
-                    return model_name
+    @staticmethod
+    def _model_name_from_yaml(config_path: str) -> Optional[str]:
+        """Parse a YAML config and extract the model name.
 
-                # Eval YAML: model name in model_args "pretrained=X,..."
-                model_args = raw.get("model_args", "")
-                for part in model_args.split(","):
-                    if part.startswith("pretrained="):
-                        return part.replace("pretrained=", "")
-            except Exception as exc:
-                logger.warning("Could not extract model name from config: %s", exc)
+        Supports two formats:
+        - Trainer YAML: ``auto_llm_trainer_args.model_name``
+        - Evaluator YAML: ``model_args: "pretrained=<name>,..."``
+        """
+        try:
+            with open(config_path, "r") as f:
+                raw = yaml.safe_load(f)
+
+            # Trainer YAML
+            model_name = (raw.get("auto_llm_trainer_args") or {}).get("model_name")
+            if model_name:
+                return model_name
+
+            # Evaluator YAML
+            model_args = raw.get("model_args", "")
+            for part in model_args.split(","):
+                if part.startswith("pretrained="):
+                    return part.replace("pretrained=", "")
+        except Exception as exc:
+            logger.warning("Could not extract model name from config: %s", exc)
 
         return None
