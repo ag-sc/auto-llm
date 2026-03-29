@@ -23,12 +23,22 @@ def cache_model_params(model_name: str):
     N = sum(p.numel() for p in model.parameters())
 
     model_config = AutoConfig.from_pretrained(model_name).to_dict()
-    for key in CTX_LENGTH_KEYS:
-        if key in list(model_config.keys()):
-            max_length = model_config[key]
+
+    # Build list of dicts to search: top-level first, then known nested sub-configs
+    # (e.g. multimodal models like Gemma 3 4b store text params under "text_config")
+    search_dicts = [model_config]
+    for sub_key in ("text_config", "language_config"):
+        if sub_key in model_config and isinstance(model_config[sub_key], dict):
+            search_dicts.append(model_config[sub_key])
+
+    max_length = -1
+    for d in search_dicts:
+        for key in CTX_LENGTH_KEYS:
+            if key in d:
+                max_length = d[key]
+                break
+        if max_length != -1:
             break
-    else:
-        max_length = -1
 
     model_meta[model_name] = {"num_params": N, "max_length": max_length}
 
