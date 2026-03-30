@@ -70,7 +70,7 @@ class SftTrainerWrapper(TrainerWrapper):
 
         #Upload the model
         model = AutoModelForCausalLM.from_pretrained(**model_kwargs)
-	if hasattr(model, "enable_input_require_grads"):
+        if hasattr(model, "enable_input_require_grads"):
             model.enable_input_require_grads()
         # end QLoRa config
         tokenizer = AutoTokenizer.from_pretrained(
