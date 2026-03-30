@@ -76,7 +76,7 @@ class SftDataBuilder(TrainerDataBuilder):
 
     def build(self) -> DatasetDict:
         if os.path.isdir(self.dataset_dir):
-            ds_dict = load_from_disk(self.dataset_dir)
+            ds_dict = load_from_disk(self.dataset_dir,keep_in_memory=True)
         else:
             ds_dict = load_dataset(self.dataset_dir)
             assert isinstance(
@@ -96,6 +96,7 @@ class SftDataBuilder(TrainerDataBuilder):
                 batched=True,
                 load_from_cache_file=False,
                 fn_kwargs={"few_shot_split": few_shot_split},
+		keep_in_memory=True,
             )
 
         if self.limit:
