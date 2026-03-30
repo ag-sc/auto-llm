@@ -4,7 +4,7 @@ from typing import Dict, Any
 import torch
 from accelerate import Accelerator, DistributedType
 from peft import LoraConfig
-from transformers import AutoModelForCausalLM, AutoTokenizer, AutoConfig
+from transformers import AutoModelForCausalLM, AutoTokenizer, AutoConfig,  BitsAndBytesConfig
 from trl import SFTConfig, SFTTrainer
 
 from auto_llm.builder.trainer_data_builder.sft_data_builder import (
@@ -42,14 +42,35 @@ class SftTrainerWrapper(TrainerWrapper):
         hf_model_config = AutoConfig.from_pretrained(
             self.config.auto_llm_trainer_args.model_name
         ).to_dict()
+        #Start QLORA config 
+        bnb_config = None
+        # check file YAML
+        if getattr(self.config, "quantization_config", None):
+            compute_dtype = getattr(torch, self.config.quantization_config.bnb_4bit_compute_dtype, torch.bfloat16)
+            
+            bnb_config = BitsAndBytesConfig(
+                load_in_4bit=self.config.quantization_config.load_in_4bit,
+                bnb_4bit_quant_type=self.config.quantization_config.bnb_4bit_quant_type,
+                bnb_4bit_compute_dtype=compute_dtype,
+                bnb_4bit_use_double_quant=self.config.quantization_config.bnb_4bit_use_double_quant,
+            )
+            self.logger.info("Start QLoRa: apply BitsAndBytesConfig ~ 4-bit.")
 
-        model = AutoModelForCausalLM.from_pretrained(
-            pretrained_model_name_or_path=self.config.auto_llm_trainer_args.model_name,
-            token=os.getenv("HF_TOKEN"),
-            attn_implementation=self.config.auto_llm_trainer_args.attn_implementation,
-            low_cpu_mem_usage=True,
-            dtype=torch.bfloat16,  # TODO: pass this as trainer arg?
-        )
+        model_kwargs = {
+            "pretrained_model_name_or_path": self.config.auto_llm_trainer_args.model_name,
+            "token": os.getenv("HF_TOKEN"),
+            "attn_implementation": self.config.auto_llm_trainer_args.attn_implementation,
+            "low_cpu_mem_usage": True,
+        }
+        
+            if bnb_config:
+            model_kwargs["quantization_config"] = bnb_config
+        else:
+            model_kwargs["dtype"] = torch.bfloat16
+
+        #Upload the model
+        model = AutoModelForCausalLM.from_pretrained(**model_kwargs)
+        # end QLoRa config
         tokenizer = AutoTokenizer.from_pretrained(
             pretrained_model_name_or_path=self.config.auto_llm_trainer_args.model_name,
             token=os.getenv("HF_TOKEN"),

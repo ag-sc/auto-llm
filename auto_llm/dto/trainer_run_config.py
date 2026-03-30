@@ -199,6 +199,19 @@ class TrainerArgs(BaseModel):
         default=None,
     )
 
+class QuantizationConfig(BaseModel):
+    load_in_4bit: bool = Field(
+        description="Whether to load the model in 4-bit precision.", default=True
+    )
+    bnb_4bit_quant_type: str = Field(
+        description="Quantization type, either 'fp4' or 'nf4'.", default="nf4"
+    )
+    bnb_4bit_compute_dtype: str = Field(
+        description="Compute dtype for 4-bit models (e.g., 'bfloat16').", default="bfloat16"
+    )
+    bnb_4bit_use_double_quant: bool = Field(
+        description="Whether to use double quantization for memory efficiency.", default=True
+    )
 
 class TrainerRunConfig(BaseModel):
     auto_llm_trainer_args: AutoLlmTrainerArgs = Field(
@@ -216,5 +229,10 @@ class TrainerRunConfig(BaseModel):
     peft_config: Optional[LoraConfig] = Field(
         description="Configuration for PEFT technique",
         title="PEFT Config",
+        default=None,
+    )
+    quantization_config: Optional[QuantizationConfig] = Field(
+        description="Configuration for bitsandbytes quantization (QLoRA)",
+        title="Quantization Config",
         default=None,
     )

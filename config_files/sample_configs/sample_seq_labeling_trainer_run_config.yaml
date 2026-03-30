@@ -12,6 +12,26 @@ peft_config:
   target_modules: "all-linear"
   task_type: "CAUSAL_LM"
 
+auto_llm_trainer_args:
+  trainer_type: sft
+  model_name: google/gemma-2-2b
+  attn_implementation: eager
+  truncation: True
+  completion_only_loss: True
+
+quantization_config:
+  load_in_4bit: True
+  bnb_4bit_quant_type: "nf4"
+  bnb_4bit_compute_dtype: "bfloat16"
+  bnb_4bit_use_double_quant: True
+
+peft_config:
+  r: 16
+  lora_alpha: 32
+  lora_dropout: 0.05
+  target_modules: "all-linear"
+  task_type: "CAUSAL_LM"
+
 trainer_data_builder_config:
   dataset_dir: /vol/auto_llm/processed_datasets/pico/EBM-NoDuplicates
   instruction_template: 'Given the text "Text", extract the PICO tags in the JSON format "Format". Do not modify the sentences.\nFormat:\n```json\n{\n  "P": ["value for P"],\n  "I": ["value for I"],\n  "O": ["value for O"],\n}\n```\n'
