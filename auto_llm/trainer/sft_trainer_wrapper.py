@@ -63,7 +63,7 @@ class SftTrainerWrapper(TrainerWrapper):
             "low_cpu_mem_usage": True,
         }
         
-            if bnb_config:
+        if bnb_config:
             model_kwargs["quantization_config"] = bnb_config
         else:
             model_kwargs["dtype"] = torch.bfloat16
