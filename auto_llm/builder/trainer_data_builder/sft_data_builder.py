@@ -76,7 +76,7 @@ class SftDataBuilder(TrainerDataBuilder):
 
     def build(self) -> DatasetDict:
         if os.path.isdir(self.dataset_dir):
-            ds_dict = load_from_disk(self.dataset_dir,keep_in_memory=True)
+            ds_dict = load_from_disk(self.dataset_dir, keep_in_memory=True)
         else:
             ds_dict = load_dataset(self.dataset_dir)
             assert isinstance(
