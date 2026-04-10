@@ -3,7 +3,7 @@ auto_llm_trainer_args:
   model_name: meta-llama/Meta-Llama-3-8B
   attn_implementation: sdpa
   truncation: True
-  completion_only_loss: True
+  completion_only_loss: False
 
 peft_config:
   r: 16
@@ -22,7 +22,7 @@ trainer_data_builder_config:
   parse_output_as_json: False
 
 trainer_args:
-  max_length: 8192
+  max_length: 1024
   bf16: True
   fp16: False
 
