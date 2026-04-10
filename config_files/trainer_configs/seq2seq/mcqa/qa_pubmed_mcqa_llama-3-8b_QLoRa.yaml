@@ -33,7 +33,8 @@ trainer_args:
   auto_find_batch_size: True
 
   # training related
-  output_dir: /vol/auto_llm/sft_models/qa_pubmed_mcqa_llama-3-8b_qlora  gradient_checkpointing: True
+  output_dir: /vol/auto_llm/sft_models/qa_pubmed_mcqa_llama-3-8b_qlora
+  gradient_checkpointing: True
   num_train_epochs: 5
   learning_rate: 1e-4
   warmup_steps: 10
