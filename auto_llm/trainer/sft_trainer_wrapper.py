@@ -66,7 +66,7 @@ class SftTrainerWrapper(TrainerWrapper):
         if bnb_config:
             model_kwargs["quantization_config"] = bnb_config
         else:
-            model_kwargs["dtype"] = torch.bfloat16
+            model_kwargs["torch_dtype"] = torch.bfloat16
             
         #Upload the model
         model = AutoModelForCausalLM.from_pretrained(**model_kwargs)
