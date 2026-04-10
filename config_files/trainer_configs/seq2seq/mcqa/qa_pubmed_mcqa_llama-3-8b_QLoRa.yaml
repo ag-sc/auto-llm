@@ -6,8 +6,8 @@ auto_llm_trainer_args:
   completion_only_loss: False
 
 peft_config:
-  r: 16
-  lora_alpha: 32
+  r: 8
+  lora_alpha: 16
   lora_dropout: 0.05
   target_modules: "all-linear"
   task_type: "CAUSAL_LM"
@@ -22,7 +22,8 @@ trainer_data_builder_config:
   parse_output_as_json: False
 
 trainer_args:
-  max_length: 1024
+  optim: "paged_adamw_8bit"
+  max_length: 512
   bf16: True
   fp16: False
 
