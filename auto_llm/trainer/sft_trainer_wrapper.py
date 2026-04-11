@@ -61,6 +61,7 @@ class SftTrainerWrapper(TrainerWrapper):
             "token": os.getenv("HF_TOKEN"),
             "attn_implementation": self.config.auto_llm_trainer_args.attn_implementation,
             "low_cpu_mem_usage": True,
+            "device_map": "auto",   
         }
         
         if bnb_config:
