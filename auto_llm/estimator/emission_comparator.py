@@ -53,6 +53,9 @@ class EmissionComparator:
     """
 
     # Map comparison dict keys → wandb summary keys.
+    # Only deviation metrics are logged here — raw estimated and actual
+    # values are already logged by EstimationPipeline and EnergyProfiler
+    # respectively, so we avoid duplicating them.
     _WANDB_KEY_MAP = {
         "runtime_error_pct": "emissions/comparison/runtime_error_pct",
         "co2_error_pct": "emissions/comparison/co2_error_pct",
@@ -60,15 +63,6 @@ class EmissionComparator:
         "estimated_vs_actual_runtime_ratio": "emissions/comparison/runtime_ratio",
         "estimated_vs_actual_co2_ratio": "emissions/comparison/co2_ratio",
         "estimated_vs_actual_energy_ratio": "emissions/comparison/energy_ratio",
-        "estimated_runtime_s": "emissions/comparison/estimated_runtime_s",
-        "actual_runtime_s": "emissions/comparison/actual_runtime_s",
-        "estimated_co2_g": "emissions/comparison/estimated_co2_g",
-        "actual_co2_g": "emissions/comparison/actual_co2_g",
-        "estimated_energy_kwh": "emissions/comparison/estimated_energy_kwh",
-        "actual_energy_kwh": "emissions/comparison/actual_energy_kwh",
-        "actual_gpu_power_w": "emissions/comparison/actual_gpu_power_w",
-        "actual_cpu_power_w": "emissions/comparison/actual_cpu_power_w",
-        "actual_ram_power_w": "emissions/comparison/actual_ram_power_w",
     }
 
     def __init__(
