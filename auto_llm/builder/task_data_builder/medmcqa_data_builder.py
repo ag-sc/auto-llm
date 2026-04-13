@@ -23,23 +23,16 @@ class MedmcqaDataBuilder(TaskDataBuilder):
     def build(self) -> DatasetDict:
         ds_dict = load_dataset("openlifescienceai/medmcqa", trust_remote_code=True)
 
-        processed = DatasetDict(
+        return DatasetDict(
             {
                 DatasetSplit.TRAIN: self._process_split(ds_dict["train"]),
                 DatasetSplit.VALIDATION: self._process_split(ds_dict["validation"]),
-                DatasetSplit.TEST: self._process_split(ds_dict["test"]),
             }
         )
-
-        return processed
 
     def _process_split(self, ds: Dataset) -> Dataset:
         samples = []
         for item in ds:
-            cop = item["cop"]
-            if cop not in self.OPTION_MAP:
-                continue
-
             question = item["question"]
             input_text = (
                 f"Question: {question}\n"
@@ -49,7 +42,7 @@ class MedmcqaDataBuilder(TaskDataBuilder):
                 f"C. {item['opc']}\n"
                 f"D. {item['opd']}"
             )
-            output_text = self.OPTION_MAP[cop]
+            output_text = self.OPTION_MAP[item["cop"]]
 
             samples.append(
                 {
