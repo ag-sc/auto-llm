@@ -104,6 +104,17 @@ class AutoLlmTrainerArgs(BaseModel):
         ),
         title="Force RAM Power",
     )
+    token_budget: Optional[int] = Field(
+        default=None,
+        description=(
+            "Total number of tokens to process during training. When set, "
+            "max_steps is computed as token_budget / (max_length x "
+            "effective_batch_size) and num_train_epochs is ignored. "
+            "This ensures fair comparison across models with different "
+            "tokenizers."
+        ),
+        title="Token Budget",
+    )
 
 
 class TrainerArgs(BaseModel):
@@ -166,6 +177,15 @@ class TrainerArgs(BaseModel):
         description="Total number of training epochs to perform",
         title="Number of Training Epochs",
         default=5,
+    )
+    max_steps: int = Field(
+        description=(
+            "Maximum number of training steps. When > 0, overrides "
+            "num_train_epochs. Typically computed automatically from "
+            "token_budget in AutoLlmTrainerArgs."
+        ),
+        title="Max Steps",
+        default=-1,
     )
     learning_rate: float = Field(
         description="The initial learning rate for the optimizer.",

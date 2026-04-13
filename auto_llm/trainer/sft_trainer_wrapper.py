@@ -72,6 +72,11 @@ class SftTrainerWrapper(TrainerWrapper):
         builder = self.get_trainer_data_builder(config=self.config)
         ds_dict = builder.build()
 
+        # Derive max_steps from token_budget so all models process the same
+        # number of tokens regardless of tokenizer differences.
+        if self.config.auto_llm_trainer_args.token_budget is not None:
+            self.apply_token_budget(max_length=max_length)
+
         pre_processor = SftPreProcessor(
             tokenizer=tokenizer,
             completion_only_loss=self.config.auto_llm_trainer_args.completion_only_loss,
@@ -226,6 +231,44 @@ class SftTrainerWrapper(TrainerWrapper):
 
         self.logger.info(
             f"Model and Tokenizer saved in the path: {self.config.trainer_args.output_dir}"
+        )
+
+    def apply_token_budget(self, max_length: int) -> None:
+        """Derive ``max_steps`` from ``token_budget`` and apply it to the config.
+
+        Ensures all models process the same number of tokens regardless of
+        tokenizer differences. Sets ``num_train_epochs`` to a large sentinel so
+        the dataloader does not exhaust before ``max_steps`` is reached.
+        """
+        token_budget = self.config.auto_llm_trainer_args.token_budget
+        bs = self.config.trainer_args.per_device_train_batch_size
+        ga = self.config.trainer_args.gradient_accumulation_steps
+
+        # For DDP/FSDP each process owns its own data-parallel shard, so
+        # effective batch scales with num_processes. On a single-process
+        # launch (python -m) num_processes==1 which is also correct.
+        ngpus = max(1, accelerator.num_processes)
+        visible_cuda = torch.cuda.device_count() if torch.cuda.is_available() else 0
+        if visible_cuda and visible_cuda != ngpus:
+            self.logger.warning(
+                f"accelerator.num_processes={ngpus} does not match "
+                f"torch.cuda.device_count()={visible_cuda}. Check that the "
+                f"accelerate config's num_processes matches the SLURM "
+                f"--gres=gpu:<N> allocation, otherwise the token budget "
+                f"math will be off."
+            )
+
+        tokens_per_step = max_length * bs * ga * ngpus
+        computed_max_steps = token_budget // tokens_per_step
+
+        self.config.trainer_args.max_steps = computed_max_steps
+        self.config.trainer_args.num_train_epochs = 100
+
+        self.logger.info(
+            f"Token budget: {token_budget:,} -> max_steps: {computed_max_steps:,} "
+            f"(tokens_per_step={tokens_per_step:,}, max_length={max_length}, "
+            f"batch_size={bs}, grad_accum={ga}, num_processes={ngpus}, "
+            f"cuda_device_count={visible_cuda})"
         )
 
     @staticmethod

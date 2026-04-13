@@ -12,6 +12,8 @@ from auto_llm.profiler.wandb_energy_logger import WandbEnergyLogger
 from auto_llm.profiler.utils import parse_wandb_args
 from auto_llm.estimator.estimation_pipeline import EstimationPipeline
 from auto_llm.estimator.emission_comparator import EmissionComparator
+import datasets.config
+
 
 # to get STDOUT in wandb. See: https://github.com/wandb/wandb/issues/2182#issuecomment-1447879531
 shutil._USE_CP_SENDFILE = False
@@ -39,7 +41,6 @@ if __name__ == "__main__":
     if config.get("trust_remote_code"):
         os.environ["HF_DATASETS_TRUST_REMOTE_CODE"] = "true"
         try:
-            import datasets.config
             datasets.config.HF_DATASETS_TRUST_REMOTE_CODE = True
         except (ImportError, AttributeError):
             pass
