@@ -1,8 +1,10 @@
-"""Add eval/avg/* metrics to existing wandb evaluation runs.
+"""Add eval/avg/* metrics to existing wandb energy-profiling runs.
 
-Mirrors the logic of ``aggregate_eval_scores`` in
-``auto_llm.evaluator.utils`` so that past runs get the same averaged
-metrics that future runs will log automatically.
+For each energy run (``{name}-energy``), finds the corresponding eval run
+(``{name}``) logged by lm-eval, computes cross-task metric averages, and
+writes them to the energy run's summary. This mirrors the logic of
+``aggregate_eval_scores`` in ``auto_llm.evaluator.utils`` so that past
+runs get the same averaged metrics that future runs will log automatically.
 
 Usage:
     python scripts/wandb_add_eval_averages.py --entity llm4kmu --project open-medical-llm-energy
@@ -16,14 +18,15 @@ from typing import Dict, List
 import wandb
 
 
+ENERGY_RUN_SUFFIX = "-energy"
+
+
 def aggregate_run_scores(summary: dict) -> Dict[str, float]:
-    """Compute cross-task metric averages from a wandb run summary.
+    """Compute cross-task metric averages from a wandb eval run summary.
 
     Parses lm-eval metric keys (``{task}/{metric}``) from the summary,
     groups by base metric name, and returns the averages.
     """
-    # Collect task metrics: keys matching "{task}/{metric}" pattern
-    # logged by lm-eval (e.g. "medmcqa/acc", "mmlu_anatomy_generative/exact_match,get_response")
     task_metrics: Dict[str, Dict[str, float]] = {}
 
     for key, value in summary.items():
@@ -31,7 +34,6 @@ def aggregate_run_scores(summary: dict) -> Dict[str, float]:
             continue
         if "/" not in key:
             continue
-        # Skip wandb internal keys, energy keys, and stderr
         if key.startswith(("_", "emissions/", "eval/")):
             continue
         if "stderr" in key:
@@ -50,7 +52,6 @@ def aggregate_run_scores(summary: dict) -> Dict[str, float]:
     if not task_metrics:
         return {}
 
-    # Group by base metric name (before the comma filter suffix)
     metric_groups: Dict[str, List[float]] = defaultdict(list)
     primary_scores: Dict[str, float] = {}
 
@@ -78,7 +79,7 @@ def aggregate_run_scores(summary: dict) -> Dict[str, float]:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Add eval/avg/* metrics to existing wandb runs."
+        description="Add eval/avg/* metrics to existing wandb energy runs."
     )
     parser.add_argument("--entity", required=True, help="wandb entity (team/user)")
     parser.add_argument("--project", required=True, help="wandb project name")
@@ -92,33 +93,46 @@ def main():
     api = wandb.Api()
     runs = api.runs(f"{args.entity}/{args.project}")
 
+    # Index all runs by name
+    runs_by_name: Dict[str, wandb.apis.public.runs.Run] = {}
+    for run in runs:
+        runs_by_name[run.name] = run
+
     updated = 0
     skipped = 0
 
-    for run in runs:
-        # Skip energy-profiling runs (they don't have task metrics)
-        if "energy-profiling" in (run.tags or []):
+    for run_name, run in runs_by_name.items():
+        # Only process energy-profiling runs
+        if not run_name.endswith(ENERGY_RUN_SUFFIX):
+            continue
+
+        # Find the corresponding eval run
+        eval_run_name = run_name.removesuffix(ENERGY_RUN_SUFFIX)
+        eval_run = runs_by_name.get(eval_run_name)
+
+        if eval_run is None:
+            print(f"  {run_name}: no matching eval run '{eval_run_name}', skipping")
             skipped += 1
             continue
 
-        avg_metrics = aggregate_run_scores(dict(run.summary))
+        avg_metrics = aggregate_run_scores(dict(eval_run.summary))
 
         if not avg_metrics:
-            print(f"  {run.name}: no task metrics found, skipping")
+            print(f"  {run_name}: no task metrics in eval run '{eval_run_name}', skipping")
             skipped += 1
             continue
 
         avg_score = avg_metrics.get("eval/avg_score", 0)
-        n_metrics = len(avg_metrics) - 1  # exclude avg_score itself
+        n_metrics = len(avg_metrics) - 1
 
         if args.dry_run:
-            print(f"  {run.name}: would write {n_metrics} avg metrics, avg_score={avg_score:.4f}")
+            print(f"  {run_name}: would write {n_metrics} avg metrics from '{eval_run_name}', avg_score={avg_score:.4f}")
             for k, v in sorted(avg_metrics.items()):
                 print(f"    {k}: {v:.4f}")
         else:
             run.summary.update(avg_metrics)
             run.summary.update()
-            print(f"  {run.name}: wrote {n_metrics} avg metrics, avg_score={avg_score:.4f}")
+            print(f"  {run_name}: wrote {n_metrics} avg metrics from '{eval_run_name}', avg_score={avg_score:.4f}")
             updated += 1
 
     print(f"\nDone. Updated: {updated}, Skipped: {skipped}")
