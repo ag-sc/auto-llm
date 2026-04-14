@@ -5,7 +5,7 @@ import os
 import yaml
 from lm_eval.__main__ import cli_evaluate
 
-from auto_llm.evaluator.utils import parse_lm_eval_config
+from auto_llm.evaluator.utils import parse_lm_eval_config, evaluate_and_capture, aggregate_eval_scores
 
 from auto_llm.profiler.energy_profiler import EnergyProfiler
 from auto_llm.profiler.wandb_energy_logger import WandbEnergyLogger
@@ -74,7 +74,7 @@ if __name__ == "__main__":
             force_cpu_power=force_cpu_power,
             force_ram_power=force_ram_power,
         ) as profiler:
-            cli_evaluate(args=lm_eval_args)
+            eval_results = evaluate_and_capture(lm_eval_args)
 
         # Post-run: compare estimated vs actual (best-effort)
         comparator = EmissionComparator(
@@ -94,6 +94,8 @@ if __name__ == "__main__":
             wandb_logger.log(pipeline.get_wandb_metrics())
             wandb_logger.log(profiler.get_wandb_metrics())
             wandb_logger.log(comparator.get_wandb_metrics())
+            if eval_results:
+                wandb_logger.log(aggregate_eval_scores(eval_results))
             wandb_logger.flush()
     else:
         cli_evaluate(args=lm_eval_args)
