@@ -3,14 +3,14 @@ auto_llm_trainer_args:
   model_name: meta-llama/Meta-Llama-3-8B
   attn_implementation: sdpa
   truncation: True
-  completion_only_loss: False
+  completion_only_loss: True
 
 
 quantization_config:
   load_in_4bit: True
   bnb_4bit_quant_type: "nf4"
   bnb_4bit_use_double_quant: True
-  bnb_4bit_compute_dtype: "bfloat16"
+  bnb_4bit_compute_dtype: "float16"
 
 peft_config:
   r: 8
@@ -34,14 +34,14 @@ trainer_data_builder_config:
 
 trainer_args:
   optim: "paged_adamw_8bit"
-  max_length: 384
-  bf16: True
-  fp16: False
+  max_length: 512
+  bf16: False
+  fp16: True
 
   # bsz related
   per_device_train_batch_size: 1
   per_device_eval_batch_size: 1
-  gradient_accumulation_steps: 32  # 4 processes
+  gradient_accumulation_steps: 64  # 4 processes
   auto_find_batch_size: False
 
   # training related
@@ -49,13 +49,13 @@ trainer_args:
   gradient_checkpointing: True
   num_train_epochs: 5
   learning_rate: 1e-4
-  warmup_steps: 10
+  warmup_steps: 100
 
   # tracking/logging related
   report_to: wandb
   run_name: qa_pubmed_mcqa_llama-3-8b_qlora
-  logging_steps: 0.1
+  logging_steps: 'epoch'
 
   # eval/save related
-  eval_strategy: steps
+  eval_strategy: epoch
   save_strategy: epoch
