@@ -1,17 +1,20 @@
 """Project-level Pareto frontier plot on wandb.
 
 Backfills ``pareto/*`` fields into every energy run's summary so a workspace
-ScatterPlot panel can aggregate them across the whole project. A helper also
-upserts the panel itself via the ``wandb-workspaces`` SDK.
+custom chart panel can aggregate them across the whole project.  The chart
+uses a layered Vega-Lite spec (scatter + black dashed Pareto frontier line)
+registered as a reusable chart preset via ``wandb.Api().create_custom_chart``.
 
 Typical usage (see also ``scripts/wandb_pareto_plot.py``)::
 
     from auto_llm.evaluator.plots.wandb_pareto_plot import (
         backfill_pareto_flags,
+        ensure_chart_preset,
         ensure_project_scatter_panel,
     )
 
     backfill_pareto_flags(entity="llm4kmu", project="open-medical-llm-energy")
+    ensure_chart_preset(entity="llm4kmu")
     ensure_project_scatter_panel(entity="llm4kmu", project="open-medical-llm-energy")
 """
 
@@ -39,6 +42,114 @@ PARETO_ENERGY_WH_KEY = "pareto/energy_wh"
 PARETO_ACCURACY_KEY = "pareto/accuracy_pct"
 PARETO_IS_OPTIMAL_KEY = "pareto/is_optimal"
 PARETO_RANK_KEY = "pareto/rank"
+
+DEFAULT_CHART_PRESET_NAME = "pareto-frontier"
+
+# ---------------------------------------------------------------------------
+# Vega-Lite specification — layered scatter + Pareto frontier dashed line
+# ---------------------------------------------------------------------------
+# Field placeholders (``${field:...}``) are resolved by wandb at render time
+# from the ``chart_fields`` mapping supplied when the panel is created.
+#
+# Layer 1 — scatter: all runs as filled circles with tooltips.
+# Layer 2 — line:  black dashed line connecting only Pareto-optimal points,
+#           ordered left-to-right by energy (ascending).
+# Layer 3 — ideal star: a single ★ marker at (min energy, max accuracy)
+#           computed via Vega-Lite aggregate transforms.
+# ---------------------------------------------------------------------------
+PARETO_VEGA_SPEC: dict = {
+    "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+    "data": {"name": "wandb"},
+    "title": "${string:title}",
+    "layer": [
+        # --- Layer 1: scatter (all runs) ---
+        {
+            "mark": {
+                "type": "point",
+                "filled": True,
+                "size": 100,
+                "opacity": 0.85,
+            },
+            "encoding": {
+                "x": {
+                    "field": "${field:energy}",
+                    "type": "quantitative",
+                    "title": "Energy Consumption (Wh)",
+                },
+                "y": {
+                    "field": "${field:accuracy}",
+                    "type": "quantitative",
+                    "title": "Accuracy (%)",
+                },
+                "tooltip": [
+                    {"field": "${field:name}", "type": "nominal", "title": "Run"},
+                    {
+                        "field": "${field:energy}",
+                        "type": "quantitative",
+                        "title": "Energy (Wh)",
+                        "format": ".2f",
+                    },
+                    {
+                        "field": "${field:accuracy}",
+                        "type": "quantitative",
+                        "title": "Accuracy (%)",
+                        "format": ".2f",
+                    },
+                ],
+            },
+        },
+        # --- Layer 2: Pareto frontier dashed line ---
+        {
+            "transform": [
+                {"filter": {"field": "${field:is_pareto}", "equal": True}}
+            ],
+            "mark": {
+                "type": "line",
+                "color": "black",
+                "strokeWidth": 2,
+                "strokeDash": [8, 4],
+                "point": False,
+            },
+            "encoding": {
+                "x": {
+                    "field": "${field:energy}",
+                    "type": "quantitative",
+                },
+                "y": {
+                    "field": "${field:accuracy}",
+                    "type": "quantitative",
+                },
+                "order": {
+                    "field": "${field:energy}",
+                    "type": "quantitative",
+                },
+            },
+        },
+        # --- Layer 3: ideal point (★) ---
+        {
+            "transform": [
+                {
+                    "aggregate": [
+                        {"op": "min", "field": "${field:energy}", "as": "min_energy"},
+                        {"op": "max", "field": "${field:accuracy}", "as": "max_accuracy"},
+                    ]
+                }
+            ],
+            "mark": {
+                "type": "point",
+                "shape": "cross",
+                "size": 200,
+                "color": "black",
+                "filled": True,
+                "strokeWidth": 2,
+            },
+            "encoding": {
+                "x": {"field": "min_energy", "type": "quantitative"},
+                "y": {"field": "max_accuracy", "type": "quantitative"},
+            },
+        },
+    ],
+}
 
 
 @dataclass
@@ -180,26 +291,77 @@ def backfill_pareto_flags(
     return points
 
 
+def ensure_chart_preset(
+    entity: str,
+    preset_name: str = DEFAULT_CHART_PRESET_NAME,
+    api: Optional[wandb.Api] = None,
+) -> str:
+    """Register (or re-use) the Pareto frontier Vega-Lite preset on wandb.
+
+    Returns the fully-qualified chart id (``entity/preset_name``) that can be
+    passed as ``chart_name`` to :class:`wr.CustomChart`.
+
+    The call is idempotent: if a chart with the same ``entity/preset_name``
+    already exists wandb will raise an error which we catch and log.
+    """
+    api = api or wandb.Api()
+    chart_id = f"{entity}/{preset_name}"
+    try:
+        api.create_custom_chart(
+            entity=entity,
+            name=preset_name,
+            display_name="Energy vs Accuracy — Pareto Frontier",
+            spec_type="vega2",
+            access="private",
+            spec=PARETO_VEGA_SPEC,
+        )
+        _logger.info("Created chart preset: %s", chart_id)
+    except Exception as exc:
+        # Preset already exists — this is fine.
+        _logger.info(
+            "Chart preset %s already exists (or creation failed): %s",
+            chart_id,
+            exc,
+        )
+    return chart_id
+
+
 def ensure_project_scatter_panel(
     entity: str,
     project: str,
     panel_title: str = DEFAULT_PANEL_TITLE,
     section_name: str = DEFAULT_SECTION_NAME,
     workspace_name: str = "Pareto Frontier",
+    preset_name: str = DEFAULT_CHART_PRESET_NAME,
 ) -> str:
-    """Upsert a project-level scatter panel that plots pareto/* summary fields.
+    """Upsert a project-level custom chart panel with the Pareto frontier.
 
     Creates (or replaces, if it already exists by name) a saved workspace
-    view containing one ScatterPlot panel. Returns the workspace URL.
+    view containing a layered Vega-Lite panel (scatter + black dashed Pareto
+    frontier line).  The panel auto-updates as new runs appear because it
+    reads ``pareto/*`` summary fields from the active run set.
+
+    Returns the workspace URL.
     """
     import wandb_workspaces.workspaces as ws
     import wandb_workspaces.reports.v2 as wr
 
-    scatter = wr.ScatterPlot(
-        title=panel_title,
-        x=wr.SummaryMetric(name=PARETO_ENERGY_WH_KEY),
-        y=wr.SummaryMetric(name=PARETO_ACCURACY_KEY),
-        regression=False,
+    chart_id = f"{entity}/{preset_name}"
+
+    pareto_chart = wr.CustomChart(
+        query={"summary": {"keys": [
+            PARETO_ENERGY_WH_KEY,
+            PARETO_ACCURACY_KEY,
+            PARETO_IS_OPTIMAL_KEY,
+        ]}},
+        chart_name=chart_id,
+        chart_fields={
+            "energy": PARETO_ENERGY_WH_KEY,
+            "accuracy": PARETO_ACCURACY_KEY,
+            "is_pareto": PARETO_IS_OPTIMAL_KEY,
+            "name": "Name",
+        },
+        chart_strings={"title": panel_title},
     )
 
     workspace = ws.Workspace(
@@ -209,7 +371,7 @@ def ensure_project_scatter_panel(
         sections=[
             ws.Section(
                 name=section_name,
-                panels=[scatter],
+                panels=[pareto_chart],
                 is_open=True,
             ),
         ],

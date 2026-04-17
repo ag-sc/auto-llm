@@ -2,8 +2,9 @@
 
 Reads every ``energy-profiling``-tagged run in a wandb project, computes the
 Pareto frontier over ``(emissions/energy_consumed_kWh, eval/avg_score)``, and
-writes the per-run ``pareto/*`` fields that drive a project ScatterPlot
-panel. Also upserts the workspace view containing that panel.
+writes the per-run ``pareto/*`` fields that drive a project custom chart
+panel.  Also registers a Vega-Lite chart preset (scatter + black dashed
+Pareto frontier line) and upserts the workspace view containing that panel.
 
 Usage::
 
@@ -21,6 +22,7 @@ from auto_llm.evaluator.plots.wandb_pareto_plot import (
     DEFAULT_SCORE_KEY,
     DEFAULT_TAG,
     backfill_pareto_flags,
+    ensure_chart_preset,
     ensure_project_scatter_panel,
 )
 
@@ -70,6 +72,11 @@ def main() -> int:
         action="store_true",
         help="Skip the workspace panel upsert step.",
     )
+    parser.add_argument(
+        "--skip-preset",
+        action="store_true",
+        help="Skip the chart preset creation step (use if already registered).",
+    )
     args = parser.parse_args()
 
     logging.basicConfig(
@@ -99,6 +106,9 @@ def main() -> int:
 
     if args.dry_run or args.skip_panel:
         return 0
+
+    if not args.skip_preset:
+        ensure_chart_preset(entity=args.entity)
 
     url = ensure_project_scatter_panel(
         entity=args.entity,

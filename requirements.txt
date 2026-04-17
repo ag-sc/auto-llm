@@ -4,6 +4,7 @@ setuptools~=44.1.1
 codecarbon==3.2.3
 lm_eval @ git+https://github.com/EleutherAI/lm-evaluation-harness.git@v0.4.9
 wandb==0.21.0
+wandb-workspaces>=0.1.10
 PyYAML~=6.0.2
 datasets==3.6.0
 aenum==3.1.16
