@@ -8,16 +8,18 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-def _compute_pareto_frontier(
+def compute_pareto_indices(
     energies: np.ndarray,
     accuracies: np.ndarray,
 ) -> List[int]:
     """Return indices of Pareto-optimal points (lower energy, higher accuracy).
 
     A point is Pareto-optimal if no other point has both strictly lower energy
-    and strictly higher accuracy.
+    and strictly higher accuracy. Ties in energy resolve toward the higher-
+    accuracy point so a dominated tie never lands on the frontier.
     """
-    sorted_indices = np.argsort(energies)
+    # Secondary key (-accuracies) sorts ties so the best accuracy is seen first.
+    sorted_indices = np.lexsort((-accuracies, energies))
     pareto_indices = []
     max_accuracy = -np.inf
     for idx in sorted_indices:
@@ -25,6 +27,9 @@ def _compute_pareto_frontier(
             pareto_indices.append(idx)
             max_accuracy = accuracies[idx]
     return pareto_indices
+
+
+_compute_pareto_frontier = compute_pareto_indices
 
 
 def energy_accuracy_plot(
