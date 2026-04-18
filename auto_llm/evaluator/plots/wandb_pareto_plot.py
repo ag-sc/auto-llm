@@ -46,16 +46,6 @@ PARETO_NAME_KEY = "pareto/name"
 
 DEFAULT_CHART_PRESET_NAME = "pareto-frontier"
 
-# GraphQL mutation used to delete an existing custom chart preset before
-# re-creating it with an updated Vega spec.
-_DELETE_CUSTOM_CHART_GQL = """
-mutation deleteCustomChart($entity: String!, $name: String!) {
-    deleteCustomChart(input: {entity: $entity, name: $name}) {
-        success
-    }
-}
-"""
-
 # ---------------------------------------------------------------------------
 # Vega-Lite specification — layered scatter + Pareto frontier dashed line
 # ---------------------------------------------------------------------------
@@ -319,21 +309,13 @@ def ensure_chart_preset(
     Returns the fully-qualified chart id (``entity/preset_name``) that can be
     passed as ``chart_name`` to :class:`wr.CustomChart`.
 
-    Deletes any existing preset with the same name first so the Vega spec
-    is always up-to-date, then re-creates it.
+    Note: wandb does not expose an update or delete API for chart presets.
+    If the preset already exists (HTTP 409), it is reused as-is.  To update
+    the Vega spec, delete the old preset manually via the wandb UI
+    (Entity → Chart Presets) and re-run this function.
     """
     api = api or wandb.Api()
     chart_id = f"{entity}/{preset_name}"
-
-    # Delete the old preset so we can re-create with the latest Vega spec.
-    try:
-        api.client.execute(
-            _DELETE_CUSTOM_CHART_GQL,
-            variable_values={"entity": entity, "name": preset_name},
-        )
-        _logger.info("Deleted old chart preset: %s", chart_id)
-    except Exception:
-        _logger.debug("No existing preset to delete (or deletion failed): %s", chart_id)
 
     try:
         api.create_custom_chart(
@@ -346,8 +328,8 @@ def ensure_chart_preset(
         )
         _logger.info("Created chart preset: %s", chart_id)
     except Exception as exc:
-        _logger.warning(
-            "Chart preset creation failed for %s: %s",
+        _logger.info(
+            "Chart preset %s already exists (reusing): %s",
             chart_id,
             exc,
         )
