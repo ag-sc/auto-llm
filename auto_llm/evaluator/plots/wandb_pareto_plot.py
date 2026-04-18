@@ -42,8 +42,19 @@ PARETO_ENERGY_WH_KEY = "pareto/energy_wh"
 PARETO_ACCURACY_KEY = "pareto/accuracy_pct"
 PARETO_IS_OPTIMAL_KEY = "pareto/is_optimal"
 PARETO_RANK_KEY = "pareto/rank"
+PARETO_NAME_KEY = "pareto/name"
 
 DEFAULT_CHART_PRESET_NAME = "pareto-frontier"
+
+# GraphQL mutation used to delete an existing custom chart preset before
+# re-creating it with an updated Vega spec.
+_DELETE_CUSTOM_CHART_GQL = """
+mutation deleteCustomChart($entity: String!, $name: String!) {
+    deleteCustomChart(input: {entity: $entity, name: $name}) {
+        success
+    }
+}
+"""
 
 # ---------------------------------------------------------------------------
 # Vega-Lite specification — layered scatter + Pareto frontier dashed line
@@ -51,54 +62,19 @@ DEFAULT_CHART_PRESET_NAME = "pareto-frontier"
 # Field placeholders (``${field:...}``) are resolved by wandb at render time
 # from the ``chart_fields`` mapping supplied when the panel is created.
 #
-# Layer 1 — scatter: all runs as filled circles with tooltips.
-# Layer 2 — line:  black dashed line connecting only Pareto-optimal points,
+# Layer 1 — line:  black dashed line connecting only Pareto-optimal points,
 #           ordered left-to-right by energy (ascending).
-# Layer 3 — ideal star: a single ★ marker at (min energy, max accuracy)
+# Layer 2 — ideal star: a single ★ marker at (min energy, max accuracy)
 #           computed via Vega-Lite aggregate transforms.
+# Layer 3 — scatter: all runs as filled circles with tooltips.
+#           Rendered last so it sits on top and receives hover events.
 # ---------------------------------------------------------------------------
 PARETO_VEGA_SPEC: dict = {
     "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
     "data": {"name": "wandb"},
     "title": "${string:title}",
     "layer": [
-        # --- Layer 1: scatter (all runs) ---
-        {
-            "mark": {
-                "type": "point",
-                "filled": True,
-                "size": 100,
-                "opacity": 0.85,
-            },
-            "encoding": {
-                "x": {
-                    "field": "${field:energy}",
-                    "type": "quantitative",
-                    "title": "Energy Consumption (Wh)",
-                },
-                "y": {
-                    "field": "${field:accuracy}",
-                    "type": "quantitative",
-                    "title": "Accuracy (%)",
-                },
-                "tooltip": [
-                    {"field": "${field:name}", "type": "nominal", "title": "Run"},
-                    {
-                        "field": "${field:energy}",
-                        "type": "quantitative",
-                        "title": "Energy (Wh)",
-                        "format": ".2f",
-                    },
-                    {
-                        "field": "${field:accuracy}",
-                        "type": "quantitative",
-                        "title": "Accuracy (%)",
-                        "format": ".2f",
-                    },
-                ],
-            },
-        },
-        # --- Layer 2: Pareto frontier dashed line ---
+        # --- Layer 1: Pareto frontier dashed line ---
         {
             "transform": [
                 {"filter": {"field": "${field:is_pareto}", "equal": True}}
@@ -125,7 +101,7 @@ PARETO_VEGA_SPEC: dict = {
                 },
             },
         },
-        # --- Layer 3: ideal point (★) ---
+        # --- Layer 2: ideal point (★) ---
         {
             "transform": [
                 {
@@ -146,6 +122,47 @@ PARETO_VEGA_SPEC: dict = {
             "encoding": {
                 "x": {"field": "min_energy", "type": "quantitative"},
                 "y": {"field": "max_accuracy", "type": "quantitative"},
+            },
+        },
+        # --- Layer 3: scatter (all runs) — on top for hover ---
+        {
+            "mark": {
+                "type": "point",
+                "filled": True,
+                "size": 100,
+                "opacity": 0.85,
+            },
+            "encoding": {
+                "x": {
+                    "field": "${field:energy}",
+                    "type": "quantitative",
+                    "title": "Energy Consumption (Wh)",
+                },
+                "y": {
+                    "field": "${field:accuracy}",
+                    "type": "quantitative",
+                    "title": "Accuracy (%)",
+                },
+                "color": {
+                    "field": "${field:name}",
+                    "type": "nominal",
+                    "legend": {"title": "Run"},
+                },
+                "tooltip": [
+                    {"field": "${field:name}", "type": "nominal", "title": "Run"},
+                    {
+                        "field": "${field:energy}",
+                        "type": "quantitative",
+                        "title": "Energy (Wh)",
+                        "format": ".2f",
+                    },
+                    {
+                        "field": "${field:accuracy}",
+                        "type": "quantitative",
+                        "title": "Accuracy (%)",
+                        "format": ".2f",
+                    },
+                ],
             },
         },
     ],
@@ -272,6 +289,7 @@ def backfill_pareto_flags(
             PARETO_ACCURACY_KEY: point.accuracy_pct,
             PARETO_IS_OPTIMAL_KEY: bool(point.is_pareto),
             PARETO_RANK_KEY: int(point.rank),
+            PARETO_NAME_KEY: run.name,
         }
         if dry_run:
             flag = "pareto" if point.is_pareto else "       "
@@ -301,11 +319,22 @@ def ensure_chart_preset(
     Returns the fully-qualified chart id (``entity/preset_name``) that can be
     passed as ``chart_name`` to :class:`wr.CustomChart`.
 
-    The call is idempotent: if a chart with the same ``entity/preset_name``
-    already exists wandb will raise an error which we catch and log.
+    Deletes any existing preset with the same name first so the Vega spec
+    is always up-to-date, then re-creates it.
     """
     api = api or wandb.Api()
     chart_id = f"{entity}/{preset_name}"
+
+    # Delete the old preset so we can re-create with the latest Vega spec.
+    try:
+        api.client.execute(
+            _DELETE_CUSTOM_CHART_GQL,
+            variable_values={"entity": entity, "name": preset_name},
+        )
+        _logger.info("Deleted old chart preset: %s", chart_id)
+    except Exception:
+        _logger.debug("No existing preset to delete (or deletion failed): %s", chart_id)
+
     try:
         api.create_custom_chart(
             entity=entity,
@@ -317,9 +346,8 @@ def ensure_chart_preset(
         )
         _logger.info("Created chart preset: %s", chart_id)
     except Exception as exc:
-        # Preset already exists — this is fine.
-        _logger.info(
-            "Chart preset %s already exists (or creation failed): %s",
+        _logger.warning(
+            "Chart preset creation failed for %s: %s",
             chart_id,
             exc,
         )
@@ -353,13 +381,14 @@ def ensure_project_scatter_panel(
             PARETO_ENERGY_WH_KEY,
             PARETO_ACCURACY_KEY,
             PARETO_IS_OPTIMAL_KEY,
+            PARETO_NAME_KEY,
         ]}},
         chart_name=chart_id,
         chart_fields={
             "energy": PARETO_ENERGY_WH_KEY,
             "accuracy": PARETO_ACCURACY_KEY,
             "is_pareto": PARETO_IS_OPTIMAL_KEY,
-            "name": "Name",
+            "name": PARETO_NAME_KEY,
         },
         chart_strings={"title": panel_title},
     )
