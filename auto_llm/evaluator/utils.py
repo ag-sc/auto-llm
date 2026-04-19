@@ -11,6 +11,40 @@ from auto_llm.registry.evaluator_registry import LM_EVAL_HARNESS_CUSTOM_TASKS_PA
 LM_EVAL_TASK_MANAGER = TaskManager(include_path=LM_EVAL_HARNESS_CUSTOM_TASKS_PATH)
 
 
+# Open Medical LLM Benchmark — source-based groupings (not defined by the HF
+# leaderboard; chosen for multi-level Pareto frontier analysis).
+TASK_GROUPS: Dict[str, List[str]] = {
+    "medical_boards": ["medqa_4options", "medmcqa"],
+    "literature_qa": ["pubmedqa"],
+    "mmlu_medical": [
+        "mmlu_anatomy_generative",
+        "mmlu_clinical_knowledge_generative",
+        "mmlu_college_biology_generative",
+        "mmlu_college_medicine_generative",
+        "mmlu_medical_genetics_generative",
+        "mmlu_professional_medicine_generative",
+    ],
+}
+
+TASK_GROUP_DISPLAY_NAMES: Dict[str, str] = {
+    "medical_boards": "Medical Board Exams",
+    "literature_qa": "Biomedical Literature QA",
+    "mmlu_medical": "MMLU Medical Subsets",
+}
+
+TASK_DISPLAY_NAMES: Dict[str, str] = {
+    "medqa_4options": "MedQA (USMLE, 4-opt)",
+    "medmcqa": "MedMCQA",
+    "pubmedqa": "PubMedQA",
+    "mmlu_anatomy_generative": "MMLU Anatomy",
+    "mmlu_clinical_knowledge_generative": "MMLU Clinical Knowledge",
+    "mmlu_college_biology_generative": "MMLU College Biology",
+    "mmlu_college_medicine_generative": "MMLU College Medicine",
+    "mmlu_medical_genetics_generative": "MMLU Medical Genetics",
+    "mmlu_professional_medicine_generative": "MMLU Professional Medicine",
+}
+
+
 def parse_lm_eval_config(config: Dict[str, Any]):
     # set values from the YAML config
     lm_eval_parser = setup_parser()
@@ -59,19 +93,29 @@ def aggregate_eval_scores(eval_results: Dict[str, Any]) -> Dict[str, Any]:
     """Compute cross-task metric averages from lm-eval results.
 
     Per-task metrics are already logged by ``cli_evaluate``'s own wandb
-    integration.  This function only computes the averages that lm-eval
-    does not provide::
+    integration under its native key scheme.  This function re-exposes them
+    under a uniform ``eval/*`` namespace and adds group/overall averages::
 
         {
             "eval/avg/acc": 0.71,
             "eval/avg/acc_norm": 0.69,
             "eval/avg/exact_match": 0.76,
             "eval/avg_score": 0.75,
+            "eval/task/medmcqa": 0.72,
+            "eval/task/pubmedqa": 0.78,
+            ...
+            "eval/group/medical_boards": 0.70,
+            "eval/group/mmlu_medical": 0.74,
+            ...
         }
 
     ``eval/avg/{metric}`` averages each metric across tasks that report it.
     ``eval/avg_score`` averages one primary score per task (the first
     non-stderr metric, matching lm-eval's metric_list ordering).
+    ``eval/task/{task_name}`` is the same primary score, per task.
+    ``eval/group/{group_name}`` averages the primary scores of the member
+    tasks (from ``TASK_GROUPS``) actually present in this run; groups with
+    no members present are omitted.
 
     Returns an empty dict when no scores can be extracted.
     """
@@ -106,5 +150,13 @@ def aggregate_eval_scores(eval_results: Dict[str, Any]) -> Dict[str, Any]:
     wandb_metrics["eval/avg_score"] = (
         sum(primary_scores.values()) / len(primary_scores)
     )
+
+    for task_name, score in primary_scores.items():
+        wandb_metrics[f"eval/task/{task_name}"] = score
+
+    for group_name, member_tasks in TASK_GROUPS.items():
+        present = [primary_scores[t] for t in member_tasks if t in primary_scores]
+        if present:
+            wandb_metrics[f"eval/group/{group_name}"] = sum(present) / len(present)
 
     return wandb_metrics

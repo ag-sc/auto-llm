@@ -1,33 +1,47 @@
-"""Project-level Pareto frontier plot on wandb.
+"""Project-level Pareto frontier plots on wandb (multi-panel).
 
-Backfills ``pareto/*`` fields into every energy run's summary so a workspace
-custom chart panel can aggregate them across the whole project.  The chart
-uses a layered Vega-Lite spec (scatter + black dashed Pareto frontier line)
-registered as a reusable chart preset via ``wandb.Api().create_custom_chart``.
+Backfills ``pareto/<label>/*`` fields into every energy run's summary, then
+upserts a workspace containing one custom-chart panel per label.  Labels are
+namespaced: ``overall``, ``group/<group_name>``, ``task/<task_name>`` — yielding
+1 overall + 3 group + 9 per-task Pareto panels for the Open Medical LLM
+benchmark.  All panels share a single Vega-Lite chart preset (scatter + black
+dashed frontier); only the ``chart_fields`` mapping differs per panel.
+
+Historical runs (logged before ``eval/task/*`` / ``eval/group/*`` keys existed)
+are handled by a fallback resolver that reads lm-eval's native per-task keys
+(``<task_name>/<metric>[,<filter>]``) and synthesizes the missing scores.
 
 Typical usage (see also ``scripts/wandb_pareto_plot.py``)::
 
-    from auto_llm.evaluator.plots.wandb_pareto_plot import (
-        backfill_pareto_flags,
-        ensure_chart_preset,
-        ensure_project_scatter_panel,
-    )
-
-    backfill_pareto_flags(entity="llm4kmu", project="open-medical-llm-energy")
+    specs = build_panels_spec()
+    for spec in specs:
+        backfill_pareto_flags(
+            entity="llm4kmu", project="open-medical-llm-energy",
+            label=spec["label"], score_key=spec["score_key"],
+            score_resolver=spec["score_resolver"],
+        )
     ensure_chart_preset(entity="llm4kmu")
-    ensure_project_scatter_panel(entity="llm4kmu", project="open-medical-llm-energy")
+    ensure_project_scatter_panels(
+        entity="llm4kmu", project="open-medical-llm-energy",
+        panel_specs=[(s["label"], s["title"], s["section"]) for s in specs],
+    )
 """
 
 from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 
 import numpy as np
 import wandb
 
 from auto_llm.evaluator.plots.pareto_plot import compute_pareto_indices
+from auto_llm.evaluator.utils import (
+    TASK_DISPLAY_NAMES,
+    TASK_GROUP_DISPLAY_NAMES,
+    TASK_GROUPS,
+)
 
 _logger = logging.getLogger(__name__)
 
@@ -38,13 +52,25 @@ DEFAULT_TAG = "energy-profiling"
 DEFAULT_PANEL_TITLE = "Energy vs Accuracy — Pareto Frontier"
 DEFAULT_SECTION_NAME = "Pareto Frontier"
 
-PARETO_ENERGY_WH_KEY = "pareto/energy_wh"
-PARETO_ACCURACY_KEY = "pareto/accuracy_pct"
-PARETO_IS_OPTIMAL_KEY = "pareto/is_optimal"
-PARETO_RANK_KEY = "pareto/rank"
-PARETO_NAME_KEY = "pareto/name"
+PARETO_KEY_PREFIX = "pareto"
 
 DEFAULT_CHART_PRESET_NAME = "pareto-frontier"
+
+
+def pareto_keys(label: str) -> Dict[str, str]:
+    """Return the five ``pareto/<label>/*`` summary key names for a panel.
+
+    ``label`` is inserted verbatim into the key path and may itself contain
+    slashes (e.g. ``"group/medical_boards"`` → ``"pareto/group/medical_boards/energy_wh"``).
+    """
+    prefix = f"{PARETO_KEY_PREFIX}/{label}"
+    return {
+        "energy_wh": f"{prefix}/energy_wh",
+        "accuracy_pct": f"{prefix}/accuracy_pct",
+        "is_optimal": f"{prefix}/is_optimal",
+        "rank": f"{prefix}/rank",
+        "name": f"{prefix}/name",
+    }
 
 # ---------------------------------------------------------------------------
 # Vega-Lite specification — layered scatter + Pareto frontier dashed line
@@ -189,21 +215,92 @@ def _get_summary_value(summary: Any, key: str) -> Optional[float]:
     return None
 
 
+def _resolve_task_score(summary: Any, task_name: str) -> Optional[float]:
+    """Return a task's primary score, with fallback to lm-eval native keys.
+
+    Priority:
+    1. ``eval/task/<task_name>`` — the canonical key written by Phase 1.
+    2. ``<task_name>/<metric>[,<filter>]`` — lm-eval-harness's own wandb
+       integration.  Scans the summary for keys starting with ``<task_name>/``,
+       skips ``alias`` and ``*stderr*`` metrics, picks the first numeric value
+       alphabetically by base metric name (so ``acc`` beats ``acc_norm``).
+    """
+    canonical = _get_summary_value(summary, f"eval/task/{task_name}")
+    if canonical is not None:
+        return canonical
+
+    prefix = f"{task_name}/"
+    candidates: List[Tuple[str, float]] = []
+    try:
+        items = dict(summary).items()
+    except Exception:
+        return None
+    for key, value in items:
+        if not key.startswith(prefix):
+            continue
+        metric_part = key[len(prefix):]
+        base_metric = metric_part.split(",")[0]
+        if base_metric == "alias" or "stderr" in base_metric:
+            continue
+        if not isinstance(value, (int, float)) or isinstance(value, bool):
+            continue
+        candidates.append((base_metric, float(value)))
+    if not candidates:
+        return None
+    candidates.sort(key=lambda p: p[0])
+    return candidates[0][1]
+
+
+def _resolve_group_score(summary: Any, group_name: str) -> Optional[float]:
+    """Return a group's average score, falling back to member-task resolutions."""
+    canonical = _get_summary_value(summary, f"eval/group/{group_name}")
+    if canonical is not None:
+        return canonical
+
+    members = TASK_GROUPS.get(group_name, [])
+    scores: List[float] = []
+    for task in members:
+        score = _resolve_task_score(summary, task)
+        if score is not None:
+            scores.append(score)
+    if not scores:
+        return None
+    return sum(scores) / len(scores)
+
+
+def make_task_resolver(task_name: str) -> Callable[[Any], Optional[float]]:
+    return lambda summary: _resolve_task_score(summary, task_name)
+
+
+def make_group_resolver(group_name: str) -> Callable[[Any], Optional[float]]:
+    return lambda summary: _resolve_group_score(summary, group_name)
+
+
 def extract_pareto_points(
     runs: Iterable[Any],
     energy_key: str = DEFAULT_ENERGY_KEY,
     score_key: str = DEFAULT_SCORE_KEY,
     score_scale: float = 100.0,
+    score_resolver: Optional[Callable[[Any], Optional[float]]] = None,
 ) -> List[ParetoPoint]:
-    """Pull ``(energy_wh, accuracy_pct)`` from each run and mark Pareto points."""
+    """Pull ``(energy_wh, accuracy_pct)`` from each run and mark Pareto points.
+
+    When ``score_resolver`` is provided it takes priority over ``score_key``;
+    the resolver receives the run's ``summary`` and returns a float in [0, 1]
+    (or None to skip the run).  This is how the task/group panels fall back
+    to lm-eval's native per-task keys on historical runs.
+    """
     points: List[ParetoPoint] = []
     for run in runs:
         summary = run.summary
         energy_kwh = _get_summary_value(summary, energy_key)
-        score = _get_summary_value(summary, score_key)
+        if score_resolver is not None:
+            score = score_resolver(summary)
+        else:
+            score = _get_summary_value(summary, score_key)
         if energy_kwh is None or score is None:
             _logger.debug(
-                "Skipping run %s: missing %s or %s", run.name, energy_key, score_key
+                "Skipping run %s: missing %s or score", run.name, energy_key
             )
             continue
         points.append(
@@ -239,22 +336,26 @@ def _filter_runs_by_tag(runs: Iterable[Any], tag: Optional[str]) -> List[Any]:
 def backfill_pareto_flags(
     entity: str,
     project: str,
+    label: str = "overall",
     energy_key: str = DEFAULT_ENERGY_KEY,
     score_key: str = DEFAULT_SCORE_KEY,
+    score_resolver: Optional[Callable[[Any], Optional[float]]] = None,
     score_scale: float = 100.0,
     tag: Optional[str] = DEFAULT_TAG,
     dry_run: bool = False,
     api: Optional[wandb.Api] = None,
+    runs: Optional[List[Any]] = None,
 ) -> List[ParetoPoint]:
-    """Write ``pareto/*`` fields into each qualifying run's summary.
+    """Write ``pareto/<label>/*`` fields into each qualifying run's summary.
 
     Returns the list of points (with is_pareto / rank populated). When
-    ``dry_run`` is set, nothing is persisted — useful for previewing the
-    frontier before writing.
+    ``dry_run`` is set, nothing is persisted.  Pass an already-fetched ``runs``
+    list to avoid re-hitting the wandb API when looping over many labels.
     """
-    api = api or wandb.Api()
-    all_runs = list(api.runs(f"{entity}/{project}"))
-    runs = _filter_runs_by_tag(all_runs, tag)
+    if runs is None:
+        api = api or wandb.Api()
+        all_runs = list(api.runs(f"{entity}/{project}"))
+        runs = _filter_runs_by_tag(all_runs, tag)
     if not runs:
         _logger.warning(
             "No runs found in %s/%s with tag %r", entity, project, tag
@@ -262,29 +363,38 @@ def backfill_pareto_flags(
         return []
 
     points = extract_pareto_points(
-        runs, energy_key=energy_key, score_key=score_key, score_scale=score_scale
+        runs,
+        energy_key=energy_key,
+        score_key=score_key,
+        score_scale=score_scale,
+        score_resolver=score_resolver,
     )
     if not points:
         _logger.warning(
-            "No runs expose both %s and %s", energy_key, score_key
+            "[%s] No runs expose both %s and a score via %s",
+            label,
+            energy_key,
+            "resolver" if score_resolver else score_key,
         )
         return []
 
+    keys = pareto_keys(label)
     runs_by_id = {r.id: r for r in runs}
     written = 0
     for point in points:
         run = runs_by_id[point.run_id]
         update: Dict[str, Any] = {
-            PARETO_ENERGY_WH_KEY: point.energy_wh,
-            PARETO_ACCURACY_KEY: point.accuracy_pct,
-            PARETO_IS_OPTIMAL_KEY: bool(point.is_pareto),
-            PARETO_RANK_KEY: int(point.rank),
-            PARETO_NAME_KEY: run.name,
+            keys["energy_wh"]: point.energy_wh,
+            keys["accuracy_pct"]: point.accuracy_pct,
+            keys["is_optimal"]: bool(point.is_pareto),
+            keys["rank"]: int(point.rank),
+            keys["name"]: run.name,
         }
         if dry_run:
             flag = "pareto" if point.is_pareto else "       "
             print(
-                f"  [{flag}] {run.name}: energy={point.energy_wh:.2f} Wh, "
+                f"  [{label}] [{flag}] {run.name}: "
+                f"energy={point.energy_wh:.2f} Wh, "
                 f"acc={point.accuracy_pct:.2f}%, rank={point.rank}"
             )
             continue
@@ -294,7 +404,11 @@ def backfill_pareto_flags(
 
     if not dry_run:
         _logger.info(
-            "Backfilled pareto/* on %d runs in %s/%s", written, entity, project
+            "Backfilled pareto/%s/* on %d runs in %s/%s",
+            label,
+            written,
+            entity,
+            project,
         )
     return points
 
@@ -336,20 +450,69 @@ def ensure_chart_preset(
     return chart_id
 
 
-def ensure_project_scatter_panel(
+def build_panels_spec() -> List[Dict[str, Any]]:
+    """Return the 13 panel specs: 1 overall + 3 groups + 9 tasks.
+
+    Each spec dict carries:
+      - ``label``: namespace inserted into ``pareto/<label>/*`` summary keys
+      - ``section``: workspace section the panel belongs to
+      - ``title``: human-readable chart title
+      - ``score_key``: canonical (Phase-1) wandb key for this score
+      - ``score_resolver``: callable that reads a run's summary and returns
+        the score (checks canonical key first, then falls back to lm-eval's
+        native ``<task>/<metric>`` keys for historical runs)
+
+    The resolver for the ``overall`` panel is ``None`` because
+    ``eval/avg_score`` already exists on every historical run.
+    """
+    specs: List[Dict[str, Any]] = []
+
+    specs.append({
+        "label": "overall",
+        "section": "Overall",
+        "title": "Overall — Energy vs Accuracy",
+        "score_key": "eval/avg_score",
+        "score_resolver": None,
+    })
+
+    for group_name in TASK_GROUPS:
+        display = TASK_GROUP_DISPLAY_NAMES.get(group_name, group_name)
+        specs.append({
+            "label": f"group/{group_name}",
+            "section": "By Group",
+            "title": f"{display} — Energy vs Accuracy",
+            "score_key": f"eval/group/{group_name}",
+            "score_resolver": make_group_resolver(group_name),
+        })
+
+    for task_name in (t for tasks in TASK_GROUPS.values() for t in tasks):
+        display = TASK_DISPLAY_NAMES.get(task_name, task_name)
+        specs.append({
+            "label": f"task/{task_name}",
+            "section": "By Task",
+            "title": f"{display} — Energy vs Accuracy",
+            "score_key": f"eval/task/{task_name}",
+            "score_resolver": make_task_resolver(task_name),
+        })
+
+    return specs
+
+
+def ensure_project_scatter_panels(
     entity: str,
     project: str,
-    panel_title: str = DEFAULT_PANEL_TITLE,
-    section_name: str = DEFAULT_SECTION_NAME,
+    panel_specs: List[Tuple[str, str, str]],
     workspace_name: str = "Pareto Frontier",
     preset_name: str = DEFAULT_CHART_PRESET_NAME,
 ) -> str:
-    """Upsert a project-level custom chart panel with the Pareto frontier.
+    """Upsert a project workspace with one Pareto panel per spec.
 
-    Creates (or replaces, if it already exists by name) a saved workspace
-    view containing a layered Vega-Lite panel (scatter + black dashed Pareto
-    frontier line).  The panel auto-updates as new runs appear because it
-    reads ``pareto/*`` summary fields from the active run set.
+    ``panel_specs`` is a list of ``(label, title, section_name)`` tuples — one
+    per panel.  Panels sharing a ``section_name`` are grouped into the same
+    workspace section, preserving insertion order.  All panels reference the
+    single Vega-Lite preset registered by ``ensure_chart_preset``; only the
+    ``chart_fields`` mapping differs per panel (pointing at the namespaced
+    ``pareto/<label>/*`` summary keys).
 
     Returns the workspace URL.
     """
@@ -358,33 +521,34 @@ def ensure_project_scatter_panel(
 
     chart_id = f"{entity}/{preset_name}"
 
-    pareto_chart = wr.CustomChart(
-        query={"summary": {"keys": [
-            PARETO_ENERGY_WH_KEY,
-            PARETO_ACCURACY_KEY,
-            PARETO_IS_OPTIMAL_KEY,
-            PARETO_NAME_KEY,
-        ]}},
-        chart_name=chart_id,
-        chart_fields={
-            "energy": PARETO_ENERGY_WH_KEY,
-            "accuracy": PARETO_ACCURACY_KEY,
-            "is_pareto": PARETO_IS_OPTIMAL_KEY,
-            "name": PARETO_NAME_KEY,
-        },
-        chart_strings={"title": panel_title},
-    )
+    sections: Dict[str, List[Any]] = {}
+    for label, title, section_name in panel_specs:
+        keys = pareto_keys(label)
+        panel = wr.CustomChart(
+            query={"summary": {"keys": [
+                keys["energy_wh"],
+                keys["accuracy_pct"],
+                keys["is_optimal"],
+                keys["name"],
+            ]}},
+            chart_name=chart_id,
+            chart_fields={
+                "energy": keys["energy_wh"],
+                "accuracy": keys["accuracy_pct"],
+                "is_pareto": keys["is_optimal"],
+                "name": keys["name"],
+            },
+            chart_strings={"title": title},
+        )
+        sections.setdefault(section_name, []).append(panel)
 
     workspace = ws.Workspace(
         name=workspace_name,
         entity=entity,
         project=project,
         sections=[
-            ws.Section(
-                name=section_name,
-                panels=[pareto_chart],
-                is_open=True,
-            ),
+            ws.Section(name=name, panels=panels, is_open=True)
+            for name, panels in sections.items()
         ],
     )
 
