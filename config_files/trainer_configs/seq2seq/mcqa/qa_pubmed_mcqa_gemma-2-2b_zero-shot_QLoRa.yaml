@@ -9,7 +9,7 @@ quantization_config:
   load_in_4bit: True
   bnb_4bit_quant_type: "nf4"
   bnb_4bit_use_double_quant: True
-  bnb_4bit_compute_dtype: "float16"
+  bnb_4bit_compute_dtype: "bfloat16"
 
 peft_config:
   r: 8
@@ -23,7 +23,7 @@ peft_config:
   task_type: "CAUSAL_LM"
 
 trainer_data_builder_config:
-  dataset_dir: llm-4-kmu/qa_pubmed_mcqa
+  dataset_dir: /vol/auto_llm/processed_datasets/qa/pubmed_mcqa
   instruction_template: "Answer the following question based on the given abstract. Answer only with a yes/no/maybe."
   input_template: "{{input}}\nAnswer:"
   output_template: "{{output}}"
@@ -33,9 +33,9 @@ trainer_data_builder_config:
 
 trainer_args:
   optim: "paged_adamw_8bit"
-  max_length: 384
-  bf16: False
-  fp16: True
+  max_length: 1024
+  bf16: True
+  fp16: False
 
   # bsz related
   per_device_train_batch_size: 1
@@ -56,5 +56,5 @@ trainer_args:
   logging_steps: 0.1
 
   # eval/save related
-  eval_strategy: epoch
+  eval_strategy: steps
   save_strategy: epoch
