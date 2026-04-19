@@ -53,7 +53,7 @@ trainer_args:
   # tracking/logging related
   report_to: wandb
   run_name: qa_pubmed_mcqa_gemma-2-2b_qlora
-  logging_steps: 'epoch'
+  logging_steps: 0.1
 
   # eval/save related
   eval_strategy: epoch

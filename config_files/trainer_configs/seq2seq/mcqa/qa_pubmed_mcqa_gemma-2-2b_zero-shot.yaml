@@ -30,7 +30,7 @@ trainer_args:
   per_device_train_batch_size: 1
   per_device_eval_batch_size: 1
   gradient_accumulation_steps: 32  # 4 processes
-  auto_find_batch_size: True
+  auto_find_batch_size: False
 
   # training related
   output_dir: /vol/auto_llm/sft_models/qa_pubmed_mcqa_gemma-2-2b_zero-shot
