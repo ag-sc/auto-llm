@@ -52,7 +52,7 @@ class SftTrainerWrapper(TrainerWrapper):
             token=os.getenv("HF_TOKEN"),
             attn_implementation=self.config.auto_llm_trainer_args.attn_implementation,
             low_cpu_mem_usage=True,
-            dtype=torch.bfloat16,  # TODO: pass this as trainer arg?
+            torch_dtype=torch.bfloat16,  # TODO: pass this as trainer arg?
         )
         tokenizer = AutoTokenizer.from_pretrained(
             pretrained_model_name_or_path=self.config.auto_llm_trainer_args.model_name,
