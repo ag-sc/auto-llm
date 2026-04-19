@@ -13,6 +13,9 @@ from auto_llm.builder.task_data_builder.pubmed_mcqa_data_builder import (
 from auto_llm.dto.builder_config import DatasetSplit, TaskDatasetFeatures
 from auto_llm.builder.utils import push_dataset_to_hub
 
+from auto_llm.builder.task_data_builder.med_mcqa_data_builder import MedmcqaDataBuilder
+from auto_llm.builder.task_data_builder.med_qa_data_builder import MedQaDataBuilder
+
 
 def _generic_task_data_builder_tests(ds_dict: DatasetDict):
     assert DatasetSplit.TRAIN in ds_dict.keys()
@@ -119,6 +122,24 @@ def test_pubmed_mcqa_data_builder():
     output_dir = "/vol/auto_llm/processed_datasets/qa/pubmed_mcqa"
     builder.save(ds_dict=ds_dict, path=output_dir)
 
+def test_med_qa_data_builder():
+    builder = MedQaDataBuilder()
+    ds_dict = builder.build()
+
+    _generic_task_data_builder_tests(ds_dict=ds_dict)
+
+    output_dir = "/vol/auto_llm/processed_datasets/qa/med_qa"
+    builder.save(ds_dict=ds_dict, path=output_dir)
+
+
+def test_med_mcqa_data_builder():
+    builder = MedmcqaDataBuilder()
+    ds_dict = builder.build()
+
+    _generic_task_data_builder_tests(ds_dict=ds_dict)
+
+    output_dir = "/vol/auto_llm/processed_datasets/qa/med_mcqa"
+    builder.save(ds_dict=ds_dict, path=output_dir)
 
 def test_push_dataset_to_hub():
     # dataset_dir = "/vol/auto_llm/processed_datasets/pico/AD"
@@ -129,10 +150,19 @@ def test_push_dataset_to_hub():
     # dataset_name = "pico_covid19"
     # push_dataset_to_hub(dataset_dir=dataset_dir, dataset_name=dataset_name)
 
-    dataset_dir = "/vol/auto_llm/processed_datasets/qa/pubmed_gen_qa"
-    dataset_name = "qa_pubmed_gen_qa"
+    # dataset_dir = "/vol/auto_llm/processed_datasets/qa/pubmed_gen_qa"
+    # dataset_name = "qa_pubmed_gen_qa"
+    # push_dataset_to_hub(dataset_dir=dataset_dir, dataset_name=dataset_name)
+
+    # dataset_dir = "/vol/auto_llm/processed_datasets/qa/pubmed_mcqa"
+    # dataset_name = "qa_pubmed_mcqa"
+    # push_dataset_to_hub(dataset_dir=dataset_dir, dataset_name=dataset_name)
+
+    dataset_dir = "/vol/auto_llm/processed_datasets/qa/med_qa"
+    dataset_name = "qa_med_qa"
     push_dataset_to_hub(dataset_dir=dataset_dir, dataset_name=dataset_name)
 
-    dataset_dir = "/vol/auto_llm/processed_datasets/qa/pubmed_mcqa"
-    dataset_name = "qa_pubmed_mcqa"
+    dataset_dir = "/vol/auto_llm/processed_datasets/qa/med_mcqa"
+    dataset_name = "qa_med_mcqa"
     push_dataset_to_hub(dataset_dir=dataset_dir, dataset_name=dataset_name)
+
