@@ -166,9 +166,9 @@ class SftPreProcessor(PreProcessor):
                 labels_list[:length] = [-100] * length
 
                 # throw a warning if all labels are -100. This means there is nothing to train upon.
-                if list(set(labels_list)):
+                if set(labels_list) == {-100}:
                     print(
-                        "***WARNING*** All labels are masked! Please check the input."
+                        "***WARNING*** All labels are masked! Please check the input. Labels list: ", labels_list
                     )
 
         return labels
