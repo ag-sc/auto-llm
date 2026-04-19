@@ -28,6 +28,7 @@ from auto_llm.evaluator.plots.wandb_pareto_plot import (
     DEFAULT_TAG,
     _filter_runs_by_tag,
     backfill_pareto_flags,
+    build_companion_map,
     build_panels_spec,
     ensure_chart_preset,
     ensure_project_scatter_panels,
@@ -99,7 +100,11 @@ def main() -> int:
             )
             return 1
 
-        print(f"Processing {len(specs)} panel(s) over {len(runs)} run(s)...\n")
+        companion_map = build_companion_map(all_runs, energy_tag=tag)
+        print(
+            f"Processing {len(specs)} panel(s) over {len(runs)} run(s); "
+            f"{len(companion_map)} lm-eval companion(s) available for fallback.\n"
+        )
         any_written = False
         for spec in specs:
             points = backfill_pareto_flags(
@@ -113,6 +118,7 @@ def main() -> int:
                 tag=tag,
                 dry_run=args.dry_run,
                 runs=runs,
+                companion_map=companion_map,
             )
             if points:
                 any_written = True

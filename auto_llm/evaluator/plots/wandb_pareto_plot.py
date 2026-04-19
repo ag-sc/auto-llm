@@ -8,8 +8,13 @@ benchmark.  All panels share a single Vega-Lite chart preset (scatter + black
 dashed frontier); only the ``chart_fields`` mapping differs per panel.
 
 Historical runs (logged before ``eval/task/*`` / ``eval/group/*`` keys existed)
-are handled by a fallback resolver that reads lm-eval's native per-task keys
+are handled by a fallback that reads lm-eval's native per-task keys
 (``<task_name>/<metric>[,<filter>]``) and synthesizes the missing scores.
+Because lm-eval-harness logs its per-task metrics to its **own** wandb run
+(not the energy one), the fallback first looks up an lm-eval *companion*
+run in the same project — matched by name (exact, then stripped of a
+``-energy`` suffix) — and merges its summary under the energy run's so the
+resolver can read the per-task keys.
 
 Typical usage (see also ``scripts/wandb_pareto_plot.py``)::
 
@@ -282,22 +287,29 @@ def extract_pareto_points(
     score_key: str = DEFAULT_SCORE_KEY,
     score_scale: float = 100.0,
     score_resolver: Optional[Callable[[Any], Optional[float]]] = None,
+    companion_map: Optional[Dict[str, Any]] = None,
 ) -> List[ParetoPoint]:
     """Pull ``(energy_wh, accuracy_pct)`` from each run and mark Pareto points.
 
-    When ``score_resolver`` is provided it takes priority over ``score_key``;
-    the resolver receives the run's ``summary`` and returns a float in [0, 1]
-    (or None to skip the run).  This is how the task/group panels fall back
-    to lm-eval's native per-task keys on historical runs.
+    Energy is always read from the energy run's own summary.  The score is
+    read from a *merged* view of the energy summary overlaid on the lm-eval
+    companion summary (if one exists in ``companion_map``) — primary wins
+    on key conflict — so resolvers can see lm-eval's native per-task keys
+    even when they live on a sibling run.
     """
+    companion_map = companion_map or {}
     points: List[ParetoPoint] = []
     for run in runs:
-        summary = run.summary
-        energy_kwh = _get_summary_value(summary, energy_key)
+        primary_summary = run.summary
+        energy_kwh = _get_summary_value(primary_summary, energy_key)
+
+        companion_summary = find_companion(companion_map, run.name)
+        merged_summary = _merge_summaries(primary_summary, companion_summary)
         if score_resolver is not None:
-            score = score_resolver(summary)
+            score = score_resolver(merged_summary)
         else:
-            score = _get_summary_value(summary, score_key)
+            score = _get_summary_value(merged_summary, score_key)
+
         if energy_kwh is None or score is None:
             _logger.debug(
                 "Skipping run %s: missing %s or score", run.name, energy_key
@@ -333,6 +345,65 @@ def _filter_runs_by_tag(runs: Iterable[Any], tag: Optional[str]) -> List[Any]:
     return [r for r in runs if tag in (r.tags or [])]
 
 
+def build_companion_map(
+    all_runs: Iterable[Any],
+    energy_tag: Optional[str] = DEFAULT_TAG,
+) -> Dict[str, Any]:
+    """Index non-energy runs by name so lm-eval siblings can be looked up.
+
+    lm-eval-harness logs per-task metrics (``<task>/<metric>[,<filter>]``) to
+    its own wandb run, not the ``WandbEnergyLogger`` run.  This helper walks
+    the full project and keeps only runs **without** the ``energy_tag``,
+    keyed by run name.  ``find_companion`` then matches energy runs to their
+    lm-eval counterparts.
+    """
+    companions: Dict[str, Any] = {}
+    for run in all_runs:
+        tags = run.tags or []
+        if energy_tag and energy_tag in tags:
+            continue
+        companions[run.name] = run.summary
+    return companions
+
+
+def find_companion(
+    companion_map: Dict[str, Any],
+    energy_run_name: str,
+) -> Optional[Any]:
+    """Return the lm-eval companion summary for an energy run, or None.
+
+    Tries exact name match first (both runs share ``wandb_args.name`` from
+    the YAML), then strips a trailing ``-energy`` suffix as a fallback for
+    configs that use the suffix only on the energy run.
+    """
+    if energy_run_name in companion_map:
+        return companion_map[energy_run_name]
+    if energy_run_name.endswith("-energy"):
+        return companion_map.get(energy_run_name[: -len("-energy")])
+    return None
+
+
+def _merge_summaries(primary: Any, companion: Optional[Any]) -> Any:
+    """Overlay ``primary`` on top of ``companion`` (primary wins on conflict).
+
+    Returns ``primary`` unchanged if ``companion`` is None or either value
+    cannot be coerced to a dict — score resolution then falls back to the
+    primary-only path.
+    """
+    if companion is None:
+        return primary
+    try:
+        merged = dict(companion)
+    except (TypeError, ValueError):
+        return primary
+    try:
+        for key, value in dict(primary).items():
+            merged[key] = value
+    except (TypeError, ValueError):
+        return primary
+    return merged
+
+
 def backfill_pareto_flags(
     entity: str,
     project: str,
@@ -345,17 +416,21 @@ def backfill_pareto_flags(
     dry_run: bool = False,
     api: Optional[wandb.Api] = None,
     runs: Optional[List[Any]] = None,
+    companion_map: Optional[Dict[str, Any]] = None,
 ) -> List[ParetoPoint]:
     """Write ``pareto/<label>/*`` fields into each qualifying run's summary.
 
     Returns the list of points (with is_pareto / rank populated). When
     ``dry_run`` is set, nothing is persisted.  Pass an already-fetched ``runs``
-    list to avoid re-hitting the wandb API when looping over many labels.
+    list and ``companion_map`` to avoid re-hitting the wandb API when looping
+    over many labels.
     """
     if runs is None:
         api = api or wandb.Api()
         all_runs = list(api.runs(f"{entity}/{project}"))
         runs = _filter_runs_by_tag(all_runs, tag)
+        if companion_map is None:
+            companion_map = build_companion_map(all_runs, energy_tag=tag)
     if not runs:
         _logger.warning(
             "No runs found in %s/%s with tag %r", entity, project, tag
@@ -368,6 +443,7 @@ def backfill_pareto_flags(
         score_key=score_key,
         score_scale=score_scale,
         score_resolver=score_resolver,
+        companion_map=companion_map,
     )
     if not points:
         _logger.warning(
