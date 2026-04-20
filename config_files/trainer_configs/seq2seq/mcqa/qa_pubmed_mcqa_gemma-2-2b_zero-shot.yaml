@@ -23,8 +23,8 @@ trainer_data_builder_config:
 
 trainer_args:
   max_length: 8192
-  bf16: True
-  fp16: False
+  bf16: False
+  fp16: True
 
   # bsz related
   per_device_train_batch_size: 1
