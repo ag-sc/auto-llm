@@ -10,7 +10,7 @@ datasets==3.6.0
 aenum==3.1.16
 gradio==5.43.1
 peft==0.16.0
-trl==0.16.0
+trl==0.19.1
 flash-attn==2.8.3
 torch==2.7.1
 matplotlib>=3.8
