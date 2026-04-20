@@ -5,11 +5,6 @@ auto_llm_trainer_args:
   truncation: True
   completion_only_loss: True
   
-quantization_config:
-  load_in_4bit: True
-  bnb_4bit_quant_type: "nf4"
-  bnb_4bit_use_double_quant: True
-  bnb_4bit_compute_dtype: "float16"
 
 peft_config:
   r: 16
