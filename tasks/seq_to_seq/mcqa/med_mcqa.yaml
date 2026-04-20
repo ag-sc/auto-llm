@@ -1,0 +1,25 @@
+tag:
+  - medical
+  - mcqa
+task: med_mcqa
+
+dataset_path: medmcqa
+test_split: test
+
+output_type: multiple_choice
+doc_to_text: |
+  Answer the following medical multiple-choice question correctly.
+  
+  {{input_text}}
+  
+  Answer:
+doc_to_target: "{{output_text}}"
+doc_to_choice: ["A", "B", "C", "D"]
+
+metric_list:
+  - metric: acc
+    aggregation: mean
+    higher_is_better: true
+
+metadata:
+  version: 1.0
