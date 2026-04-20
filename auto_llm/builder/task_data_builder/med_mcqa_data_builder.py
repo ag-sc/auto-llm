@@ -34,6 +34,9 @@ class MedmcqaDataBuilder(TaskDataBuilder):
     def _process_split(self, ds: Dataset) -> Dataset:
         samples = []
         for item in ds:
+            if item["cop"] not in self.OPTION_MAP:
+                continue
+
             question = item["question"]
             input_text = (
                 f"Question: {question}\n"
@@ -43,6 +46,7 @@ class MedmcqaDataBuilder(TaskDataBuilder):
                 f"C. {item['opc']}\n"
                 f"D. {item['opd']}"
             )
+            
             output_text = self.OPTION_MAP[item["cop"]]
 
             samples.append(
