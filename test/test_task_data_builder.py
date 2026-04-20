@@ -132,13 +132,33 @@ def test_med_qa_data_builder():
     builder.save(ds_dict=ds_dict, path=output_dir)
 
 
-def test_med_mcqa_data_builder():
+def test_medmcqa_data_builder():
     builder = MedmcqaDataBuilder()
     ds_dict = builder.build()
 
-    _generic_task_data_builder_tests(ds_dict=ds_dict)
+    assert DatasetSplit.TRAIN in ds_dict.keys()
+    assert DatasetSplit.VALIDATION in ds_dict.keys()
 
-    output_dir = "/vol/auto_llm/processed_datasets/qa/med_mcqa"
+    assert TaskDatasetFeatures.INPUT_TEXT in ds_dict[DatasetSplit.TRAIN].column_names
+    assert TaskDatasetFeatures.OUTPUT_TEXT in ds_dict[DatasetSplit.TRAIN].column_names
+
+    assert (
+        TaskDatasetFeatures.INPUT_TEXT in ds_dict[DatasetSplit.VALIDATION].column_names
+    )
+    assert (
+        TaskDatasetFeatures.OUTPUT_TEXT in ds_dict[DatasetSplit.VALIDATION].column_names
+    )
+
+    # check for data contamination. All splits should be unique - they should not have duplicate items.
+    all_samples = []
+    all_samples.extend(ds_dict[DatasetSplit.TRAIN][TaskDatasetFeatures.INPUT_TEXT])
+    all_samples.extend(ds_dict[DatasetSplit.VALIDATION][TaskDatasetFeatures.INPUT_TEXT])
+
+    assert len(all_samples) == len(
+        set(all_samples)
+    ), "Train and Validation splits should be unique - they should not have duplicate items."
+
+    output_dir = "/vol/auto_llm/processed_datasets/open-medical-llm-benchmark/medmcqa"
     builder.save(ds_dict=ds_dict, path=output_dir)
 
 def test_push_dataset_to_hub():
