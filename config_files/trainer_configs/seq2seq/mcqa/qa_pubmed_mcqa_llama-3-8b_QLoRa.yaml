@@ -16,11 +16,7 @@ peft_config:
   r: 8
   lora_alpha: 16
   lora_dropout: 0.05
-  target_modules:
-  - q_proj
-  - k_proj
-  - v_proj
-  - o_proj
+  target_modules: "all-linear"
   task_type: "CAUSAL_LM"
 
 trainer_data_builder_config:
@@ -34,14 +30,14 @@ trainer_data_builder_config:
 
 trainer_args:
   optim: "paged_adamw_8bit"
-  max_length: 512
+  max_length: 1024
   bf16: False
   fp16: True
 
   # bsz related
   per_device_train_batch_size: 1
   per_device_eval_batch_size: 1
-  gradient_accumulation_steps: 64  # 4 processes
+  gradient_accumulation_steps: 32  # 4 processes
   auto_find_batch_size: False
 
   # training related
@@ -54,8 +50,8 @@ trainer_args:
   # tracking/logging related
   report_to: wandb
   run_name: qa_pubmed_mcqa_llama-3-8b_qlora
-  logging_steps: 0.10
+  logging_steps: 0.1
 
   # eval/save related
-  eval_strategy: epoch
+  eval_strategy: steps
   save_strategy: epoch
