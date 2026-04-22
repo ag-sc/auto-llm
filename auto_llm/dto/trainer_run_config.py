@@ -214,6 +214,14 @@ class TrainerArgs(BaseModel):
         title="Report To",
         default="wandb",
     )
+    wandb_project: Optional[str] = Field(
+        description=(
+            "Weights & Biases project name for training runs. If unset, "
+            "Auto-LLM falls back to the repository default project."
+        ),
+        title="Wandb Project",
+        default=None,
+    )
     run_name: str = Field(
         description="The run name in the tracker.",
         title="Run Name",

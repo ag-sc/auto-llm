@@ -138,15 +138,19 @@ class SftTrainerWrapper(TrainerWrapper):
             ddp_find_unused_parameters = False
 
         trainer_args = SFTConfig(
-            **self.config.trainer_args.model_dump(),
+            **self.config.trainer_args.model_dump(exclude={"wandb_project"}),
             dataset_kwargs={"skip_prepare_dataset": skip_prepare_dataset},
             completion_only_loss=completion_only_loss,
             gradient_checkpointing_kwargs={"use_reentrant": use_reentrant},
             ddp_find_unused_parameters=ddp_find_unused_parameters,
         )
 
+        wandb_project = (
+            self.config.trainer_args.wandb_project or WANDB_TRAIN_PROJECT
+        )
+
         if self.config.trainer_args.report_to == "wandb":
-            os.environ["WANDB_PROJECT"] = WANDB_TRAIN_PROJECT
+            os.environ["WANDB_PROJECT"] = wandb_project
 
         peft_config = None
         if self.config.peft_config:
@@ -205,7 +209,7 @@ class SftTrainerWrapper(TrainerWrapper):
 
             with EnergyProfiler(
                 output_dir=output_dir,
-                project_name=WANDB_TRAIN_PROJECT,
+                project_name=wandb_project,
                 experiment_name=self.config.trainer_args.run_name,
                 is_main_process=accelerator.is_main_process,
                 tracking_mode=self.config.auto_llm_trainer_args.tracking_mode,
@@ -228,7 +232,7 @@ class SftTrainerWrapper(TrainerWrapper):
             # Log all energy metrics to a single wandb run
             if log_to_wandb:
                 wandb_logger = WandbEnergyLogger(
-                    project=WANDB_TRAIN_PROJECT,
+                    project=wandb_project,
                     name=self.config.trainer_args.run_name,
                 )
                 wandb_logger.log(pipeline.get_wandb_metrics())
