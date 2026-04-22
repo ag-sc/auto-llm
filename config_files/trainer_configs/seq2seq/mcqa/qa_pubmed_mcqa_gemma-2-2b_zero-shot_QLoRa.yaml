@@ -9,34 +9,34 @@ quantization_config:
   load_in_4bit: True
   bnb_4bit_quant_type: "nf4"
   bnb_4bit_use_double_quant: True
-  bnb_4bit_compute_dtype: "float16"
+  bnb_4bit_compute_dtype: "bfloat16"
 
 peft_config:
-  r: 8
-  lora_alpha: 16
+  r: 16
+  lora_alpha: 32
   lora_dropout: 0.05
   target_modules: "all-linear"
   task_type: "CAUSAL_LM"
 
 trainer_data_builder_config:
   dataset_dir: /vol/auto_llm/processed_datasets/qa/pubmedqa
-  instruction_template: "Answer the following question based on the given abstract. Answer only with a yes/no/maybe."
-  input_template: "{{input}}\nAnswer:"
-  output_template: "{{output}}"
+  instruction_template: "<start_of_turn>user\nAnswer the following question based on the given abstract. Answer only with a yes/no/maybe."
+  input_template: "{{input}}<end_of_turn>\n<start_of_turn>model\nAnswer:"
+  output_template: "{{output}}<end_of_turn>"
+  instruction_input_separator: "<start_of_turn>model\n" 
   dataset_type: prompt_completions
-  instruction_input_separator: "\n"
   parse_output_as_json: False
 
 trainer_args:
   optim: "paged_adamw_8bit"
   max_length: 1024
-  bf16: False
-  fp16: True
+  bf16: True
+  fp16: False
 
   # bsz related
   per_device_train_batch_size: 1
   per_device_eval_batch_size: 1
-  gradient_accumulation_steps: 32  # 4 processes
+  gradient_accumulation_steps: 16  # 4 processes
   auto_find_batch_size: True
 
   # training related
@@ -44,7 +44,7 @@ trainer_args:
   gradient_checkpointing: True
   num_train_epochs: 5
   learning_rate: 1e-4
-  warmup_steps: 100
+  warmup_steps: 20
 
   # tracking/logging related
   report_to: wandb
