@@ -110,6 +110,39 @@ include_path: config_files/evaluator_configs/tasks
 - Running via SLURM:
   - Configure venv and config paths in the slurm script ``scripts/autollm_eval.sbatch``. 
   - Run the script: ``sbatch scripts/autollm_eval.sbatch``.
+
+#### Step 3. Refresh Pareto frontier panels (post-hoc)
+
+Each eval run logs its own energy (`emissions/*`) and accuracy (`eval/*`)
+metrics to wandb, **but not** the `pareto/<label>/*` fields used by the
+Pareto-frontier workspace. Pareto optimality is a **cross-run** property: a
+run can only know its rank relative to every other run in the project, so
+the frontier must be computed once per batch — not during a single run.
+
+After a sweep or batch of eval jobs has finished, refresh the frontier flags
+and workspace panels by running the standalone backfill script. This is a
+lightweight wandb-API call (no GPU, no dataset loading) — run it directly on
+the cluster login/head node, inside the same venv used for eval. **Do not
+submit it via `sbatch`.**
+
+```shell
+# On the cluster login node:
+source $VENV_PATH/bin/activate
+source $ENV_VARIABLES_PATH       # exports WANDB_API_KEY
+
+python scripts/wandb_pareto_plot.py \
+    --entity <wandb-entity> \
+    --project <wandb-project>
+```
+
+The script is idempotent — re-running it after new eval jobs simply
+recomputes the frontier and overwrites the `pareto/<label>/*` summary fields
+on every run. Useful flags:
+
+- ``--dry-run``: report per-label frontier sizes without writing anything.
+- ``--skip-panel``: only backfill summary fields, skip the workspace upsert.
+- ``--skip-backfill``: only (re)create the workspace view.
+- ``--tag <tag>``: restrict to runs carrying a given tag (default: ``energy-profiling``).
 </details>
 
 # Contact Us

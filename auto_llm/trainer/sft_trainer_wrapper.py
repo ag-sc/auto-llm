@@ -59,6 +59,15 @@ class SftTrainerWrapper(TrainerWrapper):
             token=os.getenv("HF_TOKEN"),
         )
 
+        # When combining PEFT (frozen base weights) with gradient checkpointing,
+        # the embedding output has requires_grad=False which breaks the backward
+        # pass through checkpointed blocks. Enabling input require_grads fixes it.
+        if (
+            self.config.peft_config is not None
+            and self.config.trainer_args.gradient_checkpointing
+        ):
+            model.enable_input_require_grads()
+
         tokenizer.pad_token = tokenizer.eos_token
 
         max_length = self.get_max_length(
@@ -118,7 +127,9 @@ class SftTrainerWrapper(TrainerWrapper):
                 )
                 skip_prepare_dataset = True
 
-        use_reentrant = None
+        # Default to non-reentrant checkpointing (recommended by PyTorch and
+        # required for PEFT on single-GPU runs). FSDP still needs reentrant.
+        use_reentrant = False
         ddp_find_unused_parameters = None
         if accelerator.state.distributed_type == DistributedType.FSDP:
             use_reentrant = True

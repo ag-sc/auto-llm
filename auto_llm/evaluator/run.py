@@ -97,5 +97,21 @@ if __name__ == "__main__":
             if eval_results:
                 wandb_logger.log(aggregate_eval_scores(eval_results))
             wandb_logger.flush()
+
+            # NOTE: Pareto frontier fields (``pareto/<label>/*``) are NOT
+            # logged here. Pareto optimality is a cross-run property — a run
+            # only knows whether it is on the frontier relative to every
+            # other run in the wandb project. After a sweep / batch of eval
+            # jobs has finished, refresh the frontier flags and workspace
+            # panels by running the standalone backfill script on the
+            # cluster login/head node (no GPU needed, wandb API only):
+            #
+            #     source $VENV_PATH/bin/activate
+            #     source $ENV_VARIABLES_PATH   # exports WANDB_API_KEY
+            #     python scripts/wandb_pareto_plot.py \
+            #         --entity <wandb-entity> --project <wandb-project>
+            #
+            # See the "Refresh Pareto frontier panels" section in README.md
+            # for details and options (``--dry-run``, ``--skip-panel``, ...).
     else:
         cli_evaluate(args=lm_eval_args)
