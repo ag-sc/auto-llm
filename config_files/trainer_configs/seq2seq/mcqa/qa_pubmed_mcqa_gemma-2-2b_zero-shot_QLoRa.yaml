@@ -43,14 +43,14 @@ trainer_args:
   output_dir: /vol/auto_llm/sft_models/qa_pubmed_mcqa_gemma-2-2b_qlora
   gradient_checkpointing: True
   num_train_epochs: 5
-  learning_rate: 2e-5
+  learning_rate: 5e-5
   warmup_steps: 0.05
   lr_scheduler_type: "cosine" 
 
   # tracking/logging related
   report_to: wandb
   run_name: qa_pubmed_mcqa_gemma-2-2b_qlora
-  logging_steps: 0.1
+  logging_steps: 500
 
   # eval/save related
   eval_strategy: steps
