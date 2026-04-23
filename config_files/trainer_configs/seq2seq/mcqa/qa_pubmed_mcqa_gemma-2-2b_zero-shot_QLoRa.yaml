@@ -44,7 +44,7 @@ trainer_args:
   gradient_checkpointing: True
   num_train_epochs: 5
   learning_rate: 4e-5
-  warmup_steps: 0.05
+  warmup_steps: 50
   lr_scheduler_type: "cosine" 
 
   # tracking/logging related
