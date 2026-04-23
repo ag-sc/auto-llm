@@ -1,7 +1,7 @@
 from typing import Literal, List, Optional, Union
 
 from peft import TaskType
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from transformers import SchedulerType, IntervalStrategy
 from transformers.trainer_utils import SaveStrategy
 
