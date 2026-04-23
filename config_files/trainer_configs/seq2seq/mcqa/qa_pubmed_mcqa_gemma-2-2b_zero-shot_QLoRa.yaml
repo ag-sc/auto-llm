@@ -12,8 +12,8 @@ quantization_config:
   bnb_4bit_compute_dtype: "bfloat16"
 
 peft_config:
-  r: 32
-  lora_alpha: 64
+  r: 16
+  lora_alpha: 32
   lora_dropout: 0.05
   target_modules: "all-linear"
   task_type: "CAUSAL_LM"
@@ -29,7 +29,7 @@ trainer_data_builder_config:
 
 trainer_args:
   optim: "paged_adamw_8bit"
-  max_length: 1024
+  max_length: 8192
   bf16: True
   fp16: False
 
@@ -40,10 +40,10 @@ trainer_args:
   auto_find_batch_size: True
 
   # training related
-  output_dir: /vol/auto_llm/sft_models/qa_pubmed_mcqa_gemma-2-2b_qlora
+  output_dir: /vol/auto_llm/sft_models/qa_pubmed_mcqa_gemma-2-2b_zero-shot_qlora
   gradient_checkpointing: True
   num_train_epochs: 5
-  learning_rate: 5e-5
+  learning_rate: 4e-5
   warmup_steps: 0.05
   lr_scheduler_type: "cosine" 
 
