@@ -49,8 +49,8 @@ trainer_args:
 
   # tracking/logging related
   report_to: wandb
-  run_name: qa_pubmed_mcqa_gemma-2-2b_qlora
-  logging_steps: 500
+  run_name: qa_pubmed_mcqa_gemma-2-2b_zero-shot_qlora
+  logging_steps: 100
 
   # eval/save related
   eval_strategy: steps
