@@ -1,4 +1,4 @@
-num_processes: 4  #  change this according to num gpus used
+num_processes: 1  #  change this according to num gpus used
 
 compute_environment: LOCAL_MACHINE
 debug: false
