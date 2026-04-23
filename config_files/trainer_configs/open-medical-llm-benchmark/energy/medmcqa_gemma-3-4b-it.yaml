@@ -47,7 +47,7 @@ trainer_args:
   # tracking/logging related
   report_to: wandb
   run_name: medmcqa_gemma-3-4b-it_energy
-  logging_steps: 10
+  logging_steps: 500
 
   # eval/save related
   eval_strategy: steps
