@@ -1,5 +1,8 @@
 remote_theme: just-the-docs/just-the-docs
 
+plugins:
+  - jekyll-remote-theme
+
 title: AutoLLM Docs
 description: Documentation for the AutoLLM platform
 
