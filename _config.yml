@@ -1,0 +1,8 @@
+remote_theme: just-the-docs/just-the-docs
+
+title: AutoLLM Docs
+description: Documentation for the AutoLLM platform
+
+search_enabled: true
+
+nav_sort: case_insensitive

@@ -1,11 +1,12 @@
 ---
-title: Auto-LLM Documentation
+title: AutoLLM Documentation
 layout: default
----
+nav_order: 1
+***
 
 # Auto-LLM Documentation
 
-**AutoLLM** supports you in finding the **right** open source model, architecture and training method for your application. Inspired by "Auto-ML" methods, **AutoLLM** automatically determines the optimal LLM configuration for a problem, trains and evaluates different LLMs for your application. You can choose from different open-source models, training techniques and evaluation metrics.
+**AutoLLM** supports you in finding the **right** open source model, architecture and training method for your application. Inspired by "Auto-ML" methods, **AutoLLM** automatically determines the optimal LLM configuration for a problem, trains and evaluates different LLMs for your application. You can choose from different open-source models, training techniques and evaluation metrics.
 
 The platform is part of the project "LLM4KMU".
 
@@ -29,12 +30,13 @@ Fine-tuning aims to increase the performance of
 
 To further fine-tune pre-trained Large Language Models to your specific needs, you first need to provide a dataset. The dataset needs to contain inputs in the form of text, and corresponding ideal answers. During the fine-tuning, the models then get adjusted, so that the likelihood of generating the optimal output given the corresponding input increases.
 
-On the AutoLLM platform you can provide datasets either through paths from [huggingface](https://www.huggingface.co)[^1] 
+On the AutoLLM platform you can provide datasets either through paths from [huggingface](https://www.huggingface.co) 
 or your local machine. 
 
 > *Example*: llm-4-kmu/pubmed_mcqa
 
-[^1]: HuggingFace is one of the biggest online platforms in the area of machine learning, providing a vast variety of open datasets.
+HuggingFace is one of the biggest online platforms in the area of machine learning, providing a vast variety of open datasets.
+
 ### Task Category
 
 The Auto-LLM platform supports multiple different tasks. 
@@ -58,22 +60,25 @@ In the Sequence to Sequence task, models take in a sequence of text, and output 
 In the Sequence to Structured Output task, models take in a sequence of text and output structured text in response, often in the form of JSON. Structuring the data makes it easier to process the responses automatically afterwards.
 
 >Input: *"Give me the names of 3 European Prime Ministers"*
->Output: "{
-	  "prime_ministers": \[
-	    {
-	      "country": "France",
-	      "prime_minister": "Sébastien Lecornu"
-	    },
-	    {
-	      "country": "Netherlands",
-	      "prime_minister": "Rob Jetten"
-	    },
-	    {
-	      "country": "Spain",
-	      "prime_minister": "Pedro Sánchez"
-	    }
-	  ]
-	}" 
+>Output:
+>```json
+>{
+>  "prime_ministers": [
+>    {
+>      "country": "France",
+>      "prime_minister": "Sébastien Lecornu"
+>    },
+>    {
+>      "country": "Netherlands",
+>      "prime_minister": "Rob Jetten"
+>    },
+>    {
+>      "country": "Spain",
+>      "prime_minister": "Pedro Sánchez"
+>    }
+>  ]
+>}
+>```
 
 ### Hardware Type & Count
 
@@ -98,14 +103,13 @@ There are multiple steps that are performed here. Their order is indicated by th
 2. The model is then fine-tuned two times, once full-weight (prefix "fft_") and once using the LoRA method (prefix "lora_"). For more on the fine-tuning procedures see \ref{}.
 3. The resulting fine-tuned models are then evaluated again to compare their performance to each other and the baseline
 
-%%Explain everything in the configuration? No, i think..%%
 By clicking on the respective run name, you can view and modify the detailed configuration file for each run. The status column tells you if the runs are finished. 
 
 Clicking the eye-symbol next to a run opens up the [Weights&Biases](https://wandb.ai) page of the corresponding step. There you can see all relevant details of the step, including the final evaluation metric score and all generated responses.
 ## Results
 ### Evaluation Metrics
 
-Different metrics are used to evaluate the performance of the fine tuned model, depending on the specific task. %%These can be adjusted? Should this be in the docs ?%%
+Different metrics are used to evaluate the performance of the fine tuned model, depending on the specific task.
 
 #### Sequence to Label
 
@@ -141,6 +145,8 @@ Scores range from 0 to 1, and are often somewhat lower than ROUGE-1 because matc
 
 Exact Match is a strict binary metric that checks whether the model's output is completely identical to the reference. A response scores 1 if it matches exactly, and 0 otherwise. It is appropriate when the expected output has only one correct form.
 
+For a full evaluation set, Exact Match is usually reported as the proportion of examples that matched exactly, giving a final score between 0 and 1. A high value means the model reliably produces outputs in the exact required format.
+
 **F1-Score**
 
 F1 measures partial correctness by balancing precision (how much of the model's output is correct) and recall (how much of the reference is covered by the output). Unlike Exact Match, it awards partial credit for responses that are mostly correct, making it more informative when outputs can be partially right.
@@ -151,18 +157,15 @@ Scores range from 0 to 1. A value near 1 means the model is both accurate and co
 
 **Partial Match**
 
-Partial Match evaluates the model's output field by field, rather than as a whole. A response that correctly produces some fields but not others receives a score proportional to the number of fields it got right. This is more informative than Exact Match when the structured output contains multiple independent pieces of information. 
+Partial Match evaluates the model's output field by field, rather than as a whole. A response that correctly produces some fields but not others receives a score proportional to the number of fields it got right. This is more informative than Exact Match when the structured output contains multiple independent pieces of information.
 
 Scores range from 0 to 1, where higher values indicate that more of the expected fields were generated correctly. For example, a score of 0.75 means that roughly three quarters of the required fields were correct.
 
 **Fuzzy Match**
 
-Fuzzy Match is a variant of Partial Match that tolerates minor surface-level differences between the model's output and the reference, such as small spelling variations or punctuation differences. It is useful when the model's answer is semantically correct but does not match the reference character for character. 
+Fuzzy Match is a variant of Partial Match that tolerates minor surface-level differences between the model's output and the reference, such as small spelling variations or punctuation differences. It is useful when the model's answer is semantically correct but does not match the reference character for character.
 
 Scores range from 0 to 1, where higher values indicate greater similarity to the reference despite small formatting or wording differences. A high Fuzzy Match score combined with a lower Exact Match score often means that the model captured the correct content, but not in exactly the required form.
-
-
-
 
 ### How to interpret the Results?
 
@@ -176,4 +179,3 @@ What do we mean by Accuracy...
 # Monitor
 
 # Chat
-
