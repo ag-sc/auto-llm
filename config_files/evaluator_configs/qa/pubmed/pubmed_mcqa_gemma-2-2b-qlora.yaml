@@ -9,9 +9,7 @@ model_args:
   bnb_4bit_compute_dtype: "bfloat16"
   trust_remote_code: True
 
-wandb_args: 
-  project: llm4kmu-eval
-  name: pubmed_mcqa_gemma_2_2b-qlora
+wandb_args: "project=open-medical-llm-QLoRa-eval,name=pubmed_mcqa_gemma_2_2b-qlora"
 
 write_out: True
 log_samples: True
