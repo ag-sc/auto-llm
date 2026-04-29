@@ -8,7 +8,10 @@ model_args:
   bnb_4bit_use_double_quant: True
   bnb_4bit_compute_dtype: "bfloat16"
   trust_remote_code: True
+  attn_implementation: "flash_attention_2"
 
+
+trust_remote_code: True
 wandb_args: "project=open-medical-llm-QLoRa-eval,name=pubmed_mcqa_qwen_2_7b-qlora"
 
 write_out: True

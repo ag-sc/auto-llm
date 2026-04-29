@@ -8,6 +8,8 @@ model_args:
   bnb_4bit_use_double_quant: True
   bnb_4bit_compute_dtype: "bfloat16"
   trust_remote_code: True
+  attn_implementation: eager
+
 
 wandb_args: "project=open-medical-llm-QLoRa-eval,name=pubmed_mcqa_gemma_2_2b-qlora"
 
