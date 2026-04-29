@@ -1,5 +1,5 @@
 model: hf
-tasks: pubmed_mcqa
+tasks:  medmcqa,medqa_4options,mmlu_anatomy_generative,mmlu_clinical_knowledge_generative,mmlu_college_biology_generative,mmlu_college_medicine_generative,mmlu_medical_genetics_generative,mmlu_professional_medicine_generative,pubmedqa
 model_args: 
   pretrained: meta-llama/Meta-Llama-3-8B
   peft: /vol/auto_llm/sft_models/qa_pubmed_mcqa_llama-3-8b_qlora
