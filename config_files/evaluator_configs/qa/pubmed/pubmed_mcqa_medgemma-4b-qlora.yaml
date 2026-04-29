@@ -1,15 +1,6 @@
 model: hf
-tasks:  medmcqa,medqa_4options,mmlu_anatomy_generative,mmlu_clinical_knowledge_generative,mmlu_college_biology_generative,mmlu_college_medicine_generative,mmlu_medical_genetics_generative,mmlu_professional_medicine_generative,pubmedqa
-model_args: 
-  pretrained: google/medgemma-4b-it
-  peft: /vol/auto_llm/sft_models/qa_pubmed_mcqa_medgemma-4b_qlora
-  load_in_4bit: True
-  bnb_4bit_quant_type: "nf4"
-  bnb_4bit_use_double_quant: True
-  bnb_4bit_compute_dtype: "bfloat16"
-  trust_remote_code: True
-  attn_implementation: eager
-
+tasks: medmcqa,medqa_4options,mmlu_anatomy_generative,mmlu_clinical_knowledge_generative,mmlu_college_biology_generative,mmlu_college_medicine_generative,mmlu_medical_genetics_generative,mmlu_professional_medicine_generative,pubmedqa
+model_args: "pretrained=google/medgemma-4b-it,peft=/vol/auto_llm/sft_models/qa_pubmed_mcqa_medgemma-4b_qlora,load_in_4bit=True,bnb_4bit_quant_type=nf4,bnb_4bit_use_double_quant=True,bnb_4bit_compute_dtype=bfloat16,trust_remote_code=True,attn_implementation=eager"
 
 trust_remote_code: True
 wandb_args: "project=open-medical-llm-QLoRa-eval,name=pubmed_mcqa_medgemma_4b-qlora"
