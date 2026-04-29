@@ -5,4 +5,3 @@ wandb_args: project=open-medical-llm-energy,entity=llm4kmu,name=pre-llama-3.2-3b
 trust_remote_code: true
 energy_profiling: true
 force_cpu_power: 450 # 2× AMD EPYC 7713 @ 225W
-force_ram_power: 80

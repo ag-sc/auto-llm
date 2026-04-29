@@ -1,8 +1,7 @@
 model: hf
 tasks: medmcqa,medqa_4options,mmlu_anatomy_generative,mmlu_clinical_knowledge_generative,mmlu_college_biology_generative,mmlu_college_medicine_generative,mmlu_medical_genetics_generative,mmlu_professional_medicine_generative,pubmedqa
-model_args: pretrained=google/gemma-3-4b-pt,peft=/vol/auto_llm/sft_models/open-medical-llm-benchmark/energy/medmcqa_gemma-3-4b-pt
+model_args: pretrained=google/gemma-3-4b-pt,peft=/vol/auto_llm/sft_models/open-medical-llm-benchmark/energy/medmcqa_gemma-3-4b-pt,attn_implementation=eager,dtype=bfloat16
 wandb_args: project=open-medical-llm-energy,entity=llm4kmu,name=sft-medmcqa-gemma-3-4b-pt
 trust_remote_code: true
 energy_profiling: true
 force_cpu_power: 450 # 2× AMD EPYC 7713 @ 225W
-force_ram_power: 80
