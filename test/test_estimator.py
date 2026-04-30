@@ -24,7 +24,7 @@ def test_inference_flops_estimator(models_meta):
         config_path=config_path, models_meta=models_meta
     )
     flops = estimator.estimate()
-    assert flops == 13123076029415424
+    assert flops == 4374358676471808
 
     # test for a custom task
     config_path = "config_files/evaluator_configs/pico_ad_gemma-2-2b.yaml"
@@ -32,7 +32,7 @@ def test_inference_flops_estimator(models_meta):
         config_path=config_path, models_meta=models_meta
     )
     flops = estimator.estimate()
-    assert flops == 2248752318382080
+    assert flops == 749584106127360
 
 
 def test_trainer_flops_estimator(models_meta):

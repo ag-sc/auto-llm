@@ -15,9 +15,11 @@ class InferenceFlopsEstimator(Estimator):
         self.models_meta = models_meta
 
     def estimate(self) -> int:
-        # 6 * N * D
-        # N = num params [get this from model config]
-        # D = num samples [get this from ds config] * avg tokens per sample [get this from model config - max length] * num epochs
+        # Forward-pass FLOPs approximation: 2 * N * D
+        #   N = num params (from model config)
+        #   D = num samples * avg tokens per sample
+        # Training uses 6 * N * D (≈ forward + backward); inference is a
+        # single forward pass, so the factor is 2 instead of 6.
 
         # TODO: this fails when estimating inference FLOPs for full weights fine tuned models. Their pretrained field
         #  contains the FT model's name. This won't match any key in model keys.
@@ -38,11 +40,9 @@ class InferenceFlopsEstimator(Estimator):
             1024, self.models_meta[model_name].get("max_length")
         )
 
-        num_train_epochs = 1  # setting to 1 since this is an evaluation run
+        D = num_samples * avg_tokens_per_sample
 
-        D = num_samples * avg_tokens_per_sample * num_train_epochs
-
-        flops = int(6 * N * D)
+        flops = int(2 * N * D)
 
         return flops
 

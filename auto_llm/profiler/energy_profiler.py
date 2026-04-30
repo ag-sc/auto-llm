@@ -206,52 +206,68 @@ class EnergyProfiler:
         if emissions_data is None:
             return None
 
+        # CodeCarbon reports CO₂ in kg; the estimator uses grams. Convert
+        # here so that ``actual_*`` and ``estimated_*`` wandb metrics are
+        # directly comparable. The canonical ``final_emissions_data`` and
+        # ``emissions.csv`` keep their native kg values (used by
+        # ``EmissionComparator`` which performs its own kg→g conversion).
+        kg_to_g_fields = {"emissions", "emissions_rate"}
+
         summary: Dict[str, Any] = {}
         for field, wandb_key in self._EMISSIONS_KEY_MAP.items():
             value = emissions_data.get(field)
-            if value is not None and value != "":
-                summary[wandb_key] = value
+            if value is None or value == "":
+                continue
+            if field in kg_to_g_fields:
+                value = value * 1000.0
+            summary[wandb_key] = value
         return summary
 
     # Map EmissionsData fields → wandb summary keys.
+    # All keys are prefixed with ``actual_`` to clearly distinguish them
+    # from estimator-produced ``estimated_*`` metrics. CO₂ fields are
+    # exposed in **grams** (converted from CodeCarbon's native kg in
+    # :meth:`get_wandb_metrics`) so they are directly comparable with the
+    # estimator's ``estimated_co2_g``. Energy is already in kWh on both
+    # sides.
     _EMISSIONS_KEY_MAP = {
         # Energy & emissions
-        "energy_consumed": "emissions/energy_consumed_kWh",
-        "emissions": "emissions/emissions_kg",
-        "emissions_rate": "emissions/emissions_rate_kg_per_s",
-        "cpu_energy": "emissions/cpu_energy_kWh",
-        "gpu_energy": "emissions/gpu_energy_kWh",
-        "ram_energy": "emissions/ram_energy_kWh",
-        "water_consumed": "emissions/water_consumed_L",
+        "energy_consumed": "emissions/actual_energy_consumed_kWh",
+        "emissions": "emissions/actual_emissions_g",
+        "emissions_rate": "emissions/actual_emissions_rate_g_per_s",
+        "cpu_energy": "emissions/actual_cpu_energy_kWh",
+        "gpu_energy": "emissions/actual_gpu_energy_kWh",
+        "ram_energy": "emissions/actual_ram_energy_kWh",
+        "water_consumed": "emissions/actual_water_consumed_L",
         # Power draw (mean)
-        "cpu_power": "emissions/cpu_power_W",
-        "gpu_power": "emissions/gpu_power_W",
-        "ram_power": "emissions/ram_power_W",
+        "cpu_power": "emissions/actual_cpu_power_W",
+        "gpu_power": "emissions/actual_gpu_power_W",
+        "ram_power": "emissions/actual_ram_power_W",
         # Duration
-        "duration": "emissions/duration_s",
+        "duration": "emissions/actual_duration_s",
         # Utilization
-        "cpu_utilization_percent": "emissions/cpu_utilization_percent",
-        "gpu_utilization_percent": "emissions/gpu_utilization_percent",
-        "ram_utilization_percent": "emissions/ram_utilization_percent",
-        "ram_used_gb": "emissions/ram_used_gb",
+        "cpu_utilization_percent": "emissions/actual_cpu_utilization_percent",
+        "gpu_utilization_percent": "emissions/actual_gpu_utilization_percent",
+        "ram_utilization_percent": "emissions/actual_ram_utilization_percent",
+        "ram_used_gb": "emissions/actual_ram_used_gb",
         # Location
-        "country_name": "emissions/country_name",
-        "country_iso_code": "emissions/country_iso_code",
-        "region": "emissions/region",
-        "cloud_provider": "emissions/cloud_provider",
-        "cloud_region": "emissions/cloud_region",
-        "on_cloud": "emissions/on_cloud",
+        "country_name": "emissions/actual_country_name",
+        "country_iso_code": "emissions/actual_country_iso_code",
+        "region": "emissions/actual_region",
+        "cloud_provider": "emissions/actual_cloud_provider",
+        "cloud_region": "emissions/actual_cloud_region",
+        "on_cloud": "emissions/actual_on_cloud",
         # Hardware
-        "cpu_count": "emissions/cpu_count",
-        "cpu_model": "emissions/cpu_model",
-        "gpu_count": "emissions/gpu_count",
-        "gpu_model": "emissions/gpu_model",
-        "ram_total_size": "emissions/ram_total_size_GB",
+        "cpu_count": "emissions/actual_cpu_count",
+        "cpu_model": "emissions/actual_cpu_model",
+        "gpu_count": "emissions/actual_gpu_count",
+        "gpu_model": "emissions/actual_gpu_model",
+        "ram_total_size": "emissions/actual_ram_total_size_GB",
         # Tracking config
-        "tracking_mode": "emissions/tracking_mode",
-        "pue": "emissions/pue",
+        "tracking_mode": "emissions/actual_tracking_mode",
+        "pue": "emissions/actual_pue",
         # System info
-        "os": "emissions/os",
-        "python_version": "emissions/python_version",
-        "codecarbon_version": "emissions/codecarbon_version",
+        "os": "emissions/actual_os",
+        "python_version": "emissions/actual_python_version",
+        "codecarbon_version": "emissions/actual_codecarbon_version",
     }
