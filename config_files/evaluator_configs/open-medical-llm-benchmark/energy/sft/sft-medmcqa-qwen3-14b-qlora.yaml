@@ -1,7 +1,7 @@
 model: hf
 tasks: medmcqa,medqa_4options,mmlu_anatomy_generative,mmlu_clinical_knowledge_generative,mmlu_college_biology_generative,mmlu_college_medicine_generative,mmlu_medical_genetics_generative,mmlu_professional_medicine_generative,pubmedqa
 model_args: pretrained=Qwen/Qwen3-14B-Base,peft=/vol/auto_llm/sft_models/open-medical-llm-benchmark/energy/medmcqa_qwen3-14b_qlora,load_in_4bit=True,parallelize=true
-wandb_args: project=open-medical-llm-energy,entity=llm4kmu,name=sft-medmcqa-qwen3-14b-qlora
+wandb_args: project=open-medical-llm-eval-energy,entity=llm4kmu,name=sft-medmcqa-qwen3-14b-qlora
 trust_remote_code: true
 energy_profiling: true
 force_cpu_power: 450 # 2× AMD EPYC 7713 @ 225W
