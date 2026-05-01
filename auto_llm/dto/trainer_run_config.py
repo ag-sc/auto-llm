@@ -1,7 +1,7 @@
 from typing import Literal, List, Optional, Union
 
 from peft import TaskType
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from transformers import SchedulerType, IntervalStrategy
 from transformers.trainer_utils import SaveStrategy
 
@@ -32,6 +32,46 @@ class LoraConfig(BaseModel):
         title="Task Type",
         default="CAUSAL_LM",
     )
+
+class QuantizationConfig(BaseModel):
+    load_in_4bit: bool = Field(
+        description="Load base weights in 4-bit (QLoRA). Mutually exclusive with load_in_8bit.",
+        title="Load In 4-bit",
+        default=True,
+    )
+    load_in_8bit: bool = Field(
+        description="Load base weights in 8-bit (LLM.int8). Mutually exclusive with load_in_4bit.",
+        title="Load In 8-bit",
+        default=False,
+    )
+    bnb_4bit_quant_type: Literal["nf4", "fp4"] = Field(
+        description="4-bit data type. NF4 is the QLoRA-recommended normal-float variant.",
+        title="4-bit Quant Type",
+        default="nf4",
+    )
+    bnb_4bit_use_double_quant: bool = Field(
+        description="Quantize the quantization constants for additional memory savings.",
+        title="4-bit Double Quant",
+        default=True,
+    )
+    bnb_4bit_compute_dtype: Literal["bfloat16", "float16", "float32"] = Field(
+        description="Dtype used for matmul/compute in quantized layers.",
+        title="4-bit Compute Dtype",
+        default="bfloat16",
+    )
+
+    @model_validator(mode="after")
+    def _check_mutually_exclusive(self) -> "QuantizationConfig":
+        if self.load_in_4bit and self.load_in_8bit:
+            raise ValueError(
+                "load_in_4bit and load_in_8bit are mutually exclusive"
+            )
+        if not self.load_in_4bit and not self.load_in_8bit:
+            raise ValueError(
+                "One of load_in_4bit or load_in_8bit must be True"
+            )
+        return self
+
 
 
 class AutoLlmTrainerArgs(BaseModel):
@@ -270,7 +310,6 @@ class TrainerArgs(BaseModel):
         default=None,
     )
 
-
 class TrainerRunConfig(BaseModel):
     auto_llm_trainer_args: AutoLlmTrainerArgs = Field(
         description="Args specific to AutoLLM Trainer",
@@ -287,5 +326,10 @@ class TrainerRunConfig(BaseModel):
     peft_config: Optional[LoraConfig] = Field(
         description="Configuration for PEFT technique",
         title="PEFT Config",
+        default=None,
+    )
+    quantization_config: Optional[QuantizationConfig] = Field(
+        description="Configuration for bitsandbytes quantization (QLoRA)",
+        title="Quantization Config",
         default=None,
     )

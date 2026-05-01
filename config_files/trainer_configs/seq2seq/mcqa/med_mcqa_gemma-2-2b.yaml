@@ -4,6 +4,7 @@ auto_llm_trainer_args:
   attn_implementation: eager # keep eager for gemma
   truncation: True
   completion_only_loss: True
+  
 
 peft_config:
   r: 16
@@ -13,7 +14,7 @@ peft_config:
   task_type: "CAUSAL_LM"
 
 trainer_data_builder_config:
-  dataset_dir: /vol/auto_llm/processed_datasets/qa/pubmed_gen_qa
+  dataset_dir: /vol/auto_llm/processed_datasets/open-medical-llm-benchmark/medmcqa
   instruction_template: "Answer the following question based on the given context."
   input_template: "{{input}}\nAnswer:"
   output_template: "{{output}}"
@@ -33,7 +34,7 @@ trainer_args:
   auto_find_batch_size: True
 
   # training related
-  output_dir: /vol/auto_llm/sft_models/qa_pubmed_gen_qa_gemma-2-2b_zero-shot
+  output_dir: /vol/auto_llm/sft_models/med_mcqa_gemma-2-2b_QLoRa
   gradient_checkpointing: True
   num_train_epochs: 5
   learning_rate: 1e-4
@@ -41,7 +42,7 @@ trainer_args:
 
   # tracking/logging related
   report_to: wandb
-  run_name: qa_pubmed_gen_qa_gemma-2-2b_zero-shot
+  run_name: med_mcqa_gemma-2-2b_QLoRa
   logging_steps: 0.1
 
   # eval/save related

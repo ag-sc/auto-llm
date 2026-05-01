@@ -1,6 +1,6 @@
 auto_llm_trainer_args:
   trainer_type: sft
-  model_name: google/gemma-2-2b
+  model_name: google/medgemma-4b-it
   attn_implementation: eager # keep eager for gemma
   truncation: True
   completion_only_loss: True
@@ -13,8 +13,8 @@ peft_config:
   task_type: "CAUSAL_LM"
 
 trainer_data_builder_config:
-  dataset_dir: /vol/auto_llm/processed_datasets/qa/pubmed_gen_qa
-  instruction_template: "Answer the following question based on the given context."
+  dataset_dir: llm-4-kmu/qa_pubmed_mcqa
+  instruction_template: "Answer the following question based on the given abstract. Answer only with a yes/no/maybe."
   input_template: "{{input}}\nAnswer:"
   output_template: "{{output}}"
   dataset_type: prompt_completions
@@ -33,16 +33,16 @@ trainer_args:
   auto_find_batch_size: True
 
   # training related
-  output_dir: /vol/auto_llm/sft_models/qa_pubmed_gen_qa_gemma-2-2b_zero-shot
+  output_dir: /vol/auto_llm/sft_models/qa_pubmed_mcqa_medgemma-4b_qlora
   gradient_checkpointing: True
   num_train_epochs: 5
-  learning_rate: 1e-4
+  learning_rate: 3e-4
   warmup_steps: 10
 
   # tracking/logging related
   report_to: wandb
-  run_name: qa_pubmed_gen_qa_gemma-2-2b_zero-shot
-  logging_steps: 0.1
+  run_name: qa_pubmed_mcqa_medgemma-4b_qlora
+  logging_steps: 100
 
   # eval/save related
   eval_strategy: steps

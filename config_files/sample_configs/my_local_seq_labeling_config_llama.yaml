@@ -1,6 +1,6 @@
 auto_llm_trainer_args:
   trainer_type: sft
-  model_name: google/gemma-2-2b
+  model_name: meta-llama/Meta-Llama-3-8B
   attn_implementation: sdpa # keep eager for gemma
   truncation: True
   completion_only_loss: True
@@ -33,7 +33,7 @@ trainer_args:
   fp16: False
 
   # bsz related
-  per_device_train_batch_size: 4
+  per_device_train_batch_size: 1
   per_device_eval_batch_size: 4
   gradient_accumulation_steps: 16  # 4 processes, effective bsz=128
   auto_find_batch_size: True
@@ -48,7 +48,7 @@ trainer_args:
 
   # tracking/logging related
   report_to: wandb
-  run_name: pico_ebm-NoDuplicates_gemma-2-2b_zero-shot
+  run_name: pico_ebm-NoDuplicates_Llama-3-8B-QLoRA
   logging_steps: 0.1
 
   # eval/save related

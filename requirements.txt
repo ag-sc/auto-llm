@@ -14,3 +14,5 @@ trl==0.19.1
 flash-attn==2.8.3
 torch==2.7.1
 matplotlib>=3.8
+flash-attn==2.8.3
+bitsandbytes>=0.43.0
