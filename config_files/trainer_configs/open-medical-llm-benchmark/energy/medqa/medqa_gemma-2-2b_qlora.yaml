@@ -1,0 +1,58 @@
+auto_llm_trainer_args:
+  trainer_type: sft
+  model_name: google/gemma-2-2b
+  attn_implementation: eager # required for Gemma
+  truncation: True
+  completion_only_loss: True
+  energy_profiling: true
+  force_cpu_power: 450 # 2× AMD EPYC 7713 @ 225W
+  # token_budget: 200000000 # 200M tokens
+
+quantization_config:
+  load_in_4bit: True
+  bnb_4bit_quant_type: "nf4"
+  bnb_4bit_use_double_quant: True
+  bnb_4bit_compute_dtype: "bfloat16"
+
+peft_config:
+  r: 16
+  lora_alpha: 32
+  lora_dropout: 0.05
+  target_modules: "all-linear"
+  task_type: "CAUSAL_LM"
+
+trainer_data_builder_config:
+  dataset_dir: /vol/auto_llm/processed_datasets/open-medical-llm-benchmark/medqa
+  instruction_template: "Answer the following medical question by selecting the correct option (A, B, C, or D)."
+  input_template: "{{input}}\nAnswer:"
+  output_template: " {{output}}"
+  dataset_type: prompt_completions
+  instruction_input_separator: "\n"
+  parse_output_as_json: False
+
+trainer_args:
+  max_length: 512
+  bf16: True
+  fp16: False
+
+  # bsz related
+  per_device_train_batch_size: 8
+  per_device_eval_batch_size: 8
+  gradient_accumulation_steps: 4
+  auto_find_batch_size: True
+
+  # training related
+  output_dir: /vol/auto_llm/sft_models/open-medical-llm-benchmark/energy/medqa_gemma-2-2b_qlora
+  gradient_checkpointing: True
+  num_train_epochs: 5 # overridden by token_budget -> max_steps
+  learning_rate: 1e-4
+  warmup_steps: 10
+
+  # tracking/logging related
+  report_to: wandb
+  run_name: medqa_gemma-2-2b_qlora_energy
+  logging_steps: 100
+
+  # eval/save related
+  eval_strategy: steps
+  save_strategy: epoch

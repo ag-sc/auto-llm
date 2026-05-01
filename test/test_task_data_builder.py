@@ -18,6 +18,9 @@ from auto_llm.builder.utils import push_dataset_to_hub
 
 from auto_llm.builder.task_data_builder.med_mcqa_data_builder import MedmcqaDataBuilder
 from auto_llm.builder.task_data_builder.med_qa_data_builder import MedQaDataBuilder
+from auto_llm.builder.task_data_builder.med_qa_4options_data_builder import (
+    MedQa4OptionsDataBuilder,
+)
 
 
 def _generic_task_data_builder_tests(ds_dict: DatasetDict):
@@ -132,6 +135,16 @@ def test_med_qa_data_builder():
     _generic_task_data_builder_tests(ds_dict=ds_dict)
 
     output_dir = "/vol/auto_llm/processed_datasets/qa/med_qa"
+    builder.save(ds_dict=ds_dict, path=output_dir)
+
+
+def test_med_qa_4options_data_builder():
+    builder = MedQa4OptionsDataBuilder()
+    ds_dict = builder.build()
+
+    _generic_task_data_builder_tests(ds_dict=ds_dict)
+
+    output_dir = "/vol/auto_llm/processed_datasets/open-medical-llm-benchmark/medqa"
     builder.save(ds_dict=ds_dict, path=output_dir)
 
 
