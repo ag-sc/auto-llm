@@ -6,7 +6,7 @@ auto_llm_trainer_args:
   completion_only_loss: True
   energy_profiling: true
   force_cpu_power: 450 # 2× AMD EPYC 7713 @ 225W
-  force_ram_power: 80
+  
   # token_budget: 200000000 # 200M tokens
 
 peft_config:

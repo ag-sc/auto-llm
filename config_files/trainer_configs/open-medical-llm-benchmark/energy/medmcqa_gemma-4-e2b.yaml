@@ -1,6 +1,6 @@
 auto_llm_trainer_args:
   trainer_type: sft
-  model_name: google/gemma-2-2b
+  model_name: google/gemma-4-E2B
   attn_implementation: eager # required for Gemma
   truncation: True
   completion_only_loss: True
@@ -37,7 +37,7 @@ trainer_args:
   auto_find_batch_size: True
 
   # training related
-  output_dir: /vol/auto_llm/sft_models/open-medical-llm-benchmark/energy/medmcqa_gemma-2-2b
+  output_dir: /vol/auto_llm/sft_models/open-medical-llm-benchmark/energy/medmcqa_gemma-4-e2b
   gradient_checkpointing: True
   num_train_epochs: 5 # overridden by token_budget -> max_steps
   learning_rate: 1e-4
@@ -45,7 +45,7 @@ trainer_args:
 
   # tracking/logging related
   report_to: wandb
-  run_name: medmcqa_gemma-2-2b_energy
+  run_name: medmcqa_gemma-4-e2b_energy
   logging_steps: 500
 
   # eval/save related
