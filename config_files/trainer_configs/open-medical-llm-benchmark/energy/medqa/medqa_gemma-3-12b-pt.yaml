@@ -50,3 +50,5 @@ trainer_args:
   # eval/save related
   eval_strategy: steps
   save_strategy: epoch
+  save_total_limit: 1      # rotate — keep only the latest
+  save_only_model: True    # skip optimizer/scheduler/rng state in checkpoints
