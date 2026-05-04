@@ -137,8 +137,8 @@ def test_pre_processor_with_completion_only_loss(
     )
 
     # fmt: off
-    assert encoded_inputs["input_ids"][0].tolist() == [2, 883, 603, 14239, 235248, 235274, 108, 4328, 2793, 235248]
-    assert encoded_inputs["labels"][0].tolist() == [-100, -100, -100, -100, -100, -100, -100, 4328, 2793, 235248]
+    assert encoded_inputs["input_ids"][0].tolist() == [603, 14239, 235248, 235274, 108, 4328, 2793, 235248, 235274, 1]
+    assert encoded_inputs["labels"][0].tolist() == [-100, -100, -100, -100, -100, 4328, 2793, 235248, 235274, 1]
     assert encoded_inputs["attention_mask"][0].tolist() == [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
     # fmt: on
 
@@ -163,8 +163,8 @@ def test_pre_processor_with_completion_only_loss(
     )
 
     # fmt: off
-    assert encoded_inputs["input_ids"][0].tolist() == [2, 883, 603, 14239, 235248, 235274, 108, 4328, 2793, 235248]
-    assert encoded_inputs["labels"][0].tolist() == [-100, -100, -100, -100, -100, -100, -100, 4328, 2793, 235248]
+    assert encoded_inputs["input_ids"][0].tolist() == [603, 14239, 235248, 235274, 108, 4328, 2793, 235248, 235274, 1]
+    assert encoded_inputs["labels"][0].tolist() == [-100, -100, -100, -100, -100, 4328, 2793, 235248, 235274, 1]
     assert encoded_inputs["attention_mask"][0].tolist() == [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
     # fmt: on
 
@@ -243,8 +243,8 @@ def test_pre_processor_with_conversational_ds_completion_only_loss(
     )
 
     # fmt: off
-    assert encoded_inputs["input_ids"][0].tolist() == [2, 106, 1645, 108, 883, 603, 14239, 235248, 235274, 107]
-    assert encoded_inputs["labels"][0].tolist() == [-100, -100, -100, -100, -100, -100, -100, -100, -100, -100]
+    assert encoded_inputs["input_ids"][0].tolist() == [108, 106, 2516, 108, 4328, 2793, 235248, 235274, 107, 108]
+    assert encoded_inputs["labels"][0].tolist() == [-100, -100, -100, -100, 4328, 2793, 235248, 235274, 107, 108]
     assert encoded_inputs["attention_mask"][0].tolist() == [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
     # fmt: on
 
