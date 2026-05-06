@@ -11,4 +11,4 @@ nav:
       - Training: fundamentals/training_a_llm.md
       - Evaluating: fundamentals/evaluating_a_llm.md
   - Platform:
-      - Step-by-Step: how_to_use.md
+      - Step-by-Step: platform/how_to_use.md
