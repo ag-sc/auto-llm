@@ -4,10 +4,11 @@ theme:
 
 nav:
   - Home: index.md
-  - Fundamentals: fundamentals/start.md
-    - Datasets: fundamentals/datasets.md
-    - Tasks: fundamentals/nlp_tasks.md
-    - Training: fundamentals/training_a_llm.md
-    - Evaluating: fundamentals/evaluating_a_llm.md
+  - Fundamentals:
+      - Overview: fundamentals/start.md
+      - Datasets: fundamentals/datasets.md
+      - Tasks: fundamentals/nlp_tasks.md
+      - Training: fundamentals/training_a_llm.md
+      - Evaluating: fundamentals/evaluating_a_llm.md
   - Platform:
-    - Step-by-Step: how_to_use.md
+      - Step-by-Step: how_to_use.md
