@@ -2,7 +2,7 @@
 
 Different metrics are used to evaluate the performance of the fine tuned model, depending on the specific task.
 
-#### Sequence to Label
+## Sequence to Label
 
 **Accuracy**
 
@@ -10,7 +10,7 @@ Accuracy measures the proportion of inputs the model classified correctly, expre
 
 $$\text{Accuracy} = \frac{\text{correct predictions}}{\text{total predictions}}$$
 
-#### Sequence to Sequence
+## Sequence to Sequence
 
 **BLEU**
 
@@ -30,7 +30,7 @@ ROUGE-L extends ROUGE-1 by also taking word order into account. Rather than coun
 
 Scores range from 0 to 1, and are often somewhat lower than ROUGE-1 because matching both content and order is more difficult. Higher values indicate that the generated output follows the structure of the reference more closely.
 
-#### Sequence to Structured Output
+## Sequence to Structured Output
 
 **Exact Match**
 

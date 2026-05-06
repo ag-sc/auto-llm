@@ -27,6 +27,7 @@ In the Sequence to Structured Output task, models take in a sequence of text and
 >Input: *"Give me the names of 3 European Prime Ministers"*
 >
 >Output:
+
 >```json
 >{
 >  "prime_ministers": [
