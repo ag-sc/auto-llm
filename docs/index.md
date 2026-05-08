@@ -5,3 +5,24 @@
 The platform is part of the project "LLM4KMU".
 
 > **Optimierter Einsatz von Open Source Large Language Models (LLMs) in kleinen und mittelständischen Unternehmen (KMUs). Mit Mitteln der Europäischen Union gefördert.**
+
+<div style="height:20px"></div>
+<div class="grid cards" markdown>
+
+-   :material-book-open-variant:{ .lg .middle } **Fundamentals**
+
+    ---
+
+    Learn about datasets, NLP tasks, training and evaluating LLMs.
+
+    [:octicons-arrow-right-24: Get started](fundamentals/start.md)
+
+-   :material-view-dashboard:{ .lg .middle } **Platform**
+
+    ---
+
+    Step-by-step guide to using the Auto-LLM platform.
+
+    [:octicons-arrow-right-24: How to use](platform/how_to_use.md)
+
+</div>
