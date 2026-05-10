@@ -1,4 +1,5 @@
 import argparse
+import logging
 import shutil
 import os
 
@@ -36,6 +37,7 @@ if __name__ == "__main__":
     tracking_mode = config.pop("tracking_mode", "machine")
     force_cpu_power = config.pop("force_cpu_power", None)
     force_ram_power = config.pop("force_ram_power", None)
+    auto_pareto_cfg = config.pop("auto_pareto", None) or {}
     
     # Allow custom dataset code (e.g. bigbio/pubmed_qa) before any task loading
     if config.get("trust_remote_code"):
@@ -98,13 +100,62 @@ if __name__ == "__main__":
                 wandb_logger.log(aggregate_eval_scores(eval_results))
             wandb_logger.flush()
 
-            # NOTE: Pareto frontier fields (``pareto/<label>/*``) are NOT
-            # logged here. Pareto optimality is a cross-run property — a run
-            # only knows whether it is on the frontier relative to every
-            # other run in the wandb project. After a sweep / batch of eval
-            # jobs has finished, refresh the frontier flags and workspace
-            # panels by running the standalone backfill script on the
-            # cluster login/head node (no GPU needed, wandb API only):
+            # Optional in-process refresh of the project Pareto workspace.
+            # Opt-in via ``auto_pareto.enabled: true`` in the eval YAML.
+            # Best-effort: any failure is logged and the eval job still
+            # exits 0. See README.md §"Auto-refresh option".
+            if auto_pareto_cfg.get("enabled"):
+                try:
+                    from auto_llm.evaluator.plots.wandb_pareto_plot import (
+                        refresh_pareto_workspace,
+                    )
+
+                    pareto_entity = (
+                        auto_pareto_cfg.get("entity")
+                        or wandb_args.get("entity")
+                        or os.environ.get("WANDB_ENTITY")
+                    )
+                    if not pareto_entity:
+                        raise RuntimeError(
+                            "auto_pareto.entity not set and WANDB_ENTITY env var "
+                            "is empty; cannot refresh Pareto workspace."
+                        )
+
+                    url = refresh_pareto_workspace(
+                        entity=pareto_entity,
+                        project=auto_pareto_cfg.get("project") or wandb_project,
+                        energy_key=auto_pareto_cfg.get(
+                            "energy_key", "emissions/energy_consumed_kWh"
+                        ),
+                        score_scale=float(auto_pareto_cfg.get("score_scale", 100.0)),
+                        tag=auto_pareto_cfg.get("tag", "energy-profiling") or None,
+                        workspace_name=auto_pareto_cfg.get(
+                            "workspace_name", "Pareto Frontier"
+                        ),
+                        dry_run=bool(auto_pareto_cfg.get("dry_run", False)),
+                        skip_backfill=bool(auto_pareto_cfg.get("skip_backfill", False)),
+                        skip_panel=bool(auto_pareto_cfg.get("skip_panel", False)),
+                        skip_preset=bool(auto_pareto_cfg.get("skip_preset", False)),
+                    )
+                    if url:
+                        logging.getLogger(__name__).info(
+                            "Pareto workspace refreshed: %s", url
+                        )
+                except Exception as exc:
+                    logging.getLogger(__name__).warning(
+                        "auto_pareto refresh failed (best-effort, eval job will "
+                        "succeed): %s",
+                        exc,
+                    )
+
+            # NOTE: When ``auto_pareto.enabled`` is left at its default
+            # (false), the ``pareto/<label>/*`` fields are NOT written here.
+            # Pareto optimality is a cross-run property — a run only knows
+            # whether it is on the frontier relative to every other run in
+            # the wandb project. After a sweep / batch of eval jobs has
+            # finished, refresh the frontier flags and workspace panels by
+            # running the standalone backfill script on the cluster
+            # login/head node (no GPU needed, wandb API only):
             #
             #     source $VENV_PATH/bin/activate
             #     source $ENV_VARIABLES_PATH   # exports WANDB_API_KEY

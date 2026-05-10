@@ -21,17 +21,11 @@ import argparse
 import logging
 import sys
 
-import wandb
-
 from auto_llm.evaluator.plots.wandb_pareto_plot import (
     DEFAULT_ENERGY_KEY,
     DEFAULT_TAG,
-    _filter_runs_by_tag,
-    backfill_pareto_flags,
-    build_companion_map,
-    build_panels_spec,
-    ensure_chart_preset,
-    ensure_project_scatter_panels,
+    ParetoRefreshError,
+    refresh_pareto_workspace,
 )
 
 
@@ -86,66 +80,23 @@ def main() -> int:
         level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s"
     )
 
-    tag = args.tag or None
-    specs = build_panels_spec()
-
-    if not args.skip_backfill:
-        api = wandb.Api()
-        all_runs = list(api.runs(f"{args.entity}/{args.project}"))
-        runs = _filter_runs_by_tag(all_runs, tag)
-        if not runs:
-            print(
-                f"No runs found in {args.entity}/{args.project} with tag "
-                f"{tag!r}; aborting."
-            )
-            return 1
-
-        companion_map = build_companion_map(all_runs, energy_tag=tag)
-        print(
-            f"Processing {len(specs)} panel(s) over {len(runs)} run(s); "
-            f"{len(companion_map)} lm-eval companion(s) available for fallback.\n"
+    try:
+        url = refresh_pareto_workspace(
+            entity=args.entity,
+            project=args.project,
+            energy_key=args.energy_key,
+            score_scale=args.score_scale,
+            tag=args.tag or None,
+            workspace_name=args.workspace_name,
+            dry_run=args.dry_run,
+            skip_backfill=args.skip_backfill,
+            skip_panel=args.skip_panel,
+            skip_preset=args.skip_preset,
         )
-        any_written = False
-        for spec in specs:
-            points = backfill_pareto_flags(
-                entity=args.entity,
-                project=args.project,
-                label=spec["label"],
-                energy_key=args.energy_key,
-                score_key=spec["score_key"],
-                score_resolver=spec["score_resolver"],
-                score_scale=args.score_scale,
-                tag=tag,
-                dry_run=args.dry_run,
-                runs=runs,
-                companion_map=companion_map,
-            )
-            if points:
-                any_written = True
-            n_pareto = sum(1 for p in points if p.is_pareto)
-            suffix = " (dry-run)" if args.dry_run else ""
-            print(
-                f"[{spec['label']:<40}] {len(points)} run(s), "
-                f"{n_pareto} on frontier{suffix}"
-            )
+    except ParetoRefreshError as exc:
+        print(f"{exc} aborting.")
+        return 1
 
-        if not any_written:
-            print("\nNo panel produced any points; aborting.")
-            return 1
-
-    if args.dry_run or args.skip_panel:
-        return 0
-
-    if not args.skip_preset:
-        ensure_chart_preset(entity=args.entity)
-
-    panel_specs = [(s["label"], s["title"], s["section"]) for s in specs]
-    url = ensure_project_scatter_panels(
-        entity=args.entity,
-        project=args.project,
-        panel_specs=panel_specs,
-        workspace_name=args.workspace_name,
-    )
     if url:
         print(f"\nWorkspace view: {url}")
     return 0

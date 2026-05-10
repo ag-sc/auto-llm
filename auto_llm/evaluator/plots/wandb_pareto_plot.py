@@ -632,3 +632,94 @@ def ensure_project_scatter_panels(
     url = getattr(saved, "url", None) or getattr(workspace, "url", "")
     _logger.info("Workspace upserted: %s", url)
     return url
+
+
+class ParetoRefreshError(RuntimeError):
+    """Raised when ``refresh_pareto_workspace`` cannot produce any Pareto data."""
+
+
+def refresh_pareto_workspace(
+    entity: str,
+    project: str,
+    *,
+    energy_key: str = DEFAULT_ENERGY_KEY,
+    score_scale: float = 100.0,
+    tag: Optional[str] = DEFAULT_TAG,
+    workspace_name: str = "Pareto Frontier",
+    dry_run: bool = False,
+    skip_backfill: bool = False,
+    skip_panel: bool = False,
+    skip_preset: bool = False,
+) -> Optional[str]:
+    """Run the full backfill + chart-preset + workspace upsert pipeline.
+
+    Library entry point used by ``scripts/wandb_pareto_plot.py`` and by the
+    in-process auto-refresh hook in ``auto_llm.evaluator.run`` when
+    ``auto_pareto.enabled`` is set in the eval YAML config.
+
+    Returns the workspace URL on a successful upsert, ``None`` for dry-run or
+    when the panel step is skipped. Raises :class:`ParetoRefreshError` when
+    no qualifying runs exist or no panel produced any points.
+    """
+    specs = build_panels_spec()
+
+    if not skip_backfill:
+        api = wandb.Api()
+        all_runs = list(api.runs(f"{entity}/{project}"))
+        runs = _filter_runs_by_tag(all_runs, tag)
+        if not runs:
+            raise ParetoRefreshError(
+                f"No runs found in {entity}/{project} with tag {tag!r}."
+            )
+
+        companion_map = build_companion_map(all_runs, energy_tag=tag)
+        _logger.info(
+            "Processing %d panel(s) over %d run(s); %d lm-eval companion(s) "
+            "available for fallback.",
+            len(specs),
+            len(runs),
+            len(companion_map),
+        )
+        any_written = False
+        for spec in specs:
+            points = backfill_pareto_flags(
+                entity=entity,
+                project=project,
+                label=spec["label"],
+                energy_key=energy_key,
+                score_key=spec["score_key"],
+                score_resolver=spec["score_resolver"],
+                score_scale=score_scale,
+                tag=tag,
+                dry_run=dry_run,
+                runs=runs,
+                companion_map=companion_map,
+            )
+            if points:
+                any_written = True
+            n_pareto = sum(1 for p in points if p.is_pareto)
+            suffix = " (dry-run)" if dry_run else ""
+            _logger.info(
+                "[%-40s] %d run(s), %d on frontier%s",
+                spec["label"],
+                len(points),
+                n_pareto,
+                suffix,
+            )
+
+        if not any_written:
+            raise ParetoRefreshError("No panel produced any points.")
+
+    if dry_run or skip_panel:
+        return None
+
+    if not skip_preset:
+        ensure_chart_preset(entity=entity)
+
+    panel_specs = [(s["label"], s["title"], s["section"]) for s in specs]
+    return ensure_project_scatter_panels(
+        entity=entity,
+        project=project,
+        panel_specs=panel_specs,
+        workspace_name=workspace_name,
+    )
