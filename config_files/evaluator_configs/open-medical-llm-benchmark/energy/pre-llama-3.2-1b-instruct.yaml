@@ -1,7 +1,7 @@
 model: hf
 tasks: medmcqa,medqa_4options,mmlu_anatomy_generative,mmlu_clinical_knowledge_generative,mmlu_college_biology_generative,mmlu_college_medicine_generative,mmlu_medical_genetics_generative,mmlu_professional_medicine_generative,pubmedqa
 model_args: pretrained=meta-llama/Llama-3.2-1B-Instruct,dtype=bfloat16
-wandb_args: project=open-medical-llm-energy,entity=llm4kmu,name=pre-llama-3.2-1b-instruct
+wandb_args: project=open-medical-llm-eval-energy,entity=llm4kmu,name=pre-llama-3.2-1b-instruct
 trust_remote_code: true
 energy_profiling: true
 force_cpu_power: 450 # 2× AMD EPYC 7713 @ 225W
