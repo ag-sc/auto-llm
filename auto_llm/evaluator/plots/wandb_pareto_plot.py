@@ -51,7 +51,7 @@ from auto_llm.evaluator.utils import (
 _logger = logging.getLogger(__name__)
 
 
-DEFAULT_ENERGY_KEY = "emissions/energy_consumed_kWh"
+DEFAULT_ENERGY_KEY = "emissions/actual_energy_consumed_kWh"
 DEFAULT_SCORE_KEY = "eval/avg_score"
 DEFAULT_TAG = "energy-profiling"
 DEFAULT_PANEL_TITLE = "Energy vs Accuracy — Pareto Frontier"

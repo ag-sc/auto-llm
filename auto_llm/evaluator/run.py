@@ -125,7 +125,7 @@ if __name__ == "__main__":
                         entity=pareto_entity,
                         project=auto_pareto_cfg.get("project") or wandb_project,
                         energy_key=auto_pareto_cfg.get(
-                            "energy_key", "emissions/energy_consumed_kWh"
+                            "energy_key", "emissions/actual_energy_consumed_kWh"
                         ),
                         score_scale=float(auto_pareto_cfg.get("score_scale", 100.0)),
                         tag=auto_pareto_cfg.get("tag", "energy-profiling") or None,

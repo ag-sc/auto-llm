@@ -171,7 +171,7 @@ auto_pareto:
   entity: llm4kmu                       # required if WANDB_ENTITY is unset
   project: open-medical-llm-energy      # defaults to wandb_args.project
   # Everything below is optional — defaults match scripts/wandb_pareto_plot.py
-  energy_key: emissions/energy_consumed_kWh
+  energy_key: emissions/actual_energy_consumed_kWh
   score_scale: 100.0
   tag: energy-profiling
   workspace_name: Pareto Frontier
