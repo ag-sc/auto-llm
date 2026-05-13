@@ -650,6 +650,7 @@ def refresh_pareto_workspace(
     skip_backfill: bool = False,
     skip_panel: bool = False,
     skip_preset: bool = False,
+    api_key: Optional[str] = None,
 ) -> Optional[str]:
     """Run the full backfill + chart-preset + workspace upsert pipeline.
 
@@ -664,7 +665,7 @@ def refresh_pareto_workspace(
     specs = build_panels_spec()
 
     if not skip_backfill:
-        api = wandb.Api()
+        api = wandb.Api(api_key=api_key)
         all_runs = list(api.runs(f"{entity}/{project}"))
         runs = _filter_runs_by_tag(all_runs, tag)
         if not runs:
@@ -692,6 +693,7 @@ def refresh_pareto_workspace(
                 score_scale=score_scale,
                 tag=tag,
                 dry_run=dry_run,
+                api=api,
                 runs=runs,
                 companion_map=companion_map,
             )
@@ -714,7 +716,7 @@ def refresh_pareto_workspace(
         return None
 
     if not skip_preset:
-        ensure_chart_preset(entity=entity)
+        ensure_chart_preset(entity=entity, api=wandb.Api(api_key=api_key))
 
     panel_specs = [(s["label"], s["title"], s["section"]) for s in specs]
     return ensure_project_scatter_panels(

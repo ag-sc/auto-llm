@@ -19,6 +19,7 @@ Usage::
 
 import argparse
 import logging
+import os
 import sys
 
 from auto_llm.evaluator.plots.wandb_pareto_plot import (
@@ -74,6 +75,11 @@ def main() -> int:
         action="store_true",
         help="Skip the chart preset creation step (use if already registered).",
     )
+    parser.add_argument(
+        "--api-key",
+        default=os.environ.get("WANDB_API_KEY"),
+        help="W&B API key (defaults to WANDB_API_KEY env var).",
+    )
     args = parser.parse_args()
 
     logging.basicConfig(
@@ -92,6 +98,7 @@ def main() -> int:
             skip_backfill=args.skip_backfill,
             skip_panel=args.skip_panel,
             skip_preset=args.skip_preset,
+            api_key=args.api_key,
         )
     except ParetoRefreshError as exc:
         print(f"{exc} aborting.")
