@@ -65,6 +65,9 @@ def get_model_params(
             model_meta = cache_model_params(model_name=model_name)
             models_meta.update(model_meta)
 
+    parent = os.path.dirname(model_params_cache_path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
     with open(model_params_cache_path, "w+") as f:
         json.dump(models_meta, f, indent=4)
 
@@ -74,6 +77,12 @@ def get_model_params(
 def get_gpu_params(
     gpu_params_cache_path: str = GPU_PARAMS_CACHE_PATH,
 ) -> Dict[str, Any]:
+    parent = os.path.dirname(gpu_params_cache_path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+    if not os.path.exists(gpu_params_cache_path):
+        with open(gpu_params_cache_path, "w") as f:
+            json.dump({}, f)
     with open(gpu_params_cache_path, "r") as f:
         gpu_params = json.load(f)
 
