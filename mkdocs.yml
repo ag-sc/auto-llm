@@ -46,8 +46,9 @@ nav:
   - Fundamentals:
       - Overview: fundamentals/start.md
       - Tasks: fundamentals/tasks.md
-      - Fine-tuning: fundamentals/finetuning.md
       - Datasets: fundamentals/datasets.md
+      - Fine-tuning: fundamentals/finetuning.md
       - Evaluating: fundamentals/evaluating.md
+      - Energy Consumption: fundamentals/energy_consumption.md
   - Platform:
       - Step-by-Step: platform/how_to_use.md

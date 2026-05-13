@@ -28,4 +28,9 @@ In practice, LoRA trains less than 1% of the total parameters, produces no slowd
 
 The Auto-LLM platform runs both approaches side by side so you can see which one actually performs better on your data.
 
+## Further Reading
 
+[Databricks Blog on Finetuning↗](https://www.databricks.com/blog/llm-fine-tuning)
+
+
+[Google Cloud Blog on Finetuning↗](https://cloud.google.com/use-cases/fine-tuning-ai-models)

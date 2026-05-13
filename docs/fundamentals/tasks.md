@@ -2,9 +2,9 @@ Natural Language Processing (NLP) is concerned with automatically understanding 
 
 The Auto-LLM platform supports three different tasks by default:
 
-## Sequence to Label
+## Classification
 
-In the Sequence to Label task, the models take in sequences of text and output one label out of multiple possible ones for said data.
+In the Classification task, the models take in sequences of text and output one label out of multiple possible ones for said data.
 
 A classical example of this task is sentiment analysis of movie reviews, where the models apply either the label "positive" or the label "negative" to a movie review (the input sequence in this case).
 
@@ -12,17 +12,17 @@ A classical example of this task is sentiment analysis of movie reviews, where t
 >
 >Output: *Positive*
 
-## Sequence to Sequence
+## Question Answering
 
-In the Sequence to Sequence task, models take in a sequence of text, and output another sequence of text. This is the task most commonly associated with Large Language Models that come in the form of chatbots. Here the users input their sequences, often times a question or a prompt, and in return get a sequence in the form of an answer to their question or prompt.
+In the Question Answering task, models take in a sequence of text, and output another sequence of text. This is the task most commonly associated with Large Language Models that come in the form of chatbots. Here the users input their sequences, often times a question or a prompt, and in return get a sequence in the form of an answer to their question or prompt.
 
 >Input: "*In which City is the Louvre Museum located?*"
 >
 >Output: "*The Louvre Museum is located in Paris, France.*"
 
-## Sequence to Structured Output
+## Information Extraction
 
-In the Sequence to Structured Output task, models take in a sequence of text and output structured text in response, often in the form of JSON. Structuring the data makes it easier to process the responses automatically afterwards.
+In the Information Extraction task, models take in a sequence of text and output structured information in response, often in the form of JSON. Structuring the data makes it easier to process the responses automatically afterwards.
 
 >Input: *"Give me the names of 3 European Prime Ministers"*
 >
