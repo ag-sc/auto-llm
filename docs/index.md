@@ -6,8 +6,7 @@ The platform is part of the project "LLM4KMU".
 
 > **Optimierter Einsatz von Open Source Large Language Models (LLMs) in kleinen und mittelständischen Unternehmen (KMUs). Mit Mitteln der Europäischen Union gefördert.**
 
-<img src="/imgs/eu_nrw_logo.png">
-<div style="height:20px"></div>
+![Financing Banner](/imgs/eu_nrw_logo.png)
 <div class="grid cards" markdown>
 
 -   :material-book-open-variant:{ .lg .middle } **Fundamentals**

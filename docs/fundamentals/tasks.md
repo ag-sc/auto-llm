@@ -22,9 +22,9 @@ In the Question Answering task, models take in a sequence of text, and output an
 
 ## Information Extraction
 
-In the Information Extraction task, models take in a sequence of text and output structured information in response, often in the form of JSON. Structuring the data makes it easier to process the responses automatically afterwards.
+In the Information Extraction task, models take in a sequence of text, often times documents, together with a prompt that specifies the desired information, and output structured information in response, often in the form of JSON. Structuring the data makes it easier to process the responses automatically afterwards.
 
->Input: *"Give me the names of 3 European Prime Ministers"*
+>Input: _european_prime_ministers.pdf_, "Give me the names of 3 European Prime Ministers"
 >
 >Output:
 

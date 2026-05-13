@@ -1,4 +1,5 @@
 site_name: Auto-LLM Documentation
+site_url: https://ag-sc.github.io/auto-llm/
 
 theme:
   name: material
