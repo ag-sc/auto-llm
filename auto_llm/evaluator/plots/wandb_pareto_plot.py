@@ -34,6 +34,8 @@ Typical usage (see also ``scripts/wandb_pareto_plot.py``)::
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
@@ -59,7 +61,7 @@ DEFAULT_SECTION_NAME = "Pareto Frontier"
 
 PARETO_KEY_PREFIX = "pareto"
 
-DEFAULT_CHART_PRESET_NAME = "pareto-frontier"
+# Preset name is defined after PARETO_VEGA_SPEC; see _make_preset_name below.
 
 
 def pareto_keys(label: str) -> Dict[str, str]:
@@ -217,6 +219,24 @@ PARETO_VEGA_SPEC: dict = {
         },
     ],
 }
+
+
+def _make_preset_name(base: str = "pareto-frontier") -> str:
+    """Suffix the preset name with a short hash of ``PARETO_VEGA_SPEC``.
+
+    wandb has no public update API for chart presets — ``api.create_custom_chart``
+    returns HTTP 409 if the name already exists, and the call site silently
+    swallows that error. Hashing the spec into the name means any change to the
+    Vega spec auto-busts the cache: the new spec lands under a new preset name,
+    panels reference the new name, no manual UI step required.
+    """
+    digest = hashlib.sha1(
+        json.dumps(PARETO_VEGA_SPEC, sort_keys=True).encode()
+    ).hexdigest()[:8]
+    return f"{base}-{digest}"
+
+
+DEFAULT_CHART_PRESET_NAME = _make_preset_name()
 
 
 @dataclass
