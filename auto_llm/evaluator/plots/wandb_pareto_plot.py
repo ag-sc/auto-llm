@@ -63,7 +63,7 @@ DEFAULT_CHART_PRESET_NAME = "pareto-frontier"
 
 
 def pareto_keys(label: str) -> Dict[str, str]:
-    """Return the five ``pareto/<label>/*`` summary key names for a panel.
+    """Return the six ``pareto/<label>/*`` summary key names for a panel.
 
     ``label`` is inserted verbatim into the key path and may itself contain
     slashes (e.g. ``"group/medical_boards"`` → ``"pareto/group/medical_boards/energy_wh"``).
@@ -75,7 +75,26 @@ def pareto_keys(label: str) -> Dict[str, str]:
         "is_optimal": f"{prefix}/is_optimal",
         "rank": f"{prefix}/rank",
         "name": f"{prefix}/name",
+        "variant": f"{prefix}/variant",
     }
+
+
+def _classify_variant(run_name: str) -> str:
+    """Return one of {"pt", "it", "sft", "qlora"} from a run name.
+
+    Naming convention from this project's eval configs:
+      - ``sft-medqa-<model>-energy``          → ``sft``
+      - ``sft-medqa-<model>-qlora-energy``    → ``qlora``
+      - ``pre-<model>-it-energy``             → ``it``
+      - ``pre-<model>-energy`` (incl. quant)  → ``pt``
+    """
+    name = run_name.lower()
+    if name.startswith("sft-"):
+        return "qlora" if "qlora" in name else "sft"
+    stem = name[: -len("-energy")] if name.endswith("-energy") else name
+    if stem.endswith("-it") or "-it-" in stem:
+        return "it"
+    return "pt"
 
 # ---------------------------------------------------------------------------
 # Vega-Lite specification — layered scatter + Pareto frontier dashed line
@@ -150,7 +169,7 @@ PARETO_VEGA_SPEC: dict = {
             "mark": {
                 "type": "point",
                 "filled": True,
-                "size": 100,
+                "size": 120,
                 "opacity": 0.85,
             },
             "encoding": {
@@ -169,8 +188,18 @@ PARETO_VEGA_SPEC: dict = {
                     "type": "nominal",
                     "legend": {"title": "Run"},
                 },
+                "shape": {
+                    "field": "${field:variant}",
+                    "type": "nominal",
+                    "scale": {
+                        "domain": ["pt", "it", "sft", "qlora"],
+                        "range": ["circle", "square", "triangle-up", "diamond"],
+                    },
+                    "legend": {"title": "Variant"},
+                },
                 "tooltip": [
                     {"field": "${field:name}", "type": "nominal", "title": "Run"},
+                    {"field": "${field:variant}", "type": "nominal", "title": "Variant"},
                     {
                         "field": "${field:energy}",
                         "type": "quantitative",
@@ -198,6 +227,7 @@ class ParetoPoint:
     accuracy_pct: float
     is_pareto: bool = False
     rank: int = -1
+    variant: str = "pt"
 
 
 def _get_summary_value(summary: Any, key: str) -> Optional[float]:
@@ -321,6 +351,7 @@ def extract_pareto_points(
                 run_id=run.id,
                 energy_wh=energy_kwh * 1000.0,
                 accuracy_pct=score * score_scale,
+                variant=_classify_variant(run.name),
             )
         )
 
@@ -465,6 +496,7 @@ def backfill_pareto_flags(
             keys["is_optimal"]: bool(point.is_pareto),
             keys["rank"]: int(point.rank),
             keys["name"]: run.name,
+            keys["variant"]: point.variant,
         }
         if dry_run:
             flag = "pareto" if point.is_pareto else "       "
@@ -606,6 +638,7 @@ def ensure_project_scatter_panels(
                 keys["accuracy_pct"],
                 keys["is_optimal"],
                 keys["name"],
+                keys["variant"],
             ]}},
             chart_name=chart_id,
             chart_fields={
@@ -613,6 +646,7 @@ def ensure_project_scatter_panels(
                 "accuracy": keys["accuracy_pct"],
                 "is_pareto": keys["is_optimal"],
                 "name": keys["name"],
+                "variant": keys["variant"],
             },
             chart_strings={"title": title},
         )
