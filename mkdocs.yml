@@ -30,6 +30,7 @@ extra_javascript:
 markdown_extensions:
   - attr_list
   - md_in_html
+  - pymdownx.blocks.caption
   - pymdownx.emoji:
       emoji_index: !!python/name:material.extensions.emoji.twemoji
       emoji_generator: !!python/name:material.extensions.emoji.to_svg
@@ -45,7 +46,7 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Fundamentals:
-      - Overview: fundamentals/start.md
+      - Overview: fundamentals/overview.md
       - Tasks: fundamentals/tasks.md
       - Datasets: fundamentals/datasets.md
       - Fine-tuning: fundamentals/finetuning.md

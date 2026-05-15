@@ -30,8 +30,6 @@ Scores range from 0 to 1, and are often somewhat lower than ROUGE-1 because matc
 
 Exact Match is a strict binary metric that checks whether the model's output is completely identical to the reference. A response scores 1 if it matches exactly, and 0 otherwise. It is appropriate when the expected output has only one correct form.
 
-For a full evaluation set, Exact Match is usually reported as the proportion of examples that matched exactly, giving a final score between 0 and 1. A high value means the model reliably produces outputs in the exact required format.
-
 ## Partial Match
 
 Partial Match evaluates the model's output field by field, rather than as a whole. A response that correctly produces some fields but not others receives a score proportional to the number of fields it got right. This is more informative than Exact Match when the structured output contains multiple independent pieces of information.
@@ -52,7 +50,7 @@ $$\text{Precision} = \frac{\text{true positive predictions}}{\text{true positive
 
 ## Recall
 
-Recall measures out of all items in a class, how many were correctly identified as part of that class by the model
+Recall measures out of all items in a class, how many were correctly identified as part of that class by the model.
 
 $$\text{Recall} = \frac{\text{true positive predictions}}{\text{all items belonging to the class}}$$
 

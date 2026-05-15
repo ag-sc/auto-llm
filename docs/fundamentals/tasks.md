@@ -1,4 +1,4 @@
-Natural Language Processing (NLP) is concerned with automatically understanding and processing input in the form of natural language. It consists of mapping the input to a desired output. There are different kind of tasks in NLP, for example text classification (assigning a text to a class based on the input) and text generation (generating the next words after an input). The latter task is what Large Language Models (LLMs) are trained to do. More on that in the [Overview](../start)
+Natural Language Processing (NLP) is concerned with automatically understanding and processing input in the form of natural language. It consists of mapping the input to a desired output. There are different kind of tasks in NLP, for example text classification (assigning a text to a class based on the input) and text generation (generating the next words after an input). The latter task is what Large Language Models (LLMs) are trained to do. More on that in the [Overview](../overview).
 
 The Auto-LLM platform supports three different tasks by default:
 
