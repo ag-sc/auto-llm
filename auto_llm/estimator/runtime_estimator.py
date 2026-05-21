@@ -6,6 +6,13 @@ from auto_llm.estimator.inference_flops_estimator import InferenceFlopsEstimator
 from auto_llm.estimator.trainer_flops_estimator import TrainerFlopsEstimator
 
 
+# Model FLOPs Utilization: fraction of peak GPU TFLOPs actually achieved.
+# Peak TFLOPs from datasheets is unreachable in practice — typical transformer
+# fine-tuning runs at 20–50% MFU. 0.3 is a conservative central value covering
+# both BF16 dense fine-tuning (~0.3–0.5) and QLoRA 4-bit (~0.15–0.25, dequant overhead).
+DEFAULT_MFU = 0.3
+
+
 class RuntimeEstimator(Estimator):
     def __init__(
         self,
@@ -24,5 +31,5 @@ class RuntimeEstimator(Estimator):
         except KeyError:
             raise Exception(f"GPU name not found!")
 
-        runtime = flops / tflops
+        runtime = flops / (tflops * DEFAULT_MFU)
         return runtime
