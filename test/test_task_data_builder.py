@@ -21,6 +21,9 @@ from auto_llm.builder.task_data_builder.med_qa_data_builder import MedQaDataBuil
 from auto_llm.builder.task_data_builder.med_qa_4options_data_builder import (
     MedQa4OptionsDataBuilder,
 )
+from auto_llm.builder.task_data_builder.med_mixed_data_builder import (
+    MedMixedDataBuilder,
+)
 
 
 def _generic_task_data_builder_tests(ds_dict: DatasetDict):
@@ -205,6 +208,32 @@ def test_medmcqa_data_builder():
 
     output_dir = "/vol/auto_llm/processed_datasets/open-medical-llm-benchmark/medmcqa"
     builder.save(ds_dict=ds_dict, path=output_dir)
+
+
+def test_med_mixed_data_builder():
+    builder = MedMixedDataBuilder()
+    ds_dict = builder.build()
+
+    assert DatasetSplit.TRAIN in ds_dict.keys()
+    assert DatasetSplit.VALIDATION in ds_dict.keys()
+    assert DatasetSplit.TEST in ds_dict.keys()
+
+    for split in [DatasetSplit.TRAIN, DatasetSplit.VALIDATION, DatasetSplit.TEST]:
+        assert TaskDatasetFeatures.INPUT_TEXT in ds_dict[split].column_names
+        assert TaskDatasetFeatures.OUTPUT_TEXT in ds_dict[split].column_names
+
+    # cross-split uniqueness via disjoint sets — tolerates within-train
+    # duplicates introduced by the PubMedQA 2x oversample.
+    train_set = set(ds_dict[DatasetSplit.TRAIN][TaskDatasetFeatures.INPUT_TEXT])
+    val_set = set(ds_dict[DatasetSplit.VALIDATION][TaskDatasetFeatures.INPUT_TEXT])
+    test_set = set(ds_dict[DatasetSplit.TEST][TaskDatasetFeatures.INPUT_TEXT])
+
+    assert train_set.isdisjoint(val_set), "train and validation must not overlap"
+    assert train_set.isdisjoint(test_set), "train and test must not overlap"
+    assert val_set.isdisjoint(test_set), "validation and test must not overlap"
+
+    out_path = "/vol/auto_llm/processed_datasets/open-medical-llm-benchmark/openmedicalLLM_mixed"
+    builder.save(ds_dict=ds_dict, path=out_path)
 
 
 def test_push_dataset_to_hub():
