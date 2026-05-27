@@ -226,7 +226,9 @@ class AppState(rx.State):
 
         if not self.start_execution:
             self.start_execution = True
-            job_id_to_attach = 194473
+            job_id_to_attach = os.getenv("JOB_ID_TO_ATTACH", None)
+            if not job_id_to_attach:
+                rx.toast.error(f"Executor needs a JobID to attach itself. Please set the environment variable `JOB_ID_TO_ATTACH`.")
             executor = SequentialConfigExecutor(configurator_outputs=self.configurator_outputs, job_id_to_attach=job_id_to_attach)
             executor.execute()
             yield rx.toast.success("Your jobs are successfully submitted!")
@@ -263,4 +265,3 @@ class AppState(rx.State):
                 state_dict[key] = value
 
         return state_dict
-    

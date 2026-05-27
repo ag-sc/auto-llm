@@ -33,6 +33,7 @@ class ConfigurationState(rx.State):
     result_fig: str = ""
 
     is_polling: bool = False
+    is_loading_results: bool = False
 
     config_statuses: Dict[str, str] = {}
 
@@ -112,6 +113,15 @@ class ConfigurationState(rx.State):
 
         return None
 
+    async def load_config_statuses(self):
+        form_state = await self.get_state(AppState)
+        for cfg in form_state.configurator_outputs:
+            try:
+                state = Client.get_run_state(run_id=cfg.run_id, project_name=WANDB_PROJECT)
+                self.config_statuses[cfg.run_id] = state
+            except Exception:
+                self.config_statuses[cfg.run_id] = "pending"
+
     def load_config_html(self, configurator_output: ConfiguratorOutput):
         # if configurator_output.run_id:
         #     self.current_html_content = Client.get_loss_plot(run_id=configurator_output.run_id, project_name="llm4kmu-train")
@@ -125,9 +135,24 @@ class ConfigurationState(rx.State):
         )
         self.current_html_content = f'<iframe src="{run_html}" ' f'style="width:100%; height:80vh; border:none; display:block;" ' f"allowfullscreen></iframe>"
 
-    def load_config_group_results(self, group: str):
-        result_fig = Client.get_eval_runs_of_group(group=group, project_name=WANDB_PROJECT)
-        self.result_fig = result_fig
+    @rx.event
+    async def load_config_group_results(self, group: str):
+        self.is_loading_results = True
+        self.result_fig = ""
+        yield
+
+        try:
+            loop = asyncio.get_event_loop()
+            # Fetch the HTML string from your tracker Client
+            # result_fig = Client.get_eval_runs_of_group(group=group, project_name=WANDB_PROJECT)
+            result_fig = await loop.run_in_executor(None, Client.get_eval_runs_of_group, group, WANDB_PROJECT)
+
+            self.result_fig = result_fig
+        except Exception as e:
+            print(f"Error loading W&B: {e}")
+            rx.window_alert(f"Failed to fetch data: {str(e)}")
+        finally:
+            self.is_loading_results = False
 
     async def start_polling(self):
         """This starts the loop if it's not already running."""
