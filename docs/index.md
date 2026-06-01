@@ -4,6 +4,10 @@
 
 The platform is part of the project "LLM4KMU".
 
+<figure markdown="span" style="text-align: center">
+  ![LLM4KMU Logo](imgs/LLM4KMU_Logo_RGB.jpg){ width="400" }
+</figure>
+
 > **Optimierter Einsatz von Open Source Large Language Models (LLMs) in kleinen und mittelständischen Unternehmen (KMUs). Mit Mitteln der Europäischen Union gefördert.**
 
 ![Financing Banner](imgs/eu_nrw_logo.png)
@@ -15,7 +19,7 @@ The platform is part of the project "LLM4KMU".
 
     Learn about datasets, NLP tasks, training and evaluating LLMs.
 
-    [:octicons-arrow-right-24: Get started](fundamentals/start.md)
+    [:octicons-arrow-right-24: Get started](fundamentals/overview.md)
 
 -   :material-view-dashboard:{ .lg .middle } **Platform**
 

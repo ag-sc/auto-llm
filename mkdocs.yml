@@ -47,6 +47,7 @@ nav:
   - Home: index.md
   - Fundamentals:
       - Overview: fundamentals/overview.md
+      - Basics: fundamentals/basics.md
       - Tasks: fundamentals/tasks.md
       - Datasets: fundamentals/datasets.md
       - Fine-tuning: fundamentals/finetuning.md

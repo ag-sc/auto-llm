@@ -1,6 +1,6 @@
 # Evaluating
 
-Different metrics can be used to evaluate performances of LLMs, depending on the specific task.
+Different metrics can be used to evaluate performances of LLMs, depending highly on the specific task and the domain of the use-case.
 
 ## Accuracy
 
@@ -62,6 +62,23 @@ F1 measures partial correctness by balancing precision and recall. Unlike Exact 
 $$F1 = \frac{2 \times \text{Precision} \times \text{Recall}}{\text{Precision} + \text{Recall}}$$
 
 Scores range from 0 to 1. A value near 1 means the model is both accurate and complete, while lower values indicate that important content is missing, incorrect, or both.
+
+
+## Examples
+
+
+### Example 1
+
+You want to predict if an e-mail is spam or legitimate. In your dataset 1 out of 100 e-mails are spam. Your trained model predicts "legitmate" for every e-mail. **Accuracy** would be $\frac{99}{100} = 0.99$, making it an unreliable metric in this use-case, where you care about events that are rare. Precision, Recall or the F1-score would be better suited here with all of them being 0.
+
+### Example 2
+
+You want to train a model in the healthcare domain. The model generates a prescription containing "give 500mg" instead of the correct "give 50mg". Text-overlap metrics like ROUGE would score this generation very high because only one character is added in comparison. However, in the healthcare domain this is a fatal error. Evaluating purely based on text-overlap is highly problematic in this case.
+
+### Example 3
+
+You want to extract structured JSON data (name, age, location) from an input text. Your ideal output is ```{"Name": "Martin", "Age": 40, "Location": "Nordrhein-Westfalen"}```. Your model generates ```{"Name": "Martin", "Age": 40, "Location": "North Rhine-Westphalia"}```. Exact Match would score this as a 0, even though the generated output captures everything in the desired output. Partial Match would score this as a $\frac{2}{3} = 0.67$, because the "Name" and "Age" field match exactly. Fuzzy Match would score this higher than Partial Match, because it not only focusses on the exact matchings in the first two fields, but it also reflects the close proximity between the two outputs for the "Location" field, making Fuzzy Match the better suited metric in this example.
+
 
 ## Further Reading
 
