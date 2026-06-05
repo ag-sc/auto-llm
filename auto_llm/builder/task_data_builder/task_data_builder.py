@@ -29,15 +29,13 @@ class TaskDataBuilder(ABC):
     @staticmethod
     def split_ds(ds: Dataset) -> DatasetDict:
         ds_dict_sp_1 = ds.train_test_split(test_size=0.1, shuffle=True, seed=SEED)
-        ds_dict_sp_2 = ds_dict_sp_1["test"].train_test_split(
-            test_size=0.5, shuffle=True, seed=SEED
-        )
+        ds_dict_sp_2 = ds_dict_sp_1["test"].train_test_split(test_size=0.5, shuffle=True, seed=SEED)
 
         ds_dict = DatasetDict(
             {
-                DatasetSplit.TRAIN: ds_dict_sp_1["train"],
-                DatasetSplit.VALIDATION: ds_dict_sp_2["train"],
-                DatasetSplit.TEST: ds_dict_sp_2["test"],
+                DatasetSplit.TRAIN.value: ds_dict_sp_1["train"],
+                DatasetSplit.VALIDATION.value: ds_dict_sp_2["train"],
+                DatasetSplit.TEST.value: ds_dict_sp_2["test"],
             }
         )
 
