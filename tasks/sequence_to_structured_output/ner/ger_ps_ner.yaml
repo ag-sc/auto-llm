@@ -1,0 +1,46 @@
+tag:
+  - ner
+
+task: ger_ps_ner
+
+dataset_path: llm-4-kmu/ger-ps-ner
+test_split: test
+
+doc_to_text: |
+  Given the text "Text", extract the NER tags in the JSON format "Format". Do not modify the sentences.
+  Format:
+  ```json
+  {
+    "Mitwirkender": ["value for Mitwirkender"],
+    "Handlungsgrundlage": ["value for Handlungsgrundlage"],
+    "Ergebnisempfänger": ["value for Ergebnisempfänger"],
+    "Hauptakteur": ["value for Hauptakteur"],
+    "Aktion": ["value for Aktion"],
+    "Dokument": ["value for Dokument"],
+    "Signalwort": ["value for Signalwort"],
+    "Frist": ["value for Frist"],
+    "Bedingung": ["value for Bedingung"],
+    "Datenfeld": ["value for Datenfeld"],
+  }
+  ```
+
+  Text: {{input_text}}
+
+  NER tags according to the format:
+doc_to_target: "{{output_text}}"
+
+process_results: !function utils.process_results
+
+metric_list:
+  - metric: exact_match
+    aggregation: mean
+    higher_is_better: true
+  - metric: partial_match
+    aggregation: mean
+    higher_is_better: true
+  - metric: fuzzy_match
+    aggregation: mean
+    higher_is_better: true
+
+metadata:
+  version: 1.0
