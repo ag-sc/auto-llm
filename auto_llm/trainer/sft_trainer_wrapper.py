@@ -4,7 +4,7 @@ from typing import Dict, Any
 import torch
 from accelerate import Accelerator, DistributedType
 from peft import LoraConfig, prepare_model_for_kbit_training # Importato prepare_model
-from transformers import AutoModelForCausalLM, AutoTokenizer, AutoConfig, BitsAndBytesConfig
+from transformers import AutoModelForCausalLM, AutoTokenizer, AutoConfig, BitsAndBytesConfig, EarlyStoppingCallback
 from trl import SFTConfig, SFTTrainer
 
 from auto_llm.builder.trainer_data_builder.sft_data_builder import (
@@ -159,6 +159,14 @@ class SftTrainerWrapper(TrainerWrapper):
 
         trainer_args = SFTConfig(
             **self.config.trainer_args.model_dump(exclude={"wandb_project"}),
+            eval_strategy="steps",               
+            eval_steps=50,                       
+            save_strategy="steps",               
+            save_steps=50,                       
+            save_total_limit=2,                  
+            metric_for_best_model="eval_loss",   
+            greater_is_better=False,            
+            load_best_model_at_end=True,         
             dataset_kwargs={"skip_prepare_dataset": skip_prepare_dataset},
             completion_only_loss=completion_only_loss,
             gradient_checkpointing_kwargs={"use_reentrant": use_reentrant},
@@ -189,6 +197,12 @@ class SftTrainerWrapper(TrainerWrapper):
             peft_config=peft_config,
             train_dataset=ds_dict[DatasetSplit.TRAIN],
             eval_dataset=ds_dict[DatasetSplit.VALIDATION],
+            callbacks=[
+                EarlyStoppingCallback(
+                    early_stopping_patience=3,      
+                    early_stopping_threshold=0.0    
+                )
+            ]
         )
 
         self.logger.info("Train Dataset")
