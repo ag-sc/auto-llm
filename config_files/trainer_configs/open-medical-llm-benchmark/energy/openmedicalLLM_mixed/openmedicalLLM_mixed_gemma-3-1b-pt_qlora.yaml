@@ -52,7 +52,7 @@ trainer_args:
   # tracking/logging related
   report_to: wandb
   run_name: openmedicalLLM_mixed_gemma-3-1b-pt_qlora_energy
-  logging_steps: 100
+  logging_steps: 10
 
   eval_strategy: "steps"         # or "epoch"
   eval_steps: 50                  # run evaluation every 50 steps
