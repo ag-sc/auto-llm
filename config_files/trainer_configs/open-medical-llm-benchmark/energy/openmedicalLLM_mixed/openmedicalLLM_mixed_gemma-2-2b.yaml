@@ -57,6 +57,7 @@ trainer_args:
   metric_for_best_model: "eval_loss"  # metric to monitor for best model
   greater_is_better: false        # whether higher metric is better (false for loss)
   save_total_limit: 2            # keep only the latest N checkpoints to save disk space
-
-  # eval/save related
   save_only_model: True    # skip optimizer/scheduler/rng state in checkpoints
+
+  early_stopping_patience: 5       # number of evaluations without improvement
+  early_stopping_threshold: 1e-4   # minimum improvement to reset patience

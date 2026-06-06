@@ -156,17 +156,17 @@ class SftTrainerWrapper(TrainerWrapper):
         elif accelerator.state.distributed_type == DistributedType.MULTI_GPU:
             use_reentrant = False
             ddp_find_unused_parameters = False
+        
+        sft_args_dict = self.config.trainer_args.model_dump(exclude={"wandb_project"})
+
+        sft_args_dict["eval_strategy"] = "steps"
+        sft_args_dict["save_strategy"] = "steps"
+        sft_args_dict["load_best_model_at_end"] = True
+        sft_args_dict["metric_for_best_model"] = "eval_loss"
+        sft_args_dict["greater_is_better"] = False
 
         trainer_args = SFTConfig(
-            **self.config.trainer_args.model_dump(exclude={"wandb_project"}),
-            eval_strategy="steps",               
-            eval_steps=50,                       
-            save_strategy="steps",               
-            save_steps=50,                       
-            save_total_limit=2,                  
-            metric_for_best_model="eval_loss",   
-            greater_is_better=False,            
-            load_best_model_at_end=True,         
+            **sft_args_dict,         
             dataset_kwargs={"skip_prepare_dataset": skip_prepare_dataset},
             completion_only_loss=completion_only_loss,
             gradient_checkpointing_kwargs={"use_reentrant": use_reentrant},
@@ -190,6 +190,14 @@ class SftTrainerWrapper(TrainerWrapper):
                 task_type=self.config.peft_config.task_type,
             )
 
+        # Read early-stopping settings from trainer args if provided, else use defaults
+        early_stopping_patience = getattr(
+            self.config.trainer_args, "early_stopping_patience", 3
+        )
+        early_stopping_threshold = getattr(
+            self.config.trainer_args, "early_stopping_threshold", 0.0
+        )
+
         trainer = SFTTrainer(
             model=model,
             processing_class=tokenizer,
@@ -199,8 +207,8 @@ class SftTrainerWrapper(TrainerWrapper):
             eval_dataset=ds_dict[DatasetSplit.VALIDATION],
             callbacks=[
                 EarlyStoppingCallback(
-                    early_stopping_patience=3,      
-                    early_stopping_threshold=0.0    
+                    early_stopping_patience=early_stopping_patience,
+                    early_stopping_threshold=early_stopping_threshold,
                 )
             ]
         )
