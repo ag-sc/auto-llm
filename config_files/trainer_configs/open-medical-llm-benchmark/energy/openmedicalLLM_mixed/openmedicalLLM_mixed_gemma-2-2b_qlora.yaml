@@ -51,7 +51,7 @@ trainer_args:
   # tracking/logging related
   report_to: wandb
   run_name: openmedicalLLM_mixed_gemma-2-2b_qlora_energy
-  logging_steps: 100
+  logging_steps: 10
 
   # Early stopping & checkpointing parameters (recommended)
   # When using "steps" evaluation, set eval_steps to control validation frequency.
