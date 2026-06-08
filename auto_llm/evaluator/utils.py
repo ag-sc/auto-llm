@@ -5,11 +5,13 @@ import logging
 from lm_eval.config.evaluate_config import EvaluatorConfig
 
 
-def run_lm_eval_harness(cfg: EvaluatorConfig):
+def run_lm_eval_harness(config_path: str):
     """
     This is taken as is from lm_eval/_cli/run.py (version: 0.4.12). We pass the `EvaluatorConfig` object directly to this function,
     so we skip the CLI argument parsing and validation steps.
     """
+    cfg = EvaluatorConfig.from_config(config_path)
+
     # Create and validate config (most validation now occurs in EvaluationConfig)
     from lm_eval import simple_evaluate
     from lm_eval.loggers import EvaluationTracker, TrackioLogger, WandbLogger
@@ -18,6 +20,7 @@ def run_lm_eval_harness(cfg: EvaluatorConfig):
     # Set up logging
     if cfg.wandb_args:
         wandb_logger = WandbLogger(cfg.wandb_args, cfg.wandb_config_args)
+        wandb_logger.run.log_artifact(config_path, name="config")
     if cfg.trackio_args:
         trackio_logger = TrackioLogger(cfg.trackio_args)
 
