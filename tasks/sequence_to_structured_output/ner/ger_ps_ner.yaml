@@ -7,26 +7,48 @@ dataset_path: llm-4-kmu/ger-ps-ner
 test_split: test
 
 doc_to_text: |
-  Given the text "Text", extract the NER tags in the JSON format "Format". Do not modify the sentences.
-  Format:
+  Du bist ein präzises System zur Named Entity Recognition (NER). Deine Aufgabe ist es, strukturierte Entitäten aus dem bereitgestellten Text zu extrahieren und ausschließlich als valides JSON-Objekt zurückzugeben.
+
+  ### Entitätstypen:
+  * **Mitwirkender**: Eine Person oder Rolle, die den Hauptakteur bei der Durchführung einer Aktion unterstützt (z. B. durch Zuarbeit oder Freigabe).
+  * **Handlungsgrundlage**: Das Dokument, Gesetz, die Richtlinie oder der Vertrag, der festlegt, warum eine Aktion durchgeführt werden darf oder muss.
+  * **Ergebnisempfänger**: Die Person, Abteilung oder das System, die das Endprodukt, die Information oder das Resultat einer Aktion erhält.
+  * **Hauptakteur**: Die primäre Person, Rolle oder das System, das dafür verantwortlich ist, die beschriebene Aktion aktiv auszuführen.
+  * **Aktion**: Die konkrete Tätigkeit, der Arbeitsschritt oder die Aufgabe, die ausgeführt wird (z. B. "prüfen", "senden", "erstellen").
+  * **Dokument**: Das physische oder digitale Objekt (z. B. Bericht, Antrag, Rechnung), das in der Aktion verwendet, bearbeitet oder erzeugt wird.
+  * **Signalwort**: Ein Begriff im Text, der auf eine Pflicht, ein Recht oder eine zeitliche Relevanz hinweist (z. B. "muss", "sollte", "unverzüglich").
+  * **Frist**: Der zeitliche Rahmen oder der exakte Stichtag, bis zu dem die Aktion abgeschlossen sein muss.
+  * **Bedingung**: Eine Voraussetzung oder ein Ereignis, das erfüllt sein muss, damit die Aktion überhaupt startet oder in Kraft tritt (z. B. "Wenn X passiert, dann...").
+  * **Datenfeld**: Ein spezifisches Informationselement oder Attribut aus dem Text, das in ein System eingetragen oder digital erfasst werden muss (z. B. "Rechnungsnummer", "Geburtsdatum").
+
+  ### Regeln:
+  1. Extrahiere die Werte genau so, wie sie im Text vorkommen. Modifiziere oder korrigiere die Sätze oder Wörter nicht.
+  2. Wenn eine Entität im Text nicht vorkommt, gib ein leeres Array [] für diesen Schlüssel an.
+  3. WICHTIG: Das JSON muss absolut valide sein. Setze NIEMALS ein Komma nach dem letzten Element ("Datenfeld"). Vermeide jegliche Syntaxfehler.
+  4. Antworte ausschließlich im folgenden JSON-Format, eingeschlossen in ```json ... ``` Code-Blöcke. Schreibe keinen einleitenden oder erklärenden Text.
+
+  ### Ziel-Format:
   ```json
   {
-    "Mitwirkender": ["value for Mitwirkender"],
-    "Handlungsgrundlage": ["value for Handlungsgrundlage"],
-    "Ergebnisempfänger": ["value for Ergebnisempfänger"],
-    "Hauptakteur": ["value for Hauptakteur"],
-    "Aktion": ["value for Aktion"],
-    "Dokument": ["value for Dokument"],
-    "Signalwort": ["value for Signalwort"],
-    "Frist": ["value for Frist"],
-    "Bedingung": ["value for Bedingung"],
-    "Datenfeld": ["value for Datenfeld"],
+    "Mitwirkender": ["Wert für Mitwirkender"],
+    "Handlungsgrundlage": ["Wert für Handlungsgrundlage"],
+    "Ergebnisempfänger": ["Wert für Ergebnisempfänger"],
+    "Hauptakteur": ["Wert für Hauptakteur"],
+    "Aktion": ["Wert für Aktion"],
+    "Dokument": ["Wert für Dokument"],
+    "Signalwort": ["Wert für Signalwort"],
+    "Frist": ["Wert für Frist"],
+    "Bedingung": ["Wert für Bedingung"],
+    "Datenfeld": ["Wert für Datenfeld"]
   }
   ```
 
-  Text: {{input_text}}
+  ### Eingabetext:
+  "{{input_text}}"
 
-  NER tags according to the format:
+  ### Extrahierte NER-Tags im JSON-Format:
+
+
 doc_to_target: "{{output_text}}"
 
 process_results: !function utils.process_results
