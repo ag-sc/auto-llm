@@ -1,22 +1,22 @@
 pydantic~=2.11.7
-transformers==4.53.2
+
 setuptools~=44.1.1
-# git+https://github.com/EleutherAI/lm-evaluation-harness.git@v0.4.9
+git+https://github.com/EleutherAI/lm-evaluation-harness.git@v0.4.9
 wandb==0.21.0
 PyYAML~=6.0.2
-datasets==4.5.0
+
 aenum==3.1.16
-gradio==5.43.1
+
 peft==0.16.0
 # torch==2.7.1
 # flash-attn==2.8.3
-reflex>=0.7.13a1
+reflex==0.8.27
+passlib
+argon2_cffi
+alembic
+plotly
+openai==2.41.0
 
-# plotly
-# pip install argon2_cffi
-# pip install passlib
-# reflex db init
-# reflex db makemigrations
-# reflex db migrate
-
-# pip install torch==2.7.1 torchvision==0.22.1 torchaudio==2.7.1 --index-url https://download.pytorch.org/whl/cu126 --force-reinstall
+transformers==4.57.6
+trl==0.27.2
+datasets==4.8.5

@@ -7,7 +7,7 @@ import pandas as pd
 import reflex as rx
 
 from auto_llm.automator.automator import Automator
-from auto_llm.configurator.config_executor import SequentialConfigExecutor
+from auto_llm.configurator.config_executor import SequentialConfigExecutor, TaskSpoolerSequentialConfigExecutor
 from auto_llm.configurator.config_generator import ConfiguratorOutput, Priority, TrainEvalRunConfigurator
 from auto_llm.estimator.utils import get_gpu_params
 from auto_llm.tasks.registry import TASKS
@@ -226,8 +226,11 @@ class AppState(rx.State):
 
         if not self.start_execution:
             self.start_execution = True
-            job_id_to_attach = 194473
-            executor = SequentialConfigExecutor(configurator_outputs=self.configurator_outputs, job_id_to_attach=job_id_to_attach)
+            # TODO: parse job_id_to_attach from env
+            # TODO: set executors outside AppState
+            # job_id_to_attach = 194473
+            # executor = SequentialConfigExecutor(configurator_outputs=self.configurator_outputs, job_id_to_attach=job_id_to_attach)
+            executor = TaskSpoolerSequentialConfigExecutor(configurator_outputs=self.configurator_outputs)
             executor.execute()
             yield rx.toast.success("Your jobs are successfully submitted!")
 

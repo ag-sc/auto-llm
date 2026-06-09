@@ -6,8 +6,8 @@ import reflex as rx
 import reflex as rx
 from passlib.hash import argon2
 
-
 class UserModel(rx.Model, table=True):
+# class UserModel(rx.Model):
     username: str = rx.Field()
     password_hash: str
     is_enabled: bool = True
