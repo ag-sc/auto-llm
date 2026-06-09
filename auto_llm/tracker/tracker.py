@@ -78,6 +78,7 @@ class WandbClient:
         runs = self.api.runs(path=f"{self.entity}/{project_name}")
 
         results = []
+        metric_names = []
         for run in runs:
             if run.job_type != "evaluation":
                 continue
@@ -85,13 +86,19 @@ class WandbClient:
             if run.group != group:
                 continue
 
+            result = {}
             for key in run.summary.keys():
                 if "stderr" in key:
                     metric_name = key.replace("_stderr", "")
+                    if metric_name not in metric_names:
+                        metric_names.append(metric_name)
+
                     metric_value = run.summary[metric_name]
 
-                    results.append({"run": run.name, metric_name: metric_value})
-                    break
+                    result.update({metric_name: metric_value})
+
+            result.update({"run": run.name})
+            results.append(result)
 
         if len(results) == 0:
             return ""
@@ -99,38 +106,46 @@ class WandbClient:
         df = pd.DataFrame(results)
         df = df.drop_duplicates(subset="run", keep="last")
 
+        df_melted = df.melt(id_vars=["run"], value_vars=metric_names, var_name="Metric", value_name="Value")
+
+        # Update the figure to use the melted data
         fig = px.bar(
-            df,
-            x="run",
-            y="pubmed_mcqa/acc",
-            title="PubMed MCQA Accuracy",
-            labels={"run": "Run Configuration", "pubmed_mcqa/acc": "Accuracy"},
+            df_melted,
+            x="Metric",
+            y="Value",
+            color="run",  # This creates the different bars
+            barmode="group",  # This groups them side-by-side
+            labels={
+                "Metric": "Evaluation Metric",
+                "Value": "Score",
+                "run": "Run Configuration",
+            },
             template="plotly_white",
-            color="run",
         )
 
+        # Update text labels to show values on top of each bar
         fig.update_traces(texttemplate="%{y:.2f}", textposition="outside")
 
+        num_metrics = len(df_melted["Metric"].unique())
         fig.update_layout(
             showlegend=True,
-            yaxis=dict(
-                showticklabels=True,  # Hides "0.1, 0.2, 0.3..."
-                showline=True,  # Keeps the vertical axis line
-                ticks="outside",  # Keeps the little marker dashes
-                linecolor="black",
-                title="Accuracy",  # Keeps the axis title
+            legend=dict(
+                orientation="v",
+                yanchor="top",
+                y=1,
+                xanchor="left",
+                x=1.02,
+                font=dict(size=10),
+                bgcolor="rgba(255,255,255,0.5)",
             ),
-            xaxis=dict(
-                showticklabels=False,  # Hides the "pre_pubmed_mcqa..." text
-                showline=True,  # Keeps the horizontal axis line
-                ticks="outside",  # Keeps the little marker dashes
-                linecolor="black",
-                title="Run Configuration",
-            ),
-            # 3. Adjust margins now that labels are gone
-            margin=dict(t=60, l=60, r=20, b=40),
-            height=400,
+            yaxis=dict(range=[0, df_melted["Value"].max() * 1.2]),
+            margin=dict(t=60, l=60, r=150, b=40),
+            # height=500,
             autosize=True,
+            bargap=0.15,  # Spacing between groups of bars
+            bargroupgap=0.1,  # Spacing between individual bars within a group
+            # If only one metric, make the bars occupy less horizontal space
+            xaxis=dict(domain=[0.2, 0.8] if num_metrics == 1 else [0, 1], tickmode="array", tickvals=metric_names, ticktext=[m.split("/")[-1] for m in metric_names]),
         )
 
         return fig.to_html(full_html=False, include_plotlyjs="cdn")

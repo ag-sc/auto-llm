@@ -338,7 +338,11 @@ def configure() -> rx.Component:
                             rx.data_table(data=AppState.model_results, resizable=True, pagination=True),
                             rx.dialog.close(rx.button("Close", mt="4")),
                             size="4",
+                            width="100%",
+                            height="100%",
                         ),
+                        width="100%",
+                        height="100%",
                     ),
                     width="100%",
                 ),
@@ -488,6 +492,7 @@ def configure() -> rx.Component:
         execute_configs_dialog(),
         align="center",
         spacing="2",
+        on_mount=ConfigurationState.load_config_statuses,
     )
 
     results_tab = rx.card(
@@ -501,6 +506,7 @@ def configure() -> rx.Component:
                     ),
                     variant="soft",
                     on_click=ConfigurationState.load_config_group_results(AppState.run_group),
+                    loading=ConfigurationState.is_loading_results,
                 ),
                 width="100%",
                 justify="between",
