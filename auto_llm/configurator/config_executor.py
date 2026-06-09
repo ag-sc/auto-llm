@@ -8,8 +8,10 @@ from auto_llm.configurator.config_generator import (
     ConfigMode,
 )
 from auto_llm.registry.configurator_registry import (
-    EVALUATOR_RUN_SCRIPT,
-    TRAINER_RUN_SCRIPT,
+    SLURM_EVALUATOR_RUN_SCRIPT, 
+    NATIVE_EVALUATOR_RUN_SCRIPT,
+    SLURM_TRAINER_RUN_SCRIPT, 
+    NATIVE_TRAINER_RUN_SCRIPT
 )
 
 # TODO: Implement python-based config executor
@@ -97,14 +99,14 @@ class ConfigExecutor:
         env_path = "../env.sh"
         parallelism = "ddp"
         # TODO: how to decide upon which parallelism to use
-        cmd = f"{TRAINER_RUN_SCRIPT} {cfg_output.config_path} {venv_path} {env_path} {parallelism}"
+        cmd = f"{SLURM_TRAINER_RUN_SCRIPT} {cfg_output.config_path} {venv_path} {env_path} {parallelism}"
         return cmd
 
     @staticmethod
     def _get_evaluator_run_suffix(cfg_output: ConfiguratorOutput) -> str:
         venv_path = "venv"
         env_path = "../env.sh"
-        cmd = f"{EVALUATOR_RUN_SCRIPT} {cfg_output.config_path} {venv_path} {env_path}"
+        cmd = f"{SLURM_EVALUATOR_RUN_SCRIPT} {cfg_output.config_path} {venv_path} {env_path}"
         return cmd
 
     @staticmethod
@@ -198,14 +200,14 @@ set -e
         env_path = "../env.sh"
         parallelism = ""  #  "ddp"
         # TODO: how to decide upon which parallelism to use
-        cmd = f"{TRAINER_RUN_SCRIPT} {cfg_output.config_path} {venv_path} {env_path} {parallelism}"
+        cmd = f"{SLURM_TRAINER_RUN_SCRIPT} {cfg_output.config_path} {venv_path} {env_path} {parallelism}"
         return cmd
 
     @staticmethod
     def _get_evaluator_run_suffix(cfg_output: ConfiguratorOutput) -> str:
         venv_path = "venv"
         env_path = "../env.sh"
-        cmd = f"{EVALUATOR_RUN_SCRIPT} {cfg_output.config_path} {venv_path} {env_path}"
+        cmd = f"{SLURM_EVALUATOR_RUN_SCRIPT} {cfg_output.config_path} {venv_path} {env_path}"
         return cmd
 
     @staticmethod
@@ -219,59 +221,88 @@ set -e
         print(f"Pipeline started in tmux session: {session_name}")
 
 
-if __name__ == "__main__":
-    configurator_outputs = [
-        ConfiguratorOutput(
-            run_name="sft",
-            config_path=".configs/evaluator_run_configs/fft-pico_eval_run_config.yaml",
-            mode=ConfigMode.TRAINER_RUN_CFG,
-            config={},
-            priority=Priority.PRIORITY_TWO,
-        ),
-        ConfiguratorOutput(
-            run_name="baseline_pre_trained_eval",
-            config_path=".configs/evaluator_run_configs/pre-pico_eval_run_config.yaml",
-            mode=ConfigMode.EVALUATOR_RUN_CFG,
-            config={},
-            priority=Priority.PRIORITY_ONE,
-        ),
-        ConfiguratorOutput(
-            run_name="sft",
-            config_path=".configs/trainer_run_configs/fft-pico_trainer_run_config.yaml",
-            mode=ConfigMode.TRAINER_RUN_CFG,
-            config={},
-            priority=Priority.PRIORITY_TWO,
-        ),
-        ConfiguratorOutput(
-            run_name="sft_model_Eval",
-            config_path=".configs/evaluator_run_configs/fft-pico_eval_run_config.yaml",
-            mode=ConfigMode.EVALUATOR_RUN_CFG,
-            config={},
-            priority=Priority.PRIORITY_THREE,
-        ),
-        ConfiguratorOutput(
-            run_name="sft",
-            config_path=".configs/trainer_run_configs/fft-pico_trainer_run_config.yaml",
-            mode=ConfigMode.TRAINER_RUN_CFG,
-            config={},
-            priority=Priority.PRIORITY_TWO,
-        ),
-        ConfiguratorOutput(
-            run_name="sft",
-            config_path=".configs/trainer_run_configs/fft-pico_trainer_run_config.yaml",
-            mode=ConfigMode.TRAINER_RUN_CFG,
-            config={},
-            priority=Priority.PRIORITY_TWO,
-        ),
-        ConfiguratorOutput(
-            run_name="baseline_pre_trained_eval",
-            config_path=".configs/evaluator_run_configs/pre-pico_eval_run_config.yaml",
-            mode=ConfigMode.EVALUATOR_RUN_CFG,
-            config={},
-            priority=Priority.PRIORITY_ONE,
-        ),
-    ]
 
-    # executor = ConfigExecutor(configurator_outputs=configurator_outputs)
-    executor = SequentialConfigExecutor(configurator_outputs=configurator_outputs, job_id_to_attach=192535)
-    executor.execute()
+class TaskSpoolerSequentialConfigExecutor:
+    """
+    Task-Spooler based Config Executor without adding dependencies based on priority.
+    """
+
+    def __init__(self, configurator_outputs: List[ConfiguratorOutput]):
+        self.configurator_outputs = configurator_outputs
+
+    def execute(self):
+        # sort config outputs based on priority
+        # separate evaluator and trainer cfgs
+        # run pre-trained eval configs -> prio 1
+        # run trainer cfgs -> prio 2
+        # how to decide ddp or fsdp?
+        # run evaluator configs for ft models -> prio 3
+        configs_path = Path(self.configurator_outputs[0].config_path).parent.parent.absolute()
+
+        configurator_outputs_dict = [output.model_dump(mode="json") for output in self.configurator_outputs]
+        configurator_outputs_dict.sort(key=self.func)
+
+        self.configurator_outputs = [ConfiguratorOutput.model_validate(configurator_output_dict) for configurator_output_dict in configurator_outputs_dict]
+
+        cmds = {key: [] for key in Priority.__members__}
+        for cfg_output in self.configurator_outputs:
+            key = cfg_output.priority.name
+            if cfg_output.mode == ConfigMode.TRAINER_RUN_CFG:
+                cmds[key].append(self._get_trainer_run_suffix(cfg_output))
+            elif cfg_output.mode == ConfigMode.EVALUATOR_RUN_CFG:
+                cmds[key].append(self._get_evaluator_run_suffix(cfg_output))
+
+        all_cmds = []
+        for prio_str, cmds_list in cmds.items():
+            all_cmds.append(f"\n\n# Priority {Priority[prio_str].value} runs below")
+
+            for idx, cmd in enumerate(cmds_list):
+                # TODO: how to set the num of GPUs? Now setting 1 always.
+                cmd_w_prefix = f"ts -G 1 bash {cmd}"
+                all_cmds.append(cmd_w_prefix)
+
+        print(all_cmds)
+        run_script_path = f"{configs_path}/run.sh"
+        with open(run_script_path, "w") as f:
+            text = f"""
+#!/bin/bash
+ROOT_DIR={ROOT_DIR}
+cd $ROOT_DIR
+echo $pwd
+"""
+            f.write(text.strip())
+            f.write("\n".join(all_cmds))
+
+        print(f"Run scripts added here: {run_script_path}")
+
+        self.start_runs(script_path=run_script_path)
+
+    @staticmethod
+    def func(e):
+        return e["priority"]
+
+    @staticmethod
+    def _get_trainer_run_suffix(cfg_output: ConfiguratorOutput):
+        venv_path = "venv"
+        env_path = "../env.sh"
+        parallelism = ""  #  "ddp"
+        # TODO: how to decide upon which parallelism to use
+        cmd = f"{NATIVE_TRAINER_RUN_SCRIPT} {cfg_output.config_path} {venv_path} {env_path} {parallelism}"
+        return cmd
+
+    @staticmethod
+    def _get_evaluator_run_suffix(cfg_output: ConfiguratorOutput) -> str:
+        venv_path = "venv"
+        env_path = "../env.sh"
+        cmd = f"{NATIVE_EVALUATOR_RUN_SCRIPT} {cfg_output.config_path} {venv_path} {env_path}"
+        return cmd
+
+    @staticmethod
+    def start_runs(script_path: str):
+        session_name = "auto_llm_runs"
+        script_cmd = f"bash {script_path}"
+        tmux_restart_cmd = f"tmux kill-session -t {session_name} 2>/dev/null || true; tmux new-session -d -s {session_name} '{script_cmd}; exec bash'"
+
+        # tmux_cmd = f"tmux new-session -d -s {session_name} '{script_cmd}; exec bash'"
+        subprocess.run(tmux_restart_cmd, shell=True)
+        print(f"Pipeline started in tmux session: {session_name}")        
