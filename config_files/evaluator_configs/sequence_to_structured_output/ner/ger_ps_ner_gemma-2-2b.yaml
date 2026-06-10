@@ -7,10 +7,8 @@ include_path: tasks
 tasks:
   - ger_ps_ner
 
-limit: 10
-
 num_fewshot: 0
-batch_size: 8
+batch_size: 16
 device: cuda:0
 
 output_path: /vol/auto_llm/eval_results
