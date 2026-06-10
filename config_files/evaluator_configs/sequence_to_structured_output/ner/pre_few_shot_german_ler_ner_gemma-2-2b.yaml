@@ -5,11 +5,11 @@ model_args:
 
 include_path: tasks
 tasks:
-  - ger_ps_ner
+  - german_ler_ner
 
-limit: 100
+limit: 10
 
-num_fewshot: 0
+num_fewshot: 5
 batch_size: 16
 device: cuda:0
 
@@ -18,8 +18,9 @@ log_samples: true
 
 wandb_args:
   project: german-ner-eval
-  name: pre_ger_ps_ner_gemma-2-2b
+  name: pre_german_ler_ner_gemma-2-2b
   tags:
     - test
     - legal
-    - ger_ps_ner
+    - german_ler_ner
+    - few_shot

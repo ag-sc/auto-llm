@@ -6,7 +6,7 @@ task: german_ler_ner
 dataset_path: llm-4-kmu/german-ler-ner
 test_split: test
 
-doc_to_text: |
+description: |
   Du bist ein präzises System zur Named Entity Recognition (NER). Deine Aufgabe ist es, strukturierte Entitäten aus dem bereitgestellten juristischen Text zu extrahieren und ausschließlich als valides JSON-Objekt zurückzugeben.
 
   ### Entitätstypen:
@@ -55,14 +55,24 @@ doc_to_text: |
     "VS": ["Wert für Verfügung"],
     "VT": ["Wert für Vertrag"],
   }
+  ```
 
+doc_to_text: |
   ### Eingabetext:
   "{{input_text}}"
 
   ### Extrahierte NER-Tags im JSON-Format:
 
-
 doc_to_target: "{{output_text}}"
+
+fewshot_config:
+  sampler: default
+  split: validation
+
+  doc_to_target: |
+    ```json
+    {{output_text}}
+    ```
 
 process_results: !function utils.process_results
 
