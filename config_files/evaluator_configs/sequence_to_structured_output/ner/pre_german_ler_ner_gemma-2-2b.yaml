@@ -5,19 +5,21 @@ model_args:
 
 include_path: tasks
 tasks:
-  - ger_ps_ner
+  - german_ler_ner
+
+limit: 10
 
 num_fewshot: 0
 batch_size: 16
 device: cuda:0
 
-output_path: /vol/auto_llm/eval_results
+output_path: eval_results
 log_samples: true
 
 wandb_args:
   project: german-ner-eval
-  name: ger_ps_ner_gemma-2-2b
+  name: pre_german_ler_ner_gemma-2-2b
   tags:
     - test
-    - medical
-    - ger_ps_ner
+    - legal
+    - german_ler_ner

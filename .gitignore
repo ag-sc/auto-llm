@@ -33,3 +33,5 @@ venv/
 
 
 *alembic*
+
+*eval_results/*

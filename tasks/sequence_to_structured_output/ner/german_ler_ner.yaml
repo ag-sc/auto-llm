@@ -1,0 +1,70 @@
+tag:
+  - ner
+
+task: german_ler_ner
+
+dataset_path: llm-4-kmu/german-ler-ner
+test_split: test
+
+doc_to_text: |
+  Du bist ein präzises System zur Named Entity Recognition (NER). Deine Aufgabe ist es, strukturierte Entitäten aus dem bereitgestellten juristischen Text zu extrahieren und ausschließlich als valides JSON-Objekt zurückzugeben.
+
+  ### Entitätstypen:
+  * **Person**: Allgemeine am Gerichtsverfahren beteiligte Personen, die keine Juristen sind (z. B. Beschuldigte, Kläger, Beklagte, Zeugen oder unabhängige Gutachter).
+  * **Richter**: Richter, die den Vorsitz führen oder im Text erwähnt werden (z. B. "Paul Kirchhof").
+  * **Anwalt**: Rechtliche Vertreter, Strafverteidiger oder Rechtsanwälte, die eine Partei im Verfahren vertreten.
+  * **Land**: Souveräne Staaten, Bundesländer oder Stadtstaaten (z. B. "Mecklenburg-Vorpommern").
+  * **Stadt**: Städte, Gemeinden, Dörfer oder lokale Kommunen.
+  * **Straße**: Straßen, Plätze, Alleen, Straßenkreuzungen oder spezifische lokale Adressen.
+  * **Landschaft**: Kontinente, Gewässer (Flüsse, Seen, Meere), Gebirgszüge und andere natürliche geografische Merkmale.
+  * **Organisation**: Allgemeine Nichtregierungsorganisationen, Vereine, soziale Gruppen oder religiöse Körperschaften (z. B. "Evangelische Kirche").
+  * **Unternehmen**: Private Wirtschaftsunternehmen, Handelsgesellschaften, Betriebe oder Personengesellschaften (in Gerichtsdaten oft abgekürzt oder anonymisiert wie "Firma X...").
+  * **Institution**: Öffentliche staatliche Institutionen, Ministerien, Verwaltungsbehörden oder Regierungsstellen (z. B. "Landesregierung").
+  * **Gericht**: Spezifische Justizorgane, Tribunale oder Gerichte, die den Fall bearbeiten oder auf die verwiesen wird (z. B. "Landgericht Dortmund").
+  * **Marke**: Produktnamen, eingetragene Warenzeichen oder geschützte kommerzielle Markenbezeichnungen.
+  * **Gesetz**: Formelle Gesetze und Statuten, die von legislativen Körperschaften verabschiedet wurden (z. B. "GG", "BGB").
+  * **Verordnung**: Verwaltungsverordnungen oder exekutive Dekrete, die von autorisierten Verwaltungsorganen erlassen wurden.
+  * **Europarechtliche Norm**: Verträge, Verordnungen, Richtlinien oder Beschlüsse aus dem Rechtsrahmen der Europäischen Union.
+  * **Verfügung**: Verwaltungsakte, Rundschreiben, lokale Richtlinien, spezifische regulatorische Anweisungen oder behördliche Bekanntmachungen.
+  * **Vertrag**: Rechtsverbindliche Vereinbarungen oder private Verträge, die zwischen bestimmten Einheiten oder Personen ausgehandelt wurden.
+
+  ### Regeln:
+  1. Extrahiere die Werte genau so, wie sie im Text vorkommen. Modifiziere oder korrigiere die Sätze oder Wörter nicht.
+  2. Wenn eine Entität im Text nicht vorkommt, gib ein leeres Array [] für diesen Schlüssel an.
+  3. WICHTIG: Das JSON muss absolut valide sein. Setze NIEMALS ein Komma nach dem letzten Element ("Literatur"). Vermeide jegliche Syntaxfehler.
+  4. Antworte ausschließlich im folgenden JSON-Format, eingeschlossen in ```json ... ``` Code-Blöcke. Schreibe keinen einleitenden oder erklärenden Text.
+
+  ### Ziel-Format:
+  ```json
+  {
+    "PER": ["Wert für Person"],
+    "RR": ["Wert für Richter"],
+    "AN": ["Wert für Anwalt"],
+    "LD": ["Wert für Land"],
+    "ST": ["Wert für Stadt"],
+    "STR": ["Wert für Straße"],
+    "LDS": ["Wert für Landschaft"],
+    "ORG": ["Wert für Organisation"],
+    "UN": ["Wert für Unternehmen"],
+    "INN": ["Wert für Institution"],
+    "GRT": ["Wert für Gericht"],
+    "MRK": ["Wert für Marke"],
+    "GS": ["Wert für Gesetz"],
+    "VO": ["Wert für Verordnung"],
+    "EUN": ["Wert für Europarechtliche Norm"],
+    "VS": ["Wert für Verfügung"],
+    "VT": ["Wert für Vertrag"],
+  }
+
+  ### Eingabetext:
+  "{{input_text}}"
+
+  ### Extrahierte NER-Tags im JSON-Format:
+
+
+doc_to_target: "{{output_text}}"
+
+process_results: !function utils.process_results
+
+metadata:
+  version: 1.0
