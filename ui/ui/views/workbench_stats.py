@@ -13,8 +13,8 @@ class WorkbenchState(rx.State):
     is_auto_refresh: bool = False
 
     @rx.event
-    def get_jobs(self):
-        self.jobs = Workbench().get_jobs()
+    def get_jobs(self, username: str):
+        self.jobs = Workbench().get_jobs(username=username)
 
     @rx.event
     async def view_job_details(self, job_path: str):
@@ -54,12 +54,15 @@ def render_individual_job(job):
     )
 
 
-def workbench_stats_card() -> rx.Component:
+def workbench_stats_card(username: str) -> rx.Component:
     return rx.card(
         rx.vstack(
             rx.hstack(
                 rx.hstack(rx.icon("folder-kanban", size=25), rx.heading("Workbench", size="5", weight="bold"), align="center"),
-                rx.button(rx.icon(tag="refresh-cw", size=20), on_click=WorkbenchState.get_jobs),
+                rx.button(
+                    rx.icon(tag="refresh-cw", size=20),
+                    on_click=lambda: WorkbenchState.get_jobs(username=username),
+                ),
                 width="100%",
                 justify="between",
                 align="center",
@@ -76,5 +79,5 @@ def workbench_stats_card() -> rx.Component:
         ),
         width="80%",
         box_shadow=styles.box_shadow_style,
-        on_mount=WorkbenchState.get_jobs,
+        on_mount=lambda: WorkbenchState.get_jobs(username=username),
     )

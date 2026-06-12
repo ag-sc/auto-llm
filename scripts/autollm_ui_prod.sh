@@ -5,4 +5,5 @@ fuser -k 8000/tcp
 ENV_VARIABLES_PATH=/home/ubuntu/env.sh
 source $ENV_VARIABLES_PATH
 
-reflex run
+reflex export
+reflex run --env prod

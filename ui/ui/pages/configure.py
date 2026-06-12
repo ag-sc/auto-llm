@@ -30,7 +30,17 @@ def info_popover(title: str, content: str):
 
 def config_html_dialog(configurator_output: ConfiguratorOutput):
     return rx.dialog.root(
-        rx.dialog.trigger(rx.icon_button("view", variant="soft", size="1"), on_click=ConfigurationState.load_config_html(configurator_output)),
+        rx.tooltip(
+            rx.dialog.trigger(
+                rx.icon_button(
+                    "monitor",
+                    variant="soft",
+                    size="1",
+                    on_click=lambda: ConfigurationState.load_config_html(configurator_output),
+                ),
+            ),
+            content="View W&B Run",
+        ),
         rx.dialog.content(
             rx.vstack(
                 rx.dialog.title(f"View Run"),
@@ -64,12 +74,27 @@ def config_html_dialog(configurator_output: ConfiguratorOutput):
 
 
 def config_view_dialog(configurator_output: ConfiguratorOutput):
+    configuration_description = f"""The run configuration is detailed below. You can customize these paramters or proceed with the default values.
+
+ℹ️ Please refer to the documentation for a detailed guide on the configuration parameters.
+"""
     return rx.dialog.root(
-        rx.dialog.trigger(rx.button(rx.text(configurator_output.run_name), variant="outline", size="1", on_click=ConfigurationState.load_config(configurator_output))),
+        rx.tooltip(
+            rx.dialog.trigger(
+                rx.icon_button(
+                    "pencil",
+                    variant="soft",
+                    size="1",
+                    on_click=lambda: ConfigurationState.load_config(configurator_output),
+                ),
+            ),
+            content="Edit Configuration",
+        ),
         rx.dialog.content(
             rx.vstack(
-                rx.dialog.title(f"View Configuration"),
-                rx.dialog.description(f"Path: {configurator_output.config_path}"),
+                rx.dialog.title(f"Configuration"),
+                # rx.dialog.description(f"Path: {configurator_output.config_path}"),
+                rx.markdown(configuration_description),
                 rx.text_area(
                     value=ConfigurationState.current_yaml_content,
                     on_change=ConfigurationState.update_content,
@@ -79,7 +104,7 @@ def config_view_dialog(configurator_output: ConfiguratorOutput):
                     line_height="1.5",
                     # 2. Sizing & Scrolling
                     width="100%",
-                    height="500px",
+                    height="450px",
                     # 3. YAML Formatting Essentials (Custom CSS)
                     style={
                         "white-space": "pre",  # Crucial: Preserves leading spaces/tabs
@@ -93,7 +118,7 @@ def config_view_dialog(configurator_output: ConfiguratorOutput):
                 ),
                 rx.hstack(
                     rx.dialog.close(rx.button("Close", variant="soft")),
-                    rx.button("Save Changes", on_click=ConfigurationState.save_config),
+                    rx.button("Save", on_click=ConfigurationState.save_config),
                     justify="end",
                     width="100%",
                 ),
@@ -173,7 +198,8 @@ def show_configuration(configurator_output: ConfiguratorOutput):
             ),
             align="center",
         ),
-        rx.table.cell(config_view_dialog(configurator_output)),
+        rx.table.cell(rx.text(configurator_output.run_name)),
+        # rx.table.cell(),
         # rx.table.cell(
         #     rx.hstack(
         #         rx.button(
@@ -189,6 +215,8 @@ def show_configuration(configurator_output: ConfiguratorOutput):
         # rx.table.cell(rx.text(ConfigurationState.est_emission)),
         rx.table.cell(
             rx.hstack(
+                config_view_dialog(configurator_output),
+                config_html_dialog(configurator_output),
                 rx.match(
                     current_status,
                     ("running", status_badge("running")),
@@ -198,7 +226,6 @@ def show_configuration(configurator_output: ConfiguratorOutput):
                     ("killed", status_badge("killed")),
                     ("pending", status_badge("pending")),
                 ),
-                config_html_dialog(configurator_output),
             ),
             align="center",
         ),
@@ -285,6 +312,7 @@ def configure() -> rx.Component:
                             on_change=AppState.setvar("hardware_type"),
                             width="100%",
                             size="3",
+                            # disabled=True,
                         ),
                         align_items="start",
                     ),
@@ -298,6 +326,7 @@ def configure() -> rx.Component:
                             on_change=AppState.setvar("hardware_count"),
                             width="100%",
                             size="3",
+                            # disabled=True,
                         ),
                         align_items="start",
                     ),
@@ -469,7 +498,7 @@ def configure() -> rx.Component:
         spacing="5",
         padding="4",
         width="60vw",
-        on_submit=AppState.handle_prompts_submit,
+        on_submit=lambda: AppState.handle_prompts_submit,
     )
 
     jobs_table = rx.vstack(
@@ -479,9 +508,10 @@ def configure() -> rx.Component:
                     _header_cell("Priority", "gauge"),
                     _header_cell("Mode", "beaker"),
                     _header_cell("Run Name", "fingerprint"),
+                    _header_cell("Details", "cog"),
                     # _header_cell("Est. Runtime", "hourglass"),
                     # _header_cell("Est. Co2 Emission", "leaf"),
-                    _header_cell("Status", "cog"),
+                    # _header_cell("Status", "cog"),
                 ),
             ),
             rx.table.body(rx.foreach(AppState.configurator_outputs, show_configuration)),

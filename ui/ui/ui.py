@@ -10,4 +10,9 @@ app = rx.App(
         rx.el.link(rel="icon", href="/favicon.ico"),
         rx.el.title("AutoLLM"),
     ],
+    theme=rx.theme(
+        appearance="light",
+        has_background=True,
+        # accent_color="iris",
+    ),
 )

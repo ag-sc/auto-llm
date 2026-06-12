@@ -13,7 +13,15 @@ def overview() -> rx.Component:
     project_details = Client.get_project_details()
     list_stats_card = []
     for item in project_details:
-        list_stats_card.append(stats_card(project_name=item["name"], project_url=item["url"], num_runs=item["num_runs"], runtime=item["runtime"], emission=0))
+        list_stats_card.append(
+            stats_card(
+                project_name=item["name"],
+                project_url=item["url"],
+                num_runs=item["num_runs"],
+                runtime=item["runtime"],
+                emission=0,
+            )
+        )
 
     return rx.vstack(
         rx.flex(
@@ -22,7 +30,7 @@ def overview() -> rx.Component:
             ),
         ),
         stats_cards(list_stats_card),
-        workbench_stats_card(),
+        workbench_stats_card(username=User.username),
         spacing="5",
         width="100%",
     )

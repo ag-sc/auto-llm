@@ -13,7 +13,7 @@ from auto_llm.estimator.utils import get_gpu_params
 from auto_llm.tasks.registry import TASKS
 
 from ..backend import CONFIGS_DIR, OUTPUT_DIR
-
+from ..state.user import User
 
 GPU_PARAMS = get_gpu_params()
 
@@ -30,8 +30,8 @@ class AppState(rx.State):
     # settings tab
     dataset_path: Optional[str] = ""
     task_category: Optional[str] = ""
-    hardware_type: Optional[str] = ""
-    hardware_count: Optional[str] = ""
+    hardware_type: Optional[str] = "NVIDIA L40S"
+    hardware_count: Optional[str] = "1"
 
     # models tab
     selected_model: Optional[str] = ""
@@ -62,8 +62,8 @@ class AppState(rx.State):
         # settings tab
         self.dataset_path: Optional[str] = ""
         self.task_category: Optional[str] = ""
-        self.hardware_type: Optional[str] = ""
-        self.hardware_count: Optional[str] = ""
+        self.hardware_type: Optional[str] = "NVIDIA L40S"
+        self.hardware_count: Optional[str] = "1"
 
         # models tab
         self.selected_model: Optional[str] = ""
@@ -205,18 +205,23 @@ class AppState(rx.State):
 
         self.run_group = data["run_group"]
 
-        self.save_app_state(timestamp=timestamp_str, path=configs_path)
+        user_state = await self.get_state(User)
+        username = user_state.username
+        print("saving app state for user", username)
+        self.save_app_state(timestamp=timestamp_str, path=configs_path, username=username)
 
         self.current_tab = "validate"
 
-    def save_app_state(self, timestamp: str, path: str):
+    def save_app_state(self, timestamp: str, path: str, username: str):
         data = self._get_serializable_dict()
         state_path = f"{path}/configure_state.json"
         with open(state_path, "w+") as f:
             json.dump(data, f, indent=4)
 
         settings_path = f"{path}/settings.json"
-        settings = {"username": os.environ["autollm_user"], "timestamp": timestamp}
+
+        print("saving settings", username)
+        settings = {"username": username, "timestamp": timestamp}
         with open(settings_path, "w+") as f:
             json.dump(settings, f, indent=4)
 

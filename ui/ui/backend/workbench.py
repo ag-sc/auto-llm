@@ -3,22 +3,16 @@ import json
 import os
 from typing import Any, Dict, List
 
-import reflex as rx
 
-from ..backend import CONFIGS_DIR, OUTPUT_DIR
+from ..backend import CONFIGS_DIR
 
 
 class Workbench:
     def __init__(self, path: str = CONFIGS_DIR):
         self.path = path
 
-    def get_jobs(self) -> List[Dict[str, Any]]:
+    def get_jobs(self, username: str) -> List[Dict[str, Any]]:
         job_details = []
-        try:
-            username = os.environ["autollm_user"]
-        except:
-            return job_details
-
         for x in os.walk(self.path):
             for file in x[2]:
                 if "settings" not in file:

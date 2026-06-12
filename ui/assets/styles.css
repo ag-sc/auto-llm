@@ -15,3 +15,8 @@ body {
 .rt-BaseTabList {
 	box-shadow: none;
 }
+
+:root {
+  --primary-color: #35378d;
+  --accent-color: #4a4d9b;
+}

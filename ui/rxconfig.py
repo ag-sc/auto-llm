@@ -6,5 +6,6 @@ config = rx.Config(
         rx.plugins.SitemapPlugin(),
         rx.plugins.TailwindV4Plugin(),
     ],
-    # state_auto_setters=True,
+    deploy_url="https://autollm.llm4kmu.de",
+    api_url="https://autollm.llm4kmu.de",
 )

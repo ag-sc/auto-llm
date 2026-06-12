@@ -100,7 +100,6 @@ base_style = {
 }
 
 
-
 # Common style base
 shadow = "rgba(0, 0, 0, 0.15) 0px 2px 8px"
 chat_margin = "25%"

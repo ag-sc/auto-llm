@@ -4,12 +4,115 @@ from .. import styles
 from ..state.user import User
 
 
+def view_user_profile():
+    return rx.dialog.root(
+        rx.dialog.trigger(
+            rx.icon_button(
+                "user",
+                size="2",
+                radius="full",
+            ),
+        ),
+        rx.dialog.content(
+            rx.vstack(
+                rx.vstack(
+                    rx.avatar(
+                        size="7",
+                        variant="soft",
+                        color_scheme="violet",
+                        fallback=User.username_display[0],
+                        radius="full",
+                    ),
+                    rx.hstack(
+                        # rx.icon("user", size=20),
+                        rx.text(User.username_display, weight="medium"),
+                        align="center",
+                    ),
+                    rx.hstack(
+                        # rx.icon("building", size=20),
+                        rx.text("Uni Bielefeld", weight="medium"),
+                        align="center",
+                    ),
+                    align="center",
+                    width="100%",
+                    padding="2em",
+                ),
+                rx.card(
+                    rx.vstack(
+                        rx.text("You can change your password below.", weight="medium"),
+                        rx.input(
+                            placeholder="Enter your username",
+                            size="3",
+                            width="100%",
+                            name="username",
+                            on_change=User.setvar("username"),
+                            value=User.username,
+                            disabled=True,
+                        ),
+                        rx.input(
+                            placeholder="Enter your current password",
+                            type="password",
+                            size="3",
+                            width="100%",
+                            name="password",
+                            on_change=User.setvar("current_password"),
+                        ),
+                        rx.input(
+                            placeholder="Enter your new password",
+                            type="password",
+                            size="3",
+                            width="100%",
+                            name="password",
+                            on_change=User.setvar("new_password"),
+                        ),
+                        rx.button(
+                            "Change Password",
+                            size="3",
+                            width="100%",
+                            type="button",
+                            bg="#4a4d9b",
+                            on_click=User.change_password,
+                        ),
+                    ),
+                    align="center",
+                    width="100%",
+                ),
+                rx.card(
+                    rx.vstack(
+                        rx.text("You can log out from the current session below.", weight="medium"),
+                        rx.button(
+                            "Log Out",
+                            size="3",
+                            width="100%",
+                            type="button",
+                            bg="#4a4d9b",
+                            on_click=User.handle_sign_out,
+                        ),
+                    ),
+                    align="center",
+                    width="100%",
+                ),
+                # rx.hstack(
+                #     rx.dialog.close(rx.button("Close", variant="soft")),
+                #     justify="center",
+                #     width="100%",
+                # ),
+            ),
+            width="30vw",
+            height="75vh",
+            max_width="30vw",
+            max_height="75vh",
+            padding="1em",
+        ),
+    )
+
+
 def sidebar_header() -> rx.Component:
     """Sidebar header."""
     return rx.hstack(
         rx.color_mode_cond(
-            rx.image(src="/AutoLLM.png", height="5em"),
-            rx.image(src="/AutoLLM.png", height="5em"),
+            rx.image(src="/AutoLLM_logo.png", height="5em"),
+            rx.image(src="/AutoLLM_dark.png", height="5em"),
         ),
         rx.spacer(),
         align="center",
@@ -30,21 +133,20 @@ def sidebar_footer() -> rx.Component:
         rx.hstack(
             rx.link(
                 rx.text("Docs", size="3"),
-                href="https://github.com/ag-sc/autollm/",
+                href="https://ag-sc.github.io/auto-llm/",
                 color_scheme="gray",
                 underline="none",
             ),
             rx.spacer(),
             rx.color_mode.button(style={"opacity": "0.8", "scale": "0.95"}, size="3"),
-            justify="start",
+            justify="end",
             align="center",
             width="100%",
             padding="0.35em",
         ),
         rx.hstack(
-            rx.icon("user", size=16),
+            view_user_profile(),
             rx.text(User.username_display, weight="bold", size="2"),
-            rx.button(rx.icon("log_out", size=16), on_click=User.handle_sign_out),
             align="center",
             spacing="2",
             justify="end",
@@ -79,9 +181,9 @@ def sidebar_item(text: str, url: str) -> rx.Component:
                 text,
                 ("Overview", sidebar_item_icon("home")),
                 ("Configure", sidebar_item_icon("table-2")),
-                ("Monitor", sidebar_item_icon("book-open")),
-                ("Chat", sidebar_item_icon("user")),
-                ("Settings", sidebar_item_icon("settings")),
+                # ("Monitor", sidebar_item_icon("book-open")),
+                # ("Chat", sidebar_item_icon("user")),
+                ("About", sidebar_item_icon("settings")),
                 sidebar_item_icon("layout-dashboard"),
             ),
             rx.text(text, size="3", weight="regular"),
@@ -133,8 +235,8 @@ def sidebar() -> rx.Component:
     ordered_page_routes = [
         "/overview",
         "/configure",
-        "/monitor",
-        "/chat",
+        # "/monitor",
+        # "/chat",
         "/about",
     ]
 
