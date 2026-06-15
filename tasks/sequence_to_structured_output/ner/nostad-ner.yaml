@@ -1,0 +1,76 @@
+tag:
+  - ner
+
+task: nostad_ner
+
+dataset_path: llm-4-kmu/nostad-ner
+test_split: test
+
+description: |
+  Du bist ein präzises System zur Named Entity Recognition (NER) für deutsche Texte. Deine Aufgabe ist es, strukturierte Entitäten basierend auf den NoSta-D-Annotation-Guidelines aus dem bereitgestellten Text zu extrahieren und ausschließlich als valides JSON-Objekt zurückzugeben.
+  
+  ### Richtlinien zur Identifikation (NoSta-D Standards):
+  1. **Keine Artikel/Determinierer:** Artikel gehören NIEMALS zum Namen (z. B. bei "des Kolpingwerkes" wird nur "Kolpingwerkes" extrahiert).
+  2. **Keine Titel/Anreden:** Titel und Rollenbezeichnungen gehören NICHT zum Eigennamen (z. B. bei "Frau Ute Wedemeier" wird nur "Ute Wedemeier" extrahiert).
+  3. **Zusammengesetzte Wörter (_part):** Wenn eine Named Entity Teil eines komplexen, zusammengesetzten Wortes ist (z. B. "Böll-Stiftung", "Troia-Ausstellung"), wird sie mit dem Suffix `_part` annotiert.
+  4. **Ableitungen (_deriv):** Wenn ein Eigenname durch morphologische Ableitung in ein Adjektiv überführt wurde (z. B. Ortsadjektive wie "Bremer", "österreichischen" oder Personenadjektive wie "Merkelsche"), wird er mit dem Suffix `_deriv` annotiert. Genitive (z. B. "Deutschlands") zählen hingegen als direkte, reine Entitäten.
+  5. **Verschachtelung (Nesting):** Kommen mehrere Entitäten ineinander vor (z. B. ein Ortsname innerhalb eines Event-Titels wie "[Troia [Traum und Wirklichkeit]]"), extrahiere beide Werte unabhängig voneinander in die jeweiligen Listen.
+  
+  ### Entitätstypen:
+  * **location**: Geografische Orte, Länder, Staaten, Städte, Regionen, Straßen, Meere oder Planeten (z. B. "Stuttgart", "Hessen", "Frankreich").
+  * **location_deriv**: Von Orten abgeleitete Wörter (z. B. "Bremer", "österreichischen", "deutschen").
+  * **location_part**: Zu Orten gehörende Teile komplexer Wörter (z. B. "Troia-Ausstellung").
+  * **organization**: Organisationen, Vereine, Unternehmen, Universitäten, Institute, Gerichte oder politische Parteien (z. B. "EU", "Technische Universität Darmstadt", "Microsoft").
+  * **organization_deriv**: Von Organisationen abgeleitete Wörter.
+  * **organization_part**: Teile von Organisationsnamen in komplexen Wörtern (z. B. "EU-Verwaltung", "DAEWOO-Millionen").
+  * **other**: Sonstige Eigennamen wie Ausstellungen, Kunstwerke, Buchtitel, historische Ereignisse, Wettbewerbe oder Marken (z. B. "Kolpingwerkes", "Erster Weltkrieg", "Der Wolpertinger").
+  * **other_deriv**: Von sonstigen Entitäten abgeleitete Wörter (z. B. modifizierte Sprachadjektive wie "hochdeutsche").
+  * **other_part**: Teile von sonstigen Entitäten in zusammengesetzten Wörtern.
+  * **person**: Namen von echten, historischen oder fiktiven Personen sowie Künstlernamen und fiktiven Charakteren (z. B. "Hans Winkler", "Batman", "Schneewittchen").
+  * **person_deriv**: Von Personennamen abgeleitete Adjektive oder Wörter (z. B. "Hartz-Reformen", "Ottomotor").
+  * **person_part**: Teile von Personennamen (z. B. isolierte Nachnamen).
+  
+  ### Regeln:
+  1. Extrahiere die Wörter exakt so, wie sie im Text stehen. Modifiziere oder korrigiere die Sätze oder Schreibweisen nicht.
+  2. Wenn eine Entität im Text nicht vorkommt, gib ein leeres Array [] für diesen Schlüssel an.
+  3. WICHTIG: Das JSON muss absolut valide sein. Setze NIEMALS ein Komma nach dem letzten Element ("person_part"). Vermeide jegliche Syntaxfehler.
+
+  ### Ziel-Format:
+  ```json
+  {
+    "location": ["Wert für location"],
+    "location_deriv": ["Wert für location_deriv"],
+    "location_part": ["Wert für location_part"],
+    "organization": ["Wert für organization"],
+    "organization_deriv": ["Wert für organization_deriv"],
+    "organization_part": ["Wert für organization_part"],
+    "other": ["Wert für other"],
+    "other_deriv": ["Wert für other_deriv"],
+    "other_part": ["Wert für other_part"],
+    "person": ["Wert für person"],
+    "person_deriv": ["Wert für person_deriv"],
+    "person_part": ["Wert für person_part"]
+  }
+  ```
+
+doc_to_text: |
+  ### Eingabetext:
+  "{{input_text}}"
+
+  ### Extrahierte NER-Tags im JSON-Format:
+
+doc_to_target: "{{output_text}}"
+
+fewshot_config:
+  sampler: default
+  split: validation
+
+  doc_to_target: |
+    ```json
+    {{output_text}}
+    ```
+
+process_results: !function utils.process_results
+
+metadata:
+  version: 1.0
