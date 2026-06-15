@@ -1,0 +1,72 @@
+tag:
+  - ner
+
+task: swiss_ner
+
+dataset_path: llm-4-kmu/swiss-ner
+test_split: test
+
+description: |
+  Du bist ein präzises System zur Named Entity Recognition (NER). Deine Aufgabe ist es, strukturierte Entitäten aus dem bereitgestellten deutschen Text zu extrahieren und ausschließlich als valides JSON-Objekt zurückzugeben.
+  
+  ### Entitätstypen:
+  * **Canton**: Schweizer Kantone (z. B. "Bern", "Zürich").
+  * **City**: Größere Städte (z. B. "Basel", "Luzern", "Lugano").
+  * **Company**: Unternehmen, Firmen oder kommerzielle Betriebe.
+  * **Country**: Souveräne Staaten oder Länder (z. B. "Deutschland", "Frankreich", "Italien").
+  * **Event**: Veranstaltungen, Feste, Konferenzen oder historische Ereignisse.
+  * **Lake**: Seen und stehende Gewässer.
+  * **Landmark**: Bekannte Sehenswürdigkeiten, Bauwerke oder Denkmäler.
+  * **Mountain**: Berge, Gebirge oder Berggipfel (z. B. "Jungfrau").
+  * **Organization**: Organisationen, Institutionen, Universitäten oder Vereine (z. B. "Universität Freiburg").
+  * **Person**: Namen von echten oder fiktiven Personen.
+  * **Region**: Geografische Regionen oder Gebiete (z. B. "Zentralschweiz").
+  * **River**: Flüsse und fließende Gewässer.
+  * **Village**: Kleinere Dörfer, Gemeinden oder Ortschaften.
+  
+  ### Regeln:
+  1. Extrahiere die Werte genau so, wie sie im Text vorkommen. Modifiziere oder korrigiere die Wörter nicht.
+  2. Wenn eine Entität im Text nicht vorkommt, gib ein leeres Array [] für diesen Schlüssel an.
+  3. WICHTIG: Das JSON muss absolut valide sein. Vermeide jegliche Syntaxfehler und setze kein Komma nach dem letzten Element ("Village").
+  4. Antworte ausschließlich im folgenden JSON-Format, eingeschlossen in ```json ... ``` Code-Blöcke. Schreibe keinen einleitenden oder erklärenden Text.
+
+  ### Ziel-Format:
+  ```json
+  {
+    "Canton": ["Wert für Canton"],
+    "City": ["Wert für City"],
+    "Company": ["Wert für Company"],
+    "Country": ["Wert für Country"],
+    "Event": ["Wert für Event"],
+    "Lake": ["Wert für Lake"],
+    "Landmark": ["Wert für Landmark"],
+    "Mountain": ["Wert für Mountain"],
+    "Organization": ["Wert für Organization"],
+    "Person": ["Wert für Person"],
+    "Region": ["Wert für Region"],
+    "River": ["Wert für River"],
+    "Village": ["Wert für Village"],
+  }
+  ```
+
+doc_to_text: |
+  ### Eingabetext:
+  "{{input_text}}"
+
+  ### Extrahierte NER-Tags im JSON-Format:
+
+doc_to_target: "{{output_text}}"
+
+fewshot_config:
+  sampler: default
+  split: test
+
+  doc_to_target: |
+    ```json
+    {{output_text}}
+    ```
+
+process_results: !function utils.process_results
+
+metadata:
+  version: 1.0
