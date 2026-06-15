@@ -1,12 +1,9 @@
 import os
-import string
-from typing import List
 
 from datasets import DatasetDict, Dataset, Features, Value, Sequence
 
-import datasets
 from auto_llm.builder.task_data_builder.task_data_builder import TaskDataBuilder
-from auto_llm.dto.builder_config import TaskDatasetFeatures, DatasetSplit
+from auto_llm.dto.builder_config import TaskDatasetFeatures
 from collections import OrderedDict
 
 keys = [
@@ -24,9 +21,11 @@ feature_keys = {key: Sequence(feature=Value(dtype="string", id=None), length=-1,
 NER_FEATURES = Features({TaskDatasetFeatures.INPUT_TEXT: Value(dtype="string", id=None), TaskDatasetFeatures.OUTPUT_TEXT: feature_keys})
 
 
-class EhriNerDataBuilder(TaskDataBuilder):
+class EhriHolocaustNerDataBuilder(TaskDataBuilder):
     """
-    Data from https://github.com/EHRI/EHRI-NER/blob/main/dataset/iob/de/ehri_de.txt
+    Data from https://github.com/EHRI/EHRI-NER/tree/main
+    Used this split: https://github.com/EHRI/EHRI-NER/blob/main/dataset/iob/de/ehri_de.txt
+
     """
 
     def __init__(self): ...
@@ -67,8 +66,6 @@ class EhriNerDataBuilder(TaskDataBuilder):
                 if inp_text in samples[TaskDatasetFeatures.INPUT_TEXT]:
                     continue
 
-                samples[TaskDatasetFeatures.INPUT_TEXT].append(inp_text)
-
                 entities_form = []
                 for idx, entity in enumerate(entities):
                     if "B-" in entity:
@@ -95,7 +92,19 @@ class EhriNerDataBuilder(TaskDataBuilder):
                     if entity_text not in extracted_entities[form["entity_key"]]:
                         extracted_entities[form["entity_key"]].append(entity_text)
 
-                samples[TaskDatasetFeatures.OUTPUT_TEXT].append(extracted_entities)
+                count = 0
+                for _, value in extracted_entities.items():
+                    if value != []:
+                        count += 1
+
+                # skipping very short sentences
+                if len(inp_text) <= 10:
+                    continue
+
+                # skipping samples with no labels
+                if count != 0:
+                    samples[TaskDatasetFeatures.INPUT_TEXT].append(inp_text)
+                    samples[TaskDatasetFeatures.OUTPUT_TEXT].append(extracted_entities)
 
                 texts = []
                 entities = []
@@ -113,11 +122,11 @@ class EhriNerDataBuilder(TaskDataBuilder):
 
 
 if __name__ == "__main__":
-    builder = EhriNerDataBuilder()
+    builder = EhriHolocaustNerDataBuilder()
     ds_dict = builder.build()
     print(ds_dict)
 
-    repo_id = "llm-4-kmu/ehri-ner"  # f"{hf_repo_id}/{dataset_name}"
+    repo_id = "llm-4-kmu/ehri-holocaust-ner"  # f"{hf_repo_id}/{dataset_name}"
     ds_dict.push_to_hub(
         repo_id=repo_id,
         token=os.getenv("HF_TOKEN"),

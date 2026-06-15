@@ -1,0 +1,34 @@
+model: hf
+model_args:
+  pretrained: Qwen/Qwen3.5-9B
+  dtype: bfloat16
+
+apply_chat_template: True
+
+# https://huggingface.co/Qwen/Qwen3.5-9B/discussions/13
+# To avoid thinking tokens, `enable_thinking: False` should be added to tokenizer.apply_chat_template(..).
+# However, this functionality is not available yet in lm-eval-harness.
+# Hence hard-coding chat_template.jinja with `{%- set enable_thinking = false %}`.
+# The modified template is available at: /vol/auto_llm/cache/hub/models--Qwen--Qwen3.5-9B/snapshots/c202236235762e1c871ad0ccb60c8ee5ba337b9a
+
+include_path: tasks
+tasks:
+  - ger_med_ner
+
+limit: 100
+
+num_fewshot: 0
+batch_size: 16
+device: cuda:0
+
+output_path: eval_results
+log_samples: true
+
+wandb_args:
+  project: german-ner-eval
+  name: pre_zero_shot_ger_med_ner_qwen-3.5-9b
+  tags:
+    - test
+    - medical
+    - ger_med_ner
+    - zero_shot

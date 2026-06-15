@@ -1,0 +1,69 @@
+tag:
+  - ner
+
+task: ger_med_ner
+
+dataset_path: llm-4-kmu/ger-med-ner
+test_split: test
+
+description: |
+  Du bist ein präzises System zur Named Entity Recognition (NER) im medizinischen Bereich. Deine Aufgabe ist es, strukturierte Entitäten bezüglich der Medikation aus dem bereitgestellten klinischen Text zu extrahieren und ausschließlich als valides JSON-Objekt zurückzugeben.
+
+  ### Entitätstypen:
+  * **Drug (Medikament)**: Der Name des Arzneimittels oder Wirkstoffs.
+    * *Regeln*: Umfasst Handelsnamen (z. B. "Aspirin"), Generika (z. B. "Ibuprofen") oder Wirkstoffgruppen, wenn sie wie ein spezifisches Medikament verordnet werden.
+  * **Route (Applikationsweg)**: Der Weg, auf dem das Medikament in den Körper gelangt.
+    * *Regeln*: Medizinische Abkürzungen oder Ausschreibungen (z. B. "i.v.", "p.o.", "oral", "subkutan").    
+  * **Strength (Stärke)**: Die Wirkstoffmenge pro Dosiseinheit.
+    * *Regeln*: Enthält die Zahl und die Maßeinheit (z. B. "500 mg", "20 µg", "10%").
+  * **Frequency (Häufigkeit)**: Wie oft das Medikament in einem bestimmten Zeitraum eingenommen werden soll.
+    * *Regeln*: Zeitliche Intervalle oder Angaben (z. B. "3x täglich", "alle 8 Stunden", "bei Bedarf", "wöchentlich").
+  * **Duration (Dauer)**: Der Zeitraum, über den das Medikament eingenommen werden soll.
+    * *Regeln*: Zeitspannen der Therapie (z. B. "für 5 Tage", "für 3 Wochen", "dauerhaft", "bis zum Abklingen der Symptome").    
+  * **Form (Darreichungsform)**: Die galenische Form des Medikaments.
+    * *Regeln*: Die physikalische Form (z. B. "Tabletten", "Filmtabletten", "Salbe", "Suspension", "Tropfen").
+  * **Dosage (Dosis/Dosierung)**: Die Menge des Medikaments, die pro Einnahme eingenommen wird.
+    * *Regeln*: Häufig ausgedrückt in Anzahl der Formen oder Einheiten (z. B. "1-0-1", "1 Tablette", "2 Hübe", "5 ml").
+
+
+
+  ### Regeln:
+  1. Extrahiere die Werte genau so, wie sie im Text vorkommen. Modifiziere oder korrigiere die Sätze, Wörter oder Schreibweisen nicht (Klinische Tippfehler beibehalten).
+  2. Wenn eine Entität im Text nicht vorkommt, gib ein leeres Array [] für diesen Schlüssel an.
+  3. WICHTIG: Das JSON muss absolut valide sein. Setze NIEMALS ein Komma nach dem letzten Element ("Duration"). Vermeide jegliche Syntaxfehler.
+  4. Antworte ausschließlich im folgenden JSON-Format, eingeschlossen in ```json ... ``` Code-Blöcke. Schreibe keinen einleitenden oder erklärenden Text.
+
+  ### Ziel-Format:
+  ```json
+  {
+    "Drug": ["Wert für Medikament"],
+    "Route": ["Wert für Applikationsweg"],
+    "Strength": ["Wert für Stärke"],
+    "Frequency": ["Wert für Häufigkeit"],
+    "Duration": ["Wert für Dauer"],    
+    "Form": ["Wert für Darreichungsform"],
+    "Dosage": ["Wert für Dosis"]
+  }
+  ```
+
+doc_to_text: |
+  ### Eingabetext:
+  "{{input_text}}"
+
+  ### Extrahierte NER-Tags im JSON-Format:
+
+doc_to_target: "{{output_text}}"
+
+fewshot_config:
+  sampler: default
+  split: validation
+
+  doc_to_target: |
+    ```json
+    {{output_text}}
+    ```
+
+process_results: !function utils.process_results
+
+metadata:
+  version: 1.0

@@ -115,6 +115,19 @@ class HumadexGermanNerDataBuilder(TaskDataBuilder):
             for item in ner_dict:
                 sample_ner_dict[item["key"]] = [item["value"]]
 
+            # skipping very short sentences
+            if len(text.strip()) <= 10:
+                continue
+
+            count = 0
+            for _, value in sample_ner_dict.items():
+                if value != []:
+                    count += 1
+
+            # skipping samples with no labels
+            if count == 0:
+                continue
+
             samples[TaskDatasetFeatures.INPUT_TEXT].append(text)
             samples[TaskDatasetFeatures.OUTPUT_TEXT].append(sample_ner_dict)
 

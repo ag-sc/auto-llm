@@ -4,6 +4,11 @@ import re
 from typing import Any, Dict, List, Union
 from thefuzz import fuzz
 
+# TODO: Is this the right approach? When there is no reference,
+# f1-score is usually undefined. But this reduces the overall score.
+# How to deal with this?
+# For now, awarding a score of 1.0 for all metrics
+
 
 def clean_and_extract_json(text: str) -> str:
     def extract_from_tags(text, pattern):
@@ -41,6 +46,9 @@ def parse_dict(text: str) -> Union[Dict, None]:
 
 
 def get_f1_score(expected_value, predicted_value):
+    if expected_value == [] and predicted_value == []:
+        return 1.0
+
     exp_set = set(expected_value)
     pred_set = set(predicted_value)
 
@@ -58,6 +66,9 @@ def get_f1_score(expected_value, predicted_value):
 
 
 def get_fuzzy_match(expected_value, predicted_value):
+    if expected_value == [] and predicted_value == []:
+        return 1.0
+
     fuzzy_match = 0
     for exp_item in expected_value:
         all_ratios = []
@@ -72,6 +83,9 @@ def get_fuzzy_match(expected_value, predicted_value):
 
 
 def get_partial_match(expected_value, predicted_value):
+    if expected_value == [] and predicted_value == []:
+        return 1.0
+
     partial_match = 0
     for item in expected_value:
         if item in predicted_value:
@@ -84,6 +98,9 @@ def get_partial_match(expected_value, predicted_value):
 
 
 def get_exact_match(expected_value, predicted_value):
+    if expected_value == [] and predicted_value == []:
+        return 1.0
+
     exact_match_score = set(expected_value) == set(predicted_value)
     return float(exact_match_score)
 
@@ -129,7 +146,8 @@ def process_results(doc: Dict[str, Any], result: List[str]) -> Dict[str, float]:
     print("Input:", doc.get("input_text", {}))
     print("Expected Output:", expected_entities_dict)
     print("Generated Output:", predicted_response_dict)
-    print("Consolidated Metrics:", consolidated_metrics_dict)
+    print("Consolidated Metrics:", json.dumps(consolidated_metrics_dict, indent=4))
+    print("-----\n\n")
 
     return consolidated_metrics_dict
 
@@ -192,26 +210,16 @@ def get_per_sample_scores(expected_entities_dict: Dict[str, List], predicted_res
 
 
 def get_per_label_scores(expected_entities_dict: Dict[str, List], predicted_response_dict: Dict[str, List]) -> Dict[str, Dict[str, float]]:
-    scores_dict = {
-        "exact_match": 0,
-        "partial_match": 0,
-        "fuzzy_match": 0,
-        "f1_score": 0,
-    }
-
-    per_label_scores_dict = {label: scores_dict for label in list(expected_entities_dict.keys())}
+    per_label_scores_dict = {label: {"exact_match": 0.0, "partial_match": 0.0, "fuzzy_match": 0.0, "f1_score": 0.0} for label in expected_entities_dict.keys()}
 
     if not isinstance(predicted_response_dict, dict):
         print("Cannot parse response, cannot compute score. Keeping scores 0")
         print("----------------------------")
         return per_label_scores_dict
 
-    num_entity_keys_with_values = 0
     for key, expected_value in expected_entities_dict.items():
         if not isinstance(expected_value, list):
             expected_value = [str(expected_value)] if expected_value else []
-
-        num_entity_keys_with_values += 1
 
         predicted_value = predicted_response_dict.get(key, [])
         if not isinstance(predicted_value, list):
@@ -219,26 +227,18 @@ def get_per_label_scores(expected_entities_dict: Dict[str, List], predicted_resp
 
         # 1. Exact match between the Lists
         exact_match = get_exact_match(expected_value, predicted_value)
-        per_label_scores_dict[key]["exact_match"] += exact_match
+        per_label_scores_dict[key]["exact_match"] = exact_match
 
         # 2. Partial match (Exact token containment)
         partial_match = get_partial_match(expected_value, predicted_value)
-        per_label_scores_dict[key]["partial_match"] += partial_match
+        per_label_scores_dict[key]["partial_match"] = partial_match
 
         # 3. Fuzzy ratio match
         fuzzy_match = get_fuzzy_match(expected_value, predicted_value)
-        per_label_scores_dict[key]["fuzzy_match"] += fuzzy_match
+        per_label_scores_dict[key]["fuzzy_match"] = fuzzy_match
 
         # 4. F1 Score
         f1_score = get_f1_score(expected_value, predicted_value)
-        per_label_scores_dict[key]["f1_score"] += f1_score
-
-    for key, expected_value in expected_entities_dict.items():
-        # Guard against completely empty configurations
-        if num_entity_keys_with_values > 0:
-            per_label_scores_dict[key]["exact_match"] /= num_entity_keys_with_values
-            per_label_scores_dict[key]["partial_match"] /= num_entity_keys_with_values
-            per_label_scores_dict[key]["fuzzy_match"] /= num_entity_keys_with_values
-            per_label_scores_dict[key]["f1_score"] /= num_entity_keys_with_values
+        per_label_scores_dict[key]["f1_score"] = f1_score
 
     return per_label_scores_dict

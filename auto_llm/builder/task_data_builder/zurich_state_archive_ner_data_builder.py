@@ -18,7 +18,7 @@ NER_FEATURES = Features({TaskDatasetFeatures.INPUT_TEXT: Value(dtype="string", i
 
 class ZurichStateArchiveNerDataBuilder(TaskDataBuilder):
     """
-    Data from https://github.com/EHRI/EHRI-NER/blob/main/dataset/iob/de/ehri_de.txt
+    Data from https://github.com/machinelearningZH/named-entity-recognition_staatsarchiv
     """
 
     def __init__(self): ...
@@ -62,7 +62,7 @@ def extract_entities_from_xml(file_path: str):
 
     ner_data = []
 
-    # 1. Find all paragraph (<p>) tags anywhere in the document
+    # Find all paragraph (<p>) tags anywhere in the document
     p_elements = root.findall(".//tei:p", ns)
 
     for i, p_element in enumerate(p_elements, start=1):
@@ -72,7 +72,7 @@ def extract_entities_from_xml(file_path: str):
         # Initialize a dictionary for this paragraph's entities
         p_entities = {key: [] for key in keys}
 
-        # 2. Search for entities ONLY inside this specific paragraph element
+        # Search for entities ONLY inside this specific paragraph element
         for key in keys:
             # We use './' to search relative to the current paragraph
             search_path = f"./tei:{key.lower()}Name"
@@ -84,7 +84,19 @@ def extract_entities_from_xml(file_path: str):
                     if et not in p_entities[key]:
                         p_entities[key].append(et)
 
-        # 3. Combine the text and entities into a single structured object
+        # skipping very short sentences
+        if len(p_text.strip()) <= 10:
+            continue
+
+        count = 0
+        for key, value in p_entities.items():
+            if value != []:
+                count += 1
+
+        # skipping samples with no labels
+        if count == 0:
+            continue
+
         ner_data.append(
             {
                 "text": p_text,

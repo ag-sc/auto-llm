@@ -1,4 +1,5 @@
 import json
+import os
 
 from datasets import DatasetDict, Dataset, Features, Value, Sequence
 
@@ -6,9 +7,9 @@ from auto_llm.builder.task_data_builder.task_data_builder import TaskDataBuilder
 from auto_llm.dto.builder_config import TaskDatasetFeatures
 
 
-class GerNerMedDataBuilder(TaskDataBuilder):
+class GerMedNerDataBuilder(TaskDataBuilder):
     """
-    Data from https://github.com/frankkramer-lab/GERNERMED/blob/main/data/GERNERMED_dataset.json
+    Data from https://github.com/frankkramer-lab/GERNERMED/tree/main
     Save the file GERNERMED_dataset.json from https://github.com/frankkramer-lab/GERNERMED/blob/main/data/GERNERMED_dataset.json
     in the path ``/vol/auto_llm/raw_datasets`` before running the builder.
     """
@@ -62,6 +63,18 @@ class GerNerMedDataBuilder(TaskDataBuilder):
                     # print()
                     continue
 
+                # skipping very short sentences
+                if len(de_sent) <= 10:
+                    continue
+
+                # skipping samples with no labels
+                count = 0
+                for _, value in ner_dict.items():
+                    if value != []:
+                        count += 1
+                if count == 0:
+                    continue
+
                 samples[TaskDatasetFeatures.INPUT_TEXT].append(de_sent)
                 samples[TaskDatasetFeatures.OUTPUT_TEXT].append(ner_dict)
 
@@ -77,12 +90,12 @@ class GerNerMedDataBuilder(TaskDataBuilder):
 
 
 if __name__ == "__main__":
-    builder = GerNerMedDataBuilder()
+    builder = GerMedNerDataBuilder()
     ds_dict = builder.build()
     print(ds_dict)
 
-    # repo_id = "llm-4-kmu/ger-ner-med"  # f"{hf_repo_id}/{dataset_name}"
-    # ds_dict.push_to_hub(
-    #     repo_id=repo_id,
-    #     token=os.getenv("HF_TOKEN"),
-    # )
+    repo_id = "llm-4-kmu/ger-med-ner"  # f"{hf_repo_id}/{dataset_name}"
+    ds_dict.push_to_hub(
+        repo_id=repo_id,
+        token=os.getenv("HF_TOKEN"),
+    )

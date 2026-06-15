@@ -1,0 +1,64 @@
+tag:
+  - ner
+
+task: ehri_holocaust_ner
+
+dataset_path: llm-4-kmu/ehri-holocaust-ner
+test_split: test
+
+description: |
+  Du bist ein präzises System zur Named Entity Recognition (NER) für historische Dokumente des Holocausts. Deine Aufgabe ist es, strukturierte Entitäten aus dem bereitgestellten Text zu extrahieren und ausschließlich als valides JSON-Objekt zurückzugeben.
+
+  ### Entitätstypen:
+  * **PERS (Personen)**: Natürliche Personen, historische Akteure, Opfer, Überlebende oder Täter.
+    * *Regeln*: Titel und Anreden werden grundsätzlich weggelassen. Derivierte Personennamen werden ebenfalls erfasst.
+  * **LOC (Orte)**: Geografische Entitäten wie Länder, Städte, Herkunftsorte, Straßen oder Flüsse.
+    * *Regeln*: Extrahiere eindeutige Ortsbezeichnungen sowie kontextuell eindeutige Umschreibungen. Derivierte Ortsnamen (z. B. "schon in Warschau wohnhaft") werden erfasst.
+  * **ORG (Organisationen)**: Institutionen, Behörden, Verbände, Hilfsorganisationen oder militärische/administrative Einheiten.
+    * *Regeln*: Umfasst offizielle Organe (z. B. "Reichssicherheitshauptamt", "Judenrat") sowie informelle oder temporäre Komitees.
+  * **CAMP (Konzentrations- und Vernichtungslager)**: Spezifische Haft-, Arbeits-, Konzentrations- oder Vernichtungslager des NS-Regimes.
+    * *Regeln*: Umfasst Hauptlager (z. B. "Auschwitz-Birkenau", "Dachau") sowie deren Außenlager und Nebenlager.
+  * **DATE (Daten)**: Zeitliche Angaben, spezifische Daten oder Zeiträume.
+    * *Regeln*: Extrahiere konkrete Daten (z. B. "1. September 1939") sowie unvollständige oder relative Zeitangaben (z. B. "im Frühjahr 1943", "Dezember '42").
+  * **GHETTO (Ggettos)**: Spezifisch eingerichtete NS-Ggettos und jüdische Wohnbezirke.
+    * *Regeln*: Orte, die explizit als Ghetto deklariert oder genutzt wurden (z. B. "Theresienstadt", "Ghetto Litzmannstadt").
+
+  ### Regeln:
+  1. Extrahiere die Werte genau so, wie sie im Text vorkommen. Modifiziere oder korrigiere die Sätze oder Wörter nicht.
+  2. Wenn eine Entität im Text nicht vorkommt, gib ein leeres Array [] für diesen Schlüssel an.
+  3. WICHTIG: Das JSON muss absolut valide sein. Setze NIEMALS ein Komma nach dem letzten Element ("GHETTO"). Vermeide jegliche Syntaxfehler.
+  4. Antworte ausschließlich im folgenden JSON-Format, eingeschlossen in ```json ... ``` Code-Blöcke. Schreibe keinen einleitenden oder erklärenden Text.
+
+  ### Ziel-Format:
+  ```json
+  {
+    "PERS": [],
+    "LOC": [],
+    "ORG": [],
+    "CAMP": [],
+    "DATE": [],
+    "GHETTO": []
+  }
+  ```
+
+doc_to_text: |
+  ### Eingabetext:
+  "{{input_text}}"
+
+  ### Extrahierte NER-Tags im JSON-Format:
+
+doc_to_target: "{{output_text}}"
+
+fewshot_config:
+  sampler: default
+  split: validation
+
+  doc_to_target: |
+    ```json
+    {{output_text}}
+    ```
+
+process_results: !function utils.process_results
+
+metadata:
+  version: 1.0

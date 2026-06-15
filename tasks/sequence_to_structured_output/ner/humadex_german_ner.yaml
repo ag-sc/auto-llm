@@ -1,0 +1,55 @@
+tag:
+  - ner
+
+task: humadex_german_ner
+
+dataset_path: llm-4-kmu/humadex-german-ner
+test_split: test
+
+description: |
+  Du bist ein präzises System zur Named Entity Recognition (NER). Deine Aufgabe ist es, strukturierte Entitäten aus dem bereitgestellten klinischen Text zu extrahieren und ausschließlich als valides JSON-Objekt zurückzugeben.
+
+  ### Entitätstypen:
+  * **PROBLEM**: Krankheiten, Symptome und medizinische Zustände.
+    * *Regeln*: Umfasst akute und chronische Erkrankungen, physische oder psychische Symptome, Anomalien sowie jegliche Art von medizinischen Beschwerden oder Diagnosen (z. B. "Diabetes mellitus", "Fieber", "Husten", "Fraktur").
+  * **TEST**: Diagnostische Verfahren und Laboruntersuchungen.
+    * *Regeln*: Umfasst bildgebende Verfahren, Laborwerte, körperliche Untersuchungen und alle Tests, die zur Diagnosestellung oder Überwachung genutzt werden (z. B. "Blutbild", "MRT des Schädels", "EKG", "Blutdruckmessung").
+  * **TREATMENT**: Medikamente, Therapien und andere medizinische Interventionen.
+    * *Regeln*: Umfasst pharmazeutische Präparate (Wirkstoffe und Handelsnamen), operative Eingriffe, physikalische Therapien, Dosierungen sowie pflegerische oder therapeutische Maßnahmen (z. B. "Ibuprofen", "Appendektomie", "Physiotherapie", "Chemotherapie").
+
+  ### Regeln:
+  1. Extrahiere die Werte genau so, wie sie im Text vorkommen. Modifiziere oder korrigiere die Sätze oder Wörter nicht.
+  2. Wenn eine Entität im Text nicht vorkommt, gib ein leeres Array [] für diesen Schlüssel an.
+  3. WICHTIG: Das JSON muss absolut valide sein. Setze NIEMALS ein Komma nach dem letzten Element ("TEST"). Vermeide jegliche Syntaxfehler.
+  4. Antworte ausschließlich im folgenden JSON-Format, eingeschlossen in ```json ... ``` Code-Blöcke. Schreibe keinen einleitenden oder erklärenden Text.
+
+  ### Ziel-Format:
+  ```json
+  {
+    "PROBLEM": ["Wert für Problem"],
+    "TREATMENT": ["Wert für Behandlung"],
+    "TEST": ["Wert für Test"]
+  }
+  ```
+
+doc_to_text: |
+  ### Eingabetext:
+  "{{input_text}}"
+
+  ### Extrahierte NER-Tags im JSON-Format:
+
+doc_to_target: "{{output_text}}"
+
+fewshot_config:
+  sampler: default
+  split: validation
+
+  doc_to_target: |
+    ```json
+    {{output_text}}
+    ```
+
+process_results: !function utils.process_results
+
+metadata:
+  version: 1.0

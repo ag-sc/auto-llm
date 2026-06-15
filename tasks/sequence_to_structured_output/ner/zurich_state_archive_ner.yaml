@@ -1,0 +1,56 @@
+tag:
+  - ner
+
+task: zurich_state_archive_ner
+
+dataset_path: llm-4-kmu/zurich-state-archive-ner
+test_split: test
+
+description: |
+  Du bist ein präzises System zur Named Entity Recognition (NER). Deine Aufgabe ist es, strukturierte Entitäten aus dem bereitgestellten historischen und administrativen Text zu extrahieren und ausschließlich als valides JSON-Objekt zurückzugeben.
+
+  ### Entitätstypen:
+  * **PERS (Personen)**: Natürliche Personen. 
+    * *Regeln*: Titel und Anreden werden grundsätzlich weggelassen (Ausnahme: Adelstitel wie "Erzherzog"). Konjunktionen von Nachnamen werden nicht hier, sondern als Organisationen behandelt. Derivierte Personennamen (z. B. "Tannersche") werden ebenfalls hier erfasst.
+  * **PLACE (Orte)**: Geografische Entitäten und Umschreibungen.
+    * *Regeln*: Neben eindeutigen Ortsbezeichnungen (Länder, Städte, Straßen) werden auch kontextuell eindeutige oder vagere Umschreibungen erfasst (z. B. "Bahnhofsquai", "Limmatraum", "Limmat"). Disambiguierende Präfixe (z. B. "[Kanton] Zürich") werden weggelassen. Hierarchische Ortsbezeichnungen (z. B. "Dillhaus / Saland") werden getrennt ausgezeichnet. Bindestrich-verknüpfte Verkettungen von Ortsnamen (z. B. Bahnlinien) als zusammenhängendes Token werden *nicht* ausgezeichnet. Derivierte Ortsnamen (z. B. "Zürcher", "schweizerischen", "St.Galler") werden mitaufgenommen.
+  * **ORG (Organisationen)**: Unternehmen, Institutionen, Gerichte und administrative Körperschaften.
+    * *Regeln*: Umfasst klassische Organisationen (Unternehmen, Universitäten) sowie Institutionen unterschiedlicher Konkretheit (z. B. "Regierungsrat", "Kantonsrat"). Untergeordnete Organisationen, temporäre Kommissionen oder im Dokument lediglich hypothetische Organisationen werden ebenfalls erfasst. 
+    * *Konjunktionen*: Reine Konjunktionen werden nicht ausgezeichnet. Enthalten Konjunktionen jedoch eingeschachtelte, freistehende und kontextuell eindeutige Entitäten, werden diese separat oder als zusammengesetzte Organisation erfasst (z. B. "Kantonsspitäler [ZürichLOC] und [WinterthurLOC]" oder "[Direktionen der Finanzen und des MilitärsORG]"). Derivierte Organisationen (z. B. "kantonale", "parlamentarische", "bundesrätliche") werden mitaufgenommen.
+
+  ### Regeln:
+  1. Extrahiere die Werte genau so, wie sie im Text vorkommen. Modifiziere oder korrigiere die Sätze oder Wörter nicht.
+  2. Wenn eine Entität im Text nicht vorkommt, gib ein leeres Array [] für diesen Schlüssel an.
+  3. WICHTIG: Das JSON muss absolut valide sein. Setze NIEMALS ein Komma nach dem letzten Element ("PLACE"). Vermeide jegliche Syntaxfehler.
+  4. Antworte ausschließlich im folgenden JSON-Format, eingeschlossen in ```json ... ``` Code-Blöcke. Schreibe keinen einleitenden oder erklärenden Text.
+
+  ### Ziel-Format:
+  ```json
+  {
+    "PERS": ["Wert für Person"],
+    "ORG": ["Wert für Organisation"],
+    "PLACE": ["Wert für Ort"]
+  }
+  ```
+
+doc_to_text: |
+  ### Eingabetext:
+  "{{input_text}}"
+
+  ### Extrahierte NER-Tags im JSON-Format:
+
+doc_to_target: "{{output_text}}"
+
+fewshot_config:
+  sampler: default
+  split: validation
+
+  doc_to_target: |
+    ```json
+    {{output_text}}
+    ```
+
+process_results: !function utils.process_results
+
+metadata:
+  version: 1.0
