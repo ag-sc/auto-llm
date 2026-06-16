@@ -1,7 +1,10 @@
 pydantic~=2.11.7
 transformers==4.53.2
 setuptools~=44.1.1
-# git+https://github.com/EleutherAI/lm-evaluation-harness.git@v0.4.9
+
+lm-eval[api]==0.4.12
+mistral_common==1.11.3
+
 wandb==0.21.0
 PyYAML~=6.0.2
 datasets==4.5.0

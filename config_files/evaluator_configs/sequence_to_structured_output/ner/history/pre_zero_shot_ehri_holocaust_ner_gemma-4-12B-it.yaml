@@ -1,6 +1,6 @@
 model: hf
 model_args:
-  pretrained: Qwen/Qwen3.5-9B
+  pretrained: google/gemma-4-12B-it
   dtype: bfloat16
 
 apply_chat_template: True
@@ -13,9 +13,9 @@ apply_chat_template: True
 
 include_path: tasks
 tasks:
-  - zurich_state_archive_ner
+  - ehri_holocaust_ner
 
-num_fewshot: 5
+num_fewshot: 0
 batch_size: 16
 device: cuda:0
 
@@ -24,8 +24,8 @@ log_samples: true
 
 wandb_args:
   project: german-ner-eval
-  name: pre_few_shot_zurich_state_archive_ner_qwen-3.5-9b
+  name: pre_zero_shot_ehri_holocaust_ner_qwen-3.5-9b
   tags:
     - history
-    - zurich_state_archive_ner
-    - few_shot
+    - ehri_holocaust_ner
+    - zero_shot

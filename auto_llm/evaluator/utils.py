@@ -3,10 +3,12 @@ import json
 import logging
 from typing import Any, Dict, List
 
-from lm_eval.config.evaluate_config import EvaluatorConfig
+import jinja2
+from lm_eval.config.evaluate_config import EvaluatorConfig, eval_logger
 from lm_eval.loggers.wandb_logger import WandbLogger
 import numpy as np
 import pandas as pd
+import transformers
 
 
 class CustomWandbLogger(WandbLogger):
@@ -239,3 +241,56 @@ def run_lm_eval_harness(config_path: str):
 
         if cfg.trackio_args:
             trackio_logger.finish()
+
+
+def mistral3_create_tokenizer(
+    self,
+    pretrained: str | transformers.PreTrainedModel,
+    tokenizer: str | transformers.PreTrainedTokenizer | transformers.PreTrainedTokenizerFast | None,
+    revision: str | None = "main",
+    trust_remote_code: bool | None = False,
+    use_fast_tokenizer: bool | None = True,
+    gguf_file: str | None = None,
+    add_bos_token: bool | None = None,
+    subfolder: str | None = "",
+) -> None:
+    """
+    Tokenizer loading for Mistral 3.
+    Otherwise in lm-eval-harness, faulty tokenization
+    pip install mistral_common==1.11.3
+    """
+    print("Creating MistralCommonBackend tokenizer for", pretrained)
+    self.tokenizer = transformers.MistralCommonBackend.from_pretrained(pretrained)
+
+
+def hf_apply_chat_template(self, chat_history: list[dict[str, str]], add_generation_prompt: bool = True) -> str:
+    """
+    To avoid thinking tokens, `enable_thinking: False` should be added to tokenizer.apply_chat_template(..).
+    See https://huggingface.co/Qwen/Qwen3.5-9B/discussions/13
+    """
+
+    if "Qwen/Qwen3.5" in self.pretrained:
+        # hard-code enable_thinking = False to prevent thinking tokens
+        print(f"Setting `enable_thinking=False` for {self.pretrained}")
+        self.chat_template_args["enable_thinking"] = False
+
+    try:
+        chat_templated = self.tokenizer.apply_chat_template(
+            chat_history,
+            tokenize=False,
+            add_generation_prompt=add_generation_prompt,
+            continue_final_message=not add_generation_prompt,
+            **self.chat_template_args,
+        )
+    except jinja2.exceptions.TemplateError:
+        eval_logger.warning("Failed to apply chat template. removing the system role in chat history.")
+        chat_history = [msg for msg in chat_history if msg["role"] != "system"]
+        chat_templated = self.tokenizer.apply_chat_template(
+            chat_history,
+            tokenize=False,
+            add_generation_prompt=add_generation_prompt,
+            continue_final_message=not add_generation_prompt,
+            **self.chat_template_args,
+        )
+
+    return chat_templated
