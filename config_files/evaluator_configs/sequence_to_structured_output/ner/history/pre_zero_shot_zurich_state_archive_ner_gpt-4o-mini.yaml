@@ -2,6 +2,8 @@ model: openai-chat-completions
 model_args:
   pretrained: gpt-4o-mini-2024-07-18
 
+apply_chat_template: True
+
 include_path: tasks
 tasks:
   - zurich_state_archive_ner
