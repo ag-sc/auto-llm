@@ -5,12 +5,6 @@ model_args:
 
 apply_chat_template: True
 
-# https://huggingface.co/Qwen/Qwen3.5-9B/discussions/13
-# To avoid thinking tokens, `enable_thinking: False` should be added to tokenizer.apply_chat_template(..).
-# However, this functionality is not available yet in lm-eval-harness.
-# Hence hard-coding chat_template.jinja with `{%- set enable_thinking = false %}`.
-# The modified template is available at: /vol/auto_llm/cache/hub/models--Qwen--Qwen3.5-9B/snapshots/c202236235762e1c871ad0ccb60c8ee5ba337b9a
-
 include_path: tasks
 tasks:
   - zurich_state_archive_ner

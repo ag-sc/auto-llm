@@ -21,6 +21,5 @@ wandb_args:
   name: pre_zero_shot_zurich_state_archive_ner_ministral-3-8B-instruct
   tags:
     - history
-    - test
     - zurich_state_archive_ner
     - zero_shot

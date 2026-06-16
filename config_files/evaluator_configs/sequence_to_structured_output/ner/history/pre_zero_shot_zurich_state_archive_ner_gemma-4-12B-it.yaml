@@ -21,6 +21,5 @@ wandb_args:
   name: pre_zero_shot_zurich_state_archive_ner_gemma-4-12B-it
   tags:
     - history
-    - test
     - zurich_state_archive_ner
     - zero_shot
