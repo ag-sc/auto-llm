@@ -1,13 +1,13 @@
 model: hf
 model_args:
-  pretrained: Qwen/Qwen3.5-9B
+  pretrained: google/gemma-4-12B-it
   dtype: bfloat16
 
 apply_chat_template: True
 
 include_path: tasks
 tasks:
-  - ger_med_ner
+  - ger_ps_ner
 
 num_fewshot: 0
 batch_size: 16
@@ -18,8 +18,8 @@ log_samples: true
 
 wandb_args:
   project: german-ner-eval
-  name: pre_zero_shot_ger_med_ner_qwen-3.5-9b
+  name: pre_zero_shot_ger_ps_ner_gemma-4-12B-it
   tags:
-    - medical
-    - ger_med_ner
+    - legal
+    - ger_ps_ner
     - zero_shot
