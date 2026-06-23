@@ -1,0 +1,25 @@
+model: hf
+model_args:
+  pretrained: Qwen/Qwen3.5-2B
+  dtype: bfloat16
+
+apply_chat_template: True
+
+include_path: tasks
+tasks:
+  - german_ler_ner
+
+num_fewshot: 0
+batch_size: 16
+device: cuda:0
+
+output_path: eval_results
+log_samples: true
+
+wandb_args:
+  project: german-ner-eval
+  name: pre_zero_shot_german_ler_ner_qwen-3.5-2b
+  tags:
+    - legal
+    - german_ler_ner
+    - zero_shot

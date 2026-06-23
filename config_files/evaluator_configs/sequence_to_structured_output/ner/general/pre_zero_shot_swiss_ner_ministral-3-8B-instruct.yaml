@@ -1,0 +1,25 @@
+model: hf-mistral3
+model_args:
+  pretrained: mistralai/Ministral-3-8B-Instruct-2512-BF16
+  dtype: bfloat16
+
+apply_chat_template: True
+
+include_path: tasks
+tasks:
+  - swiss_ner
+
+num_fewshot: 0
+batch_size: 16
+device: cuda:0
+
+output_path: eval_results
+log_samples: true
+
+wandb_args:
+  project: german-ner-eval
+  name: pre_zero_shot_swiss_ner_ministral-3-8B-instruct
+  tags:
+    - general
+    - swiss_ner
+    - zero_shot

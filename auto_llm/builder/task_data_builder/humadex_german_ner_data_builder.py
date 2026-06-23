@@ -143,8 +143,8 @@ if __name__ == "__main__":
     print(ds_dict)
     # print(ds_dict[ds_dict.keys()[0]][0])
 
-    repo_id = "llm-4-kmu/humadex-german-ner"  # f"{hf_repo_id}/{dataset_name}"
-    ds_dict.push_to_hub(
-        repo_id=repo_id,
-        token=os.getenv("HF_TOKEN"),
-    )
+    # repo_id = "llm-4-kmu/humadex-german-ner"  # f"{hf_repo_id}/{dataset_name}"
+    # ds_dict.push_to_hub(
+    #     repo_id=repo_id,
+    #     token=os.getenv("HF_TOKEN"),
+    # )

@@ -112,8 +112,8 @@ if __name__ == "__main__":
     ds_dict = builder.build()
     print(ds_dict)
 
-    repo_id = "llm-4-kmu/zurich-state-archive-ner"  # f"{hf_repo_id}/{dataset_name}"
-    ds_dict.push_to_hub(
-        repo_id=repo_id,
-        token=os.getenv("HF_TOKEN"),
-    )
+    # repo_id = "llm-4-kmu/zurich-state-archive-ner"  # f"{hf_repo_id}/{dataset_name}"
+    # ds_dict.push_to_hub(
+    #     repo_id=repo_id,
+    #     token=os.getenv("HF_TOKEN"),
+    # )

@@ -30,9 +30,7 @@ class SftPreProcessor(PreProcessor):
 
         self.check_dataset_tokenizer_compatibility(is_conversational=is_conversational)
 
-        input_sequences, full_sequences = self.collect_sequences(
-            examples=examples, is_conversational=is_conversational
-        )
+        input_sequences, full_sequences = self.collect_sequences(examples=examples, is_conversational=is_conversational)
 
         input_sequences_encodings = self.tokenizer(
             text=input_sequences,
@@ -75,9 +73,7 @@ class SftPreProcessor(PreProcessor):
                 encodings=encodings["labels"],
                 max_length=max_length,
                 padding_side=self.tokenizer.padding_side,
-                pad_token_id=(
-                    -100 if self.completion_only_loss else self.tokenizer.pad_token_id
-                ),
+                pad_token_id=(-100 if self.completion_only_loss else self.tokenizer.pad_token_id),
             ),
         }
 
@@ -93,9 +89,7 @@ class SftPreProcessor(PreProcessor):
         elif "messages" in examples.keys():
             return True
         else:
-            raise Exception(
-                "The passed examples are neither conversational or completion!"
-            )
+            raise Exception("The passed examples are neither conversational or completion!")
 
     @staticmethod
     def is_dataset_conversational(dataset_dict: DatasetDict) -> bool:
@@ -105,9 +99,7 @@ class SftPreProcessor(PreProcessor):
         elif "messages" in ds.column_names:
             return True
         else:
-            raise Exception(
-                "The passed examples are neither conversational or completion!"
-            )
+            raise Exception("The passed examples are neither conversational or completion!")
 
     def collect_sequences(self, examples: Dict[str, List], is_conversational: bool):
         if is_conversational:
@@ -115,9 +107,7 @@ class SftPreProcessor(PreProcessor):
         else:
             return self.collect_sequences_completions(examples=examples)
 
-    def collect_sequences_completions(
-        self, examples: Dict[str, List]
-    ) -> Tuple[List[str], List[str]]:
+    def collect_sequences_completions(self, examples: Dict[str, List]) -> Tuple[List[str], List[str]]:
         input_sequences = []
         full_sequences = []
 
@@ -130,9 +120,7 @@ class SftPreProcessor(PreProcessor):
 
         return input_sequences, full_sequences
 
-    def collect_sequences_conversational(
-        self, examples: Dict[str, List]
-    ) -> Tuple[List[str], List[str]]:
+    def collect_sequences_conversational(self, examples: Dict[str, List]) -> Tuple[List[str], List[str]]:
         input_messages: List[Message] = []
         full_messages: List[Message] = []
         for messages in examples["messages"]:
@@ -149,13 +137,9 @@ class SftPreProcessor(PreProcessor):
             # full_message[last_assistant_idx]["content"] += self.tokenizer.eos_token
             full_messages.append(full_message)
 
-        input_sequences = self.apply_chat_template_to_messages(
-            messages=input_messages, tokenize=False, add_generation_prompt=True
-        )
+        input_sequences = self.apply_chat_template_to_messages(messages=input_messages, tokenize=False, add_generation_prompt=True)
 
-        full_sequences = self.apply_chat_template_to_messages(
-            messages=full_messages, tokenize=False, add_generation_prompt=False
-        )
+        full_sequences = self.apply_chat_template_to_messages(messages=full_messages, tokenize=False, add_generation_prompt=False)
 
         return input_sequences, full_sequences
 
@@ -167,15 +151,11 @@ class SftPreProcessor(PreProcessor):
 
                 # throw a warning if all labels are -100. This means there is nothing to train upon.
                 if list(set(labels_list)):
-                    print(
-                        "***WARNING*** All labels are masked! Please check the input."
-                    )
+                    print("***WARNING*** All labels are masked! Please check the input.")
 
         return labels
 
-    def apply_chat_template_to_messages(
-        self, messages: List[Message], tokenize: bool, add_generation_prompt: bool
-    ) -> List[str]:
+    def apply_chat_template_to_messages(self, messages: List[Message], tokenize: bool, add_generation_prompt: bool) -> List[str]:
         sequences = []
         for message in messages:
             sequences.append(
@@ -188,9 +168,7 @@ class SftPreProcessor(PreProcessor):
         return sequences
 
     @staticmethod
-    def truncate(
-        encodings: Dict[str, List[List[int]]], max_length: int
-    ) -> Dict[str, List[List[int]]]:
+    def truncate(encodings: Dict[str, List[List[int]]], max_length: int) -> Dict[str, List[List[int]]]:
         truncated_encodings = {}
         for key, value in encodings.items():
             items = []
@@ -231,13 +209,11 @@ class SftPreProcessor(PreProcessor):
             if not is_conversational:
                 # case C.
                 print(
-                    f"[WARNING] You are using a non-conversational dataset, but with a tokenizer with chat template. "
+                    f"***WARNING*** You are using a non-conversational dataset, but with a tokenizer with chat template. "
                     f"Better usages will be: (i) Conversational DS + Tokenizer w/ Chat Template or (ii) "
                     f"Non-Conversational DS + Tokenizer w/o Chat Template."
                 )
         else:
             if is_conversational:
                 # case B.
-                raise Exception(
-                    f"You are using a conversational dataset, but with a tokenizer without chat template. Please use a tokenizer with a chat template."
-                )
+                raise Exception(f"You are using a conversational dataset, but with a tokenizer without chat template. Please use a tokenizer with a chat template.")

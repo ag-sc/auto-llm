@@ -1,0 +1,25 @@
+model: hf
+model_args:
+  pretrained: Qwen/Qwen3.5-0.8B
+  dtype: bfloat16
+
+apply_chat_template: True
+
+include_path: tasks
+tasks:
+  - humadex_german_ner
+
+num_fewshot: 0
+batch_size: 16
+device: cuda:0
+
+output_path: eval_results
+log_samples: true
+
+wandb_args:
+  project: german-ner-eval
+  name: pre_zero_shot_humadex_german_ner_qwen-3.5-0.8b
+  tags:
+    - medical
+    - humadex_german_ner
+    - zero_shot

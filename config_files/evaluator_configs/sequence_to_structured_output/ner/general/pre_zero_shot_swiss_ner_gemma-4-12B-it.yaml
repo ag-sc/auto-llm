@@ -1,0 +1,25 @@
+model: hf
+model_args:
+  pretrained: google/gemma-4-12B-it
+  dtype: bfloat16
+
+apply_chat_template: True
+
+include_path: tasks
+tasks:
+  - swiss_ner
+
+num_fewshot: 0
+batch_size: 16
+device: cuda:0
+
+output_path: eval_results
+log_samples: true
+
+wandb_args:
+  project: german-ner-eval
+  name: pre_zero_shot_swiss_ner_gemma-4-12B-it
+  tags:
+    - general
+    - swiss_ner
+    - zero_shot

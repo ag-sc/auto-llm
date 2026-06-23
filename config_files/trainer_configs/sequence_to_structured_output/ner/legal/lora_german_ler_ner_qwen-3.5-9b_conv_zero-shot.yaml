@@ -1,0 +1,106 @@
+auto_llm_trainer_args:
+  trainer_type: sft
+  model_name: Qwen/Qwen3.5-9B
+  attn_implementation: sdpa  # flash_attention_2
+  truncation: True
+  completion_only_loss: True
+
+peft_config:
+  r: 16
+  lora_alpha: 32
+  lora_dropout: 0.05
+  target_modules: "all-linear"
+  task_type: "CAUSAL_LM"
+
+
+tracker_config:
+  wandb_project: german-ner-train
+  wandb_run_name: lora_german_ler_ner_qwen-3.5-9b_conv_zero-shot
+  wandb_run_type: training  
+
+trainer_data_builder_config:
+  dataset_dir: llm-4-kmu/german-ler-ner
+  instruction_template: |
+    Du bist ein präzises System zur Named Entity Recognition (NER). Deine Aufgabe ist es, strukturierte Entitäten aus dem bereitgestellten juristischen Text zu extrahieren und ausschließlich als valides JSON-Objekt zurückzugeben.
+
+    ### Entitätstypen:
+    * **Person**: Allgemeine am Gerichtsverfahren beteiligte Personen, die keine Juristen sind (z. B. Beschuldigte, Kläger, Beklagte, Zeugen oder unabhängige Gutachter).
+    * **Richter**: Richter, die den Vorsitz führen oder im Text erwähnt werden (z. B. "Paul Kirchhof").
+    * **Anwalt**: Rechtliche Vertreter, Strafverteidiger oder Rechtsanwälte, die eine Partei im Verfahren vertreten.
+    * **Land**: Souveräne Staaten, Bundesländer oder Stadtstaaten (z. B. "Mecklenburg-Vorpommern").
+    * **Stadt**: Städte, Gemeinden, Dörfer oder lokale Kommunen.
+    * **Straße**: Straßen, Plätze, Alleen, Straßenkreuzungen oder spezifische lokale Adressen.
+    * **Landschaft**: Kontinente, Gewässer (Flüsse, Seen, Meere), Gebirgszüge und andere natürliche geografische Merkmale.
+    * **Organisation**: Allgemeine Nichtregierungsorganisationen, Vereine, soziale Gruppen oder religiöse Körperschaften (z. B. "Evangelische Kirche").
+    * **Unternehmen**: Private Wirtschaftsunternehmen, Handelsgesellschaften, Betriebe oder Personengesellschaften (in Gerichtsdaten oft abgekürzt oder anonymisiert wie "Firma X...").
+    * **Institution**: Öffentliche staatliche Institutionen, Ministerien, Verwaltungsbehörden oder Regierungsstellen (z. B. "Landesregierung").
+    * **Gericht**: Spezifische Justizorgane, Tribunale oder Gerichte, die den Fall bearbeiten oder auf die verwiesen wird (z. B. "Landgericht Dortmund").
+    * **Marke**: Produktnamen, eingetragene Warenzeichen oder geschützte kommerzielle Markenbezeichnungen.
+    * **Gesetz**: Formelle Gesetze und Statuten, die von legislativen Körperschaften verabschiedet wurden (z. B. "GG", "BGB").
+    * **Verordnung**: Verwaltungsverordnungen oder exekutive Dekrete, die von autorisierten Verwaltungsorganen erlassen wurden.
+    * **Europarechtliche Norm**: Verträge, Verordnungen, Richtlinien oder Beschlüsse aus dem Rechtsrahmen der Europäischen Union.
+    * **Verfügung**: Verwaltungsakte, Rundschreiben, lokale Richtlinien, spezifische regulatorische Anweisungen oder behördliche Bekanntmachungen.
+    * **Vertrag**: Rechtsverbindliche Vereinbarungen oder private Verträge, die zwischen bestimmten Einheiten oder Personen ausgehandelt wurden.
+
+    ### Regeln:
+    1. Extrahiere die Werte genau so, wie sie im Text vorkommen. Modifiziere oder korrigiere die Sätze oder Wörter nicht.
+    2. Wenn eine Entität im Text nicht vorkommt, gib ein leeres Array [] für diesen Schlüssel an.
+    3. WICHTIG: Das JSON muss absolut valide sein. Setze NIEMALS ein Komma nach dem letzten Element ("Literatur"). Vermeide jegliche Syntaxfehler.
+    4. Antworte ausschließlich im folgenden JSON-Format, eingeschlossen in ```json ... ``` Code-Blöcke. Schreibe keinen einleitenden oder erklärenden Text.
+
+    ### Ziel-Format:
+    ```json
+    {
+      "PER": ["Wert für Person"],
+      "RR": ["Wert für Richter"],
+      "AN": ["Wert für Anwalt"],
+      "LD": ["Wert für Land"],
+      "ST": ["Wert für Stadt"],
+      "STR": ["Wert für Straße"],
+      "LDS": ["Wert für Landschaft"],
+      "ORG": ["Wert für Organisation"],
+      "UN": ["Wert für Unternehmen"],
+      "INN": ["Wert für Institution"],
+      "GRT": ["Wert für Gericht"],
+      "MRK": ["Wert für Marke"],
+      "GS": ["Wert für Gesetz"],
+      "VO": ["Wert für Verordnung"],
+      "EUN": ["Wert für Europarechtliche Norm"],
+      "VS": ["Wert für Verfügung"],
+      "VT": ["Wert für Vertrag"],
+    }
+    ```  
+  input_template: |
+    ### Eingabetext:
+    "{{input}}"
+    ### Extrahierte NER-Tags im JSON-Format:
+  
+  output_template: "```json\n{{output}}\n```"
+
+  dataset_type: conversational
+  use_system_message: True 
+  instruction_input_separator: "\n"
+  parse_output_as_json: True
+
+trainer_args:
+  max_length: 1024
+  bf16: True
+  fp16: False
+
+  per_device_train_batch_size: 4
+  per_device_eval_batch_size: 4
+  gradient_accumulation_steps: 32
+  auto_find_batch_size: False
+
+  output_dir: /vol/auto_llm/sft_models/lora_german_ler_ner_qwen-3.5-9b_conv_zero-shot
+  gradient_checkpointing: True
+  num_train_epochs: 1
+  learning_rate: 1e-4
+  warmup_steps: 10
+
+  report_to: wandb
+  logging_steps: 10
+
+  eval_strategy: steps
+  save_strategy: epoch
+

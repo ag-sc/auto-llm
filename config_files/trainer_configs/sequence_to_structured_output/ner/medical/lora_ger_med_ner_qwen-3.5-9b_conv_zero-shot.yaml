@@ -1,0 +1,94 @@
+auto_llm_trainer_args:
+  trainer_type: sft
+  model_name: Qwen/Qwen3.5-9B
+  attn_implementation: sdpa  # flash_attention_2
+  truncation: True
+  completion_only_loss: True
+
+peft_config:
+  r: 16
+  lora_alpha: 32
+  lora_dropout: 0.05
+  target_modules: "all-linear"
+  task_type: "CAUSAL_LM"
+
+
+tracker_config:
+  wandb_project: german-ner-train
+  wandb_run_name: lora_ger_med_ner_qwen-3.5-9b_conv_zero-shot
+  wandb_run_type: training  
+
+trainer_data_builder_config:
+  dataset_dir: llm-4-kmu/ger-med-ner
+  instruction_template: |
+    Du bist ein präzises System zur Named Entity Recognition (NER) im medizinischen Bereich. Deine Aufgabe ist es, strukturierte Entitäten bezüglich der Medikation aus dem bereitgestellten klinischen Text zu extrahieren und ausschließlich als valides JSON-Objekt zurückzugeben.
+
+    ### Entitätstypen:
+    * **Drug (Medikament)**: Der Name des Arzneimittels oder Wirkstoffs.
+      * *Regeln*: Umfasst Handelsnamen (z. B. "Aspirin"), Generika (z. B. "Ibuprofen") oder Wirkstoffgruppen, wenn sie wie ein spezifisches Medikament verordnet werden.
+    * **Route (Applikationsweg)**: Der Weg, auf dem das Medikament in den Körper gelangt.
+      * *Regeln*: Medizinische Abkürzungen oder Ausschreibungen (z. B. "i.v.", "p.o.", "oral", "subkutan").    
+    * **Strength (Stärke)**: Die Wirkstoffmenge pro Dosiseinheit.
+      * *Regeln*: Enthält die Zahl und die Maßeinheit (z. B. "500 mg", "20 µg", "10%").
+    * **Frequency (Häufigkeit)**: Wie oft das Medikament in einem bestimmten Zeitraum eingenommen werden soll.
+      * *Regeln*: Zeitliche Intervalle oder Angaben (z. B. "3x täglich", "alle 8 Stunden", "bei Bedarf", "wöchentlich").
+    * **Duration (Dauer)**: Der Zeitraum, über den das Medikament eingenommen werden soll.
+      * *Regeln*: Zeitspannen der Therapie (z. B. "für 5 Tage", "für 3 Wochen", "dauerhaft", "bis zum Abklingen der Symptome").    
+    * **Form (Darreichungsform)**: Die galenische Form des Medikaments.
+      * *Regeln*: Die physikalische Form (z. B. "Tabletten", "Filmtabletten", "Salbe", "Suspension", "Tropfen").
+    * **Dosage (Dosis/Dosierung)**: Die Menge des Medikaments, die pro Einnahme eingenommen wird.
+      * *Regeln*: Häufig ausgedrückt in Anzahl der Formen oder Einheiten (z. B. "1-0-1", "1 Tablette", "2 Hübe", "5 ml").
+
+    ### Regeln:
+    1. Extrahiere die Werte genau so, wie sie im Text vorkommen. Modifiziere oder korrigiere die Sätze, Wörter oder Schreibweisen nicht (Klinische Tippfehler beibehalten).
+    2. Wenn eine Entität im Text nicht vorkommt, gib ein leeres Array [] für diesen Schlüssel an.
+    3. WICHTIG: Das JSON muss absolut valide sein. Setze NIEMALS ein Komma nach dem letzten Element ("Duration"). Vermeide jegliche Syntaxfehler.
+    4. Antworte ausschließlich im folgenden JSON-Format, eingeschlossen in ```json ... ``` Code-Blöcke. Schreibe keinen einleitenden oder erklärenden Text.
+
+    ### Ziel-Format:
+    ```json
+    {
+      "Drug": ["Wert für Medikament"],
+      "Route": ["Wert für Applikationsweg"],
+      "Strength": ["Wert für Stärke"],
+      "Frequency": ["Wert für Häufigkeit"],
+      "Duration": ["Wert für Dauer"],    
+      "Form": ["Wert für Darreichungsform"],
+      "Dosage": ["Wert für Dosis"]
+    }
+    ```
+
+  input_template: |
+    ### Eingabetext:
+    "{{input}}"
+    ### Extrahierte NER-Tags im JSON-Format:
+  
+  output_template: "```json\n{{output}}\n```"
+
+  dataset_type: conversational
+  use_system_message: True 
+  instruction_input_separator: "\n"
+  parse_output_as_json: True
+
+trainer_args:
+  max_length: 1024
+  bf16: True
+  fp16: False
+
+  per_device_train_batch_size: 32
+  per_device_eval_batch_size: 32
+  gradient_accumulation_steps: 16
+  auto_find_batch_size: False
+
+  output_dir: /vol/auto_llm/sft_models/lora_ger_med_ner_qwen-3.5-9b_conv_zero-shot
+  gradient_checkpointing: True
+  num_train_epochs: 1
+  learning_rate: 1e-4
+  warmup_steps: 10
+
+  report_to: wandb
+  logging_steps: 10
+
+  eval_strategy: steps
+  save_strategy: epoch
+
