@@ -1,0 +1,26 @@
+model: hf
+model_args:
+  pretrained: Qwen/Qwen3.5-9B
+  dtype: bfloat16
+  peft: /vol/auto_llm/sft_models/lora_ger_med_ner_qwen-3.5-9b_conv_zero-shot
+
+apply_chat_template: True
+
+include_path: tasks
+tasks:
+  - ger_med_ner
+
+num_fewshot: 0
+batch_size: 16
+device: cuda:0
+
+output_path: eval_results
+log_samples: true
+
+wandb_args:
+  project: german-ner-eval
+  name: lora_zero_shot_ger_med_ner_qwen-3.5-9b
+  tags:
+    - medical
+    - ger_med_ner
+    - zero_shot
