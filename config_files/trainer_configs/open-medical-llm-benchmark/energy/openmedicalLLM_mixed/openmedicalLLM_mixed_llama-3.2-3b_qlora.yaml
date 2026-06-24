@@ -6,6 +6,7 @@ auto_llm_trainer_args:
   completion_only_loss: True
   energy_profiling: true
   force_cpu_power: 450 # 2× AMD EPYC 7713 @ 225W
+  experiment_notes: "Config_1_QLoRA_r8_alpha16"
   
   # token_budget: 200000000 # 200M tokens
 
@@ -16,8 +17,8 @@ quantization_config:
   bnb_4bit_compute_dtype: "bfloat16"
 
 peft_config:
-  r: 16
-  lora_alpha: 32
+  r: 8
+  lora_alpha: 16
   lora_dropout: 0.05
   target_modules: "all-linear"
   task_type: "CAUSAL_LM"
