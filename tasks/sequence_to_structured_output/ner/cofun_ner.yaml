@@ -1,0 +1,55 @@
+tag:
+  - ner
+
+task: cofun_ner
+
+dataset_path: llm-4-kmu/COFun
+test_split: test
+
+
+description: |
+    Du bist ein präzises System zur Named Entity Recognition (NER). Deine Aufgabe ist es, strukturierte Entitäten aus dem bereitgestellten Text zu extrahieren und ausschließlich als valides JSON-Objekt zurückzugeben.
+
+    ### Entitätstypen:
+    * **Auslagerung**: Eine an ein externes Unternehmen ausgelagerte Tätigkeit oder Funktion (z. B. Portfoliomanagement, Betrieb der IT-Systeme). Auch Auslagerungen in Klammern werden annotiert.
+    * **Ort**: Name einer Stadt, an der sich das beauftragte Unternehmen befindet. Es werden ausschließlich Städte annotiert – keine Länder, Adressen oder Postleitzahlen.
+    * **Software**: Name einer Software oder eines IT-Systems, das im Zusammenhang mit einer Auslagerung erwähnt wird.
+    * **Unternehmen**: Name eines Unternehmens, an das Tätigkeiten ausgelagert wurden. Firmenbezeichnungen werden so vollständig wie möglich annotiert, auch bei Schreibfehlern.
+
+    ### Regeln:
+    1. Extrahiere die Werte genau so, wie sie im Text vorkommen. Modifiziere oder korrigiere die Sätze oder Wörter nicht.
+    2. Wenn eine Entität im Text nicht vorkommt, gib ein leeres Array [] für diesen Schlüssel an.
+    3. WICHTIG: Das JSON muss absolut valide sein. Setze NIEMALS ein Komma nach dem letzten Element ("Unternehmen"). Vermeide jegliche Syntaxfehler.
+    4. Antworte ausschließlich im folgenden JSON-Format, eingeschlossen in ```json ... ``` Code-Blöcke. Schreibe keinen einleitenden oder erklärenden Text.
+
+    ### Ziel-Format:
+    ```json
+    {
+      "Auslagerung": ["Wert für Auslagerung"],
+      "Ort": ["Wert für Ort"],
+      "Software": ["Wert für Software"],
+      "Unternehmen": ["Wert für Unternehmen"]
+    }
+    ```
+
+doc_to_text: |
+  ### Eingabetext:
+  "{{input_text}}"
+
+  ### Extrahierte NER-Tags im JSON-Format:
+
+doc_to_target: "{{output_text}}"
+
+fewshot_config:
+  sampler: default
+  split: validation
+
+  doc_to_target: |
+    ```json
+    {{output_text}}
+    ```
+
+process_results: !function utils.process_results
+
+metadata:
+  version: 1.0

@@ -1,0 +1,73 @@
+tag:
+  - ner
+
+task: fairagro_de_ner
+
+dataset_path: llm-4-kmu/FAIRagroDE
+test_split: test
+
+
+description: |
+    Du bist ein präzises System zur Named Entity Recognition (NER). Deine Aufgabe ist es, strukturierte Entitäten aus dem bereitgestellten Text zu extrahieren und ausschließlich als valides JSON-Objekt zurückzugeben.
+
+    ### Entitätstypen:
+    * **city**: Name einer Stadt, Gemeinde oder eines Dorfes.
+    * **country**: Name eines Landes oder Kontinents.
+    * **cropSpecies**: Name einer Pflanzenart (wissenschaftlich oder gebräuchlich) auf taxonomischer Ebene.
+    * **cropVariety**: Name einer spezifischen Sorte oder Varietät einer Pflanze.
+    * **duration**: Zeitspanne zwischen zwei Zeitpunkten, wenn Start- und Endzeitpunkt nicht einzeln genannt werden.
+    * **endTime**: Zeitpunkt, zu dem ein Ereignis endete (Datum, Jahreszeit oder Kombination).
+    * **region**: Name einer geografischen Region, eines Bundeslandes oder einer übergeordneten administrativen Einheit.
+    * **soilDepth**: Tiefe, aus der eine Bodenprobe entnommen wurde.
+    * **soilOrganicCarbon**: Messbare Bestandteile der organischen Bodensubstanz (organischer Kohlenstoff).
+    * **soilPH**: Wasserstoffionenkonzentration einer Bodenprobe (pH-Wert).
+    * **soilReferenceGroup**: Bodenklassifikation gemäß den WRB-Referenzbodengrupppen (World Reference Base for Soil Resources).
+    * **soilTexture**: Anteil von Sand-, Schluff- und Tonfraktionen in einer Bodenprobe (Bodenart).
+    * **startTime**: Zeitpunkt, zu dem ein Ereignis begann (Datum, Jahreszeit oder Kombination).
+
+    ### Regeln:
+    1. Extrahiere die Werte genau so, wie sie im Text vorkommen. Modifiziere oder korrigiere die Sätze oder Wörter nicht.
+    2. Wenn eine Entität im Text nicht vorkommt, gib ein leeres Array [] für diesen Schlüssel an.
+    3. WICHTIG: Das JSON muss absolut valide sein. Setze NIEMALS ein Komma nach dem letzten Element ("startTime"). Vermeide jegliche Syntaxfehler.
+    4. Antworte ausschließlich im folgenden JSON-Format, eingeschlossen in ```json ... ``` Code-Blöcke. Schreibe keinen einleitenden oder erklärenden Text.
+
+    ### Ziel-Format:
+    ```json
+    {
+      "city": ["Wert für city"],
+      "country": ["Wert für country"],
+      "cropSpecies": ["Wert für cropSpecies"],
+      "cropVariety": ["Wert für cropVariety"],
+      "duration": ["Wert für duration"],
+      "endTime": ["Wert für endTime"],
+      "region": ["Wert für region"],
+      "soilDepth": ["Wert für soilDepth"],
+      "soilOrganicCarbon": ["Wert für soilOrganicCarbon"],
+      "soilPH": ["Wert für soilPH"],
+      "soilReferenceGroup": ["Wert für soilReferenceGroup"],
+      "soilTexture": ["Wert für soilTexture"],
+      "startTime": ["Wert für startTime"]
+    }
+    ```
+
+doc_to_text: |
+  ### Eingabetext:
+  "{{input_text}}"
+
+  ### Extrahierte NER-Tags im JSON-Format:
+
+doc_to_target: "{{output_text}}"
+
+fewshot_config:
+  sampler: default
+  split: validation
+
+  doc_to_target: |
+    ```json
+    {{output_text}}
+    ```
+
+process_results: !function utils.process_results
+
+metadata:
+  version: 1.0

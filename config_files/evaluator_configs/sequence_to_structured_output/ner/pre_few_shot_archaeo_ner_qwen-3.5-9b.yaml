@@ -1,0 +1,27 @@
+model: hf
+model_args:
+  pretrained: Qwen/Qwen3.5-9B
+  dtype: bfloat16
+
+include_path: tasks
+tasks:
+  - archaeo_ner
+
+num_fewshot: 5
+batch_size: 16
+device: cuda:0
+
+apply_chat_template: true
+fewshot_as_multiturn: true
+
+output_path: eval_results
+log_samples: true
+
+wandb_args:
+  project: german-ner-eval
+  entity: llm4kmu
+  name: pre_few_shot_archaeo_ner_qwen-3.5-9b
+  tags:
+    - archaeology
+    - archaeo_ner
+    - few_shot

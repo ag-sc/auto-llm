@@ -1,0 +1,57 @@
+tag:
+  - ner
+
+task: wiki_biography_ner
+
+dataset_path: llm-4-kmu/WikiBiography
+test_split: test
+
+
+description: |
+    Du bist ein präzises System zur Named Entity Recognition (NER). Deine Aufgabe ist es, strukturierte Entitäten aus dem bereitgestellten Text zu extrahieren und ausschließlich als valides JSON-Objekt zurückzugeben.
+
+    ### Entitätstypen:
+    * **loc**: Geografische Ortsangaben wie Städte, Länder, Regionen oder andere benannte Orte (z. B. Deutschland, New York, Tübingen).
+    * **org**: Organisationen, insbesondere Universitäten, Institute und andere Einrichtungen (z. B. Harvard, Ecole Polytechnique, Trinity College). Häufig nur Teilnamen.
+    * **person**: Personenbezeichnungen, einschließlich Eigennamen und Personalpronomen wie 'er', 'ihm', 'sie', die sich auf die beschriebene Person beziehen.
+    * **temp**: Zeitangaben jeglicher Art, darunter Jahreszahlen, Datumsbereiche, Zeitadverbien wie 'heute', 'dann' sowie umgangssprachliche Zeitausdrücke (z. B. 1844, von 1848, Vom Dezember 1836 bis Mai 1837).
+    * **undef_ne**: Automatisch erkannte Eigennamen, die keiner der anderen Kategorien eindeutig zugeordnet werden konnten. Enthält u. a. fremdsprachige Namen, Konzeptnamen und sonstige benannte Entitäten.
+
+    ### Regeln:
+    1. Extrahiere die Werte genau so, wie sie im Text vorkommen. Modifiziere oder korrigiere die Sätze oder Wörter nicht.
+    2. Wenn eine Entität im Text nicht vorkommt, gib ein leeres Array [] für diesen Schlüssel an.
+    3. WICHTIG: Das JSON muss absolut valide sein. Setze NIEMALS ein Komma nach dem letzten Element ("undef_ne"). Vermeide jegliche Syntaxfehler.
+    4. Antworte ausschließlich im folgenden JSON-Format, eingeschlossen in ```json ... ``` Code-Blöcke. Schreibe keinen einleitenden oder erklärenden Text.
+
+    ### Ziel-Format:
+    ```json
+    {
+      "loc": ["Wert für loc"],
+      "org": ["Wert für org"],
+      "person": ["Wert für person"],
+      "temp": ["Wert für temp"],
+      "undef_ne": ["Wert für undef_ne"]
+    }
+    ```
+
+doc_to_text: |
+  ### Eingabetext:
+  "{{input_text}}"
+
+  ### Extrahierte NER-Tags im JSON-Format:
+
+doc_to_target: "{{output_text}}"
+
+fewshot_config:
+  sampler: default
+  split: validation
+
+  doc_to_target: |
+    ```json
+    {{output_text}}
+    ```
+
+process_results: !function utils.process_results
+
+metadata:
+  version: 1.0

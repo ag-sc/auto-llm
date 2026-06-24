@@ -34,4 +34,6 @@ venv/
 
 *alembic*
 
-*eval_results/*
+*eval_results/*logs/
+eval_results/
+logs/
