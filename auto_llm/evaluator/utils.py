@@ -4,6 +4,8 @@ from typing import Any, Dict, List, Optional
 from lm_eval.__main__ import setup_parser, cli_evaluate
 import lm_eval.evaluator as _lm_eval_evaluator
 from lm_eval.tasks import TaskManager
+from transformers import Gemma3Config
+
 
 from auto_llm.registry.evaluator_registry import LM_EVAL_HARNESS_CUSTOM_TASKS_PATH
 
@@ -61,6 +63,24 @@ def get_lm_eval_tasks(lm_eval_args, task_manager: TaskManager = LM_EVAL_TASK_MAN
     tasks = task_manager.load_task_or_group(task_list=task_list)
 
     return tasks
+
+
+def _patch_gemma3_vocab_size() -> None:
+    """Forward ``vocab_size`` onto the composite ``Gemma3Config``.
+
+    transformers >=4.53 only exposes ``vocab_size`` under
+    ``config.text_config`` for multimodal Gemma3 (4b/12b/27b), but
+    lm-eval (v0.4.9) reads ``model.config.vocab_size`` directly during
+    ``HFLM`` construction -> ``AttributeError``. 1b is text-only
+    (``Gemma3TextConfig``) and unaffected.
+    """
+    if not hasattr(Gemma3Config, "vocab_size"):
+        Gemma3Config.vocab_size = property(
+            lambda self: self.text_config.vocab_size
+        )
+
+
+_patch_gemma3_vocab_size()
 
 
 def evaluate_and_capture(lm_eval_args) -> Optional[Dict[str, Any]]:
