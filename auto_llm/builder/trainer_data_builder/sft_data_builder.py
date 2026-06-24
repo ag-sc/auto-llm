@@ -79,9 +79,13 @@ class SftDataBuilder(TrainerDataBuilder):
             ds_dict = load_from_disk(self.dataset_dir)
         else:
             ds_dict = load_dataset(self.dataset_dir)
-            assert isinstance(
-                ds_dict, DatasetDict
-            ), "Please check the dataset_dir provided. It should yield a DatasetDict object."
+            assert isinstance(ds_dict, DatasetDict), "Please check the dataset_dir provided. It should yield a DatasetDict object."
+
+        if self.limit:
+            print(f"***WARNING***You have set a limit of `{self.limit}`. This is intended only for debugging. Please remove this for real trainer runs.")
+            for key, value in ds_dict.items():
+                limit = min(self.limit, len(ds_dict[key]))
+                ds_dict[key] = value.select(range(limit))
 
         ds_dict = ds_dict.map(
             function=self.construct_samples,
@@ -98,14 +102,6 @@ class SftDataBuilder(TrainerDataBuilder):
                 fn_kwargs={"few_shot_split": few_shot_split},
             )
 
-        if self.limit:
-            print(
-                f"***WARNING***You have set a limit of `{self.limit}`. This is intended only for debugging. Please remove this for real trainer runs."
-            )
-            for key, value in ds_dict.items():
-                limit = min(self.limit, len(ds_dict[key]))
-                ds_dict[key] = value.select(range(limit))
-
         return ds_dict
 
     def sanity_check(self):
@@ -114,15 +110,11 @@ class SftDataBuilder(TrainerDataBuilder):
     def construct_samples(self, ds_items: Dict[str, List[Any]]) -> Dict[str, List[Any]]:
         raise NotImplementedError
 
-    def add_few_shot_examples(
-        self, ds_items: Dict[str, List[Any]], few_shot_split: Dataset
-    ) -> Dict[str, List[Any]]:
+    def add_few_shot_examples(self, ds_items: Dict[str, List[Any]], few_shot_split: Dataset) -> Dict[str, List[Any]]:
         raise NotImplementedError
 
     def get_instruction_text(self, text: str) -> str:
-        text = self.instruction_template.replace(
-            PromptPlaceholders.INPUT_TEXT, text.strip()
-        )
+        text = self.instruction_template.replace(PromptPlaceholders.INPUT_TEXT, text.strip())
         return text
 
     def get_input_text(self, text: str) -> str:
@@ -137,9 +129,7 @@ class SftDataBuilder(TrainerDataBuilder):
         if self.parse_output_as_json:
             entities = json.dumps(entities, indent=4).strip()
 
-        completion = self.output_template.replace(
-            PromptPlaceholders.OUTPUT_TEXT, entities
-        )
+        completion = self.output_template.replace(PromptPlaceholders.OUTPUT_TEXT, entities)
         return completion
 
 
@@ -151,9 +141,7 @@ class PromptCompletionsSftDataBuilder(SftDataBuilder):
     def sanity_check(self):
         if PromptPlaceholders.EXAMPLES_TEXT in self.input_template:
             if not self.num_few_shot_examples or self.num_few_shot_examples == 0:
-                print(
-                    f"***WARNING*** You have added the examples placeholder `{PromptPlaceholders.EXAMPLES_TEXT}` but did not pass a valid value for num_few_shot_examples."
-                )
+                print(f"***WARNING*** You have added the examples placeholder `{PromptPlaceholders.EXAMPLES_TEXT}` but did not pass a valid value for num_few_shot_examples.")
 
         if self.num_few_shot_examples and self.num_few_shot_examples >= 1:
             assert self.few_shot_examples_split is not None
@@ -176,9 +164,7 @@ class PromptCompletionsSftDataBuilder(SftDataBuilder):
             # instruction_text = self.get_instruction_text(text=text)
             instruction_text = self.instruction_template
             input_text = self.get_input_text(text=text)
-            prompt = self.get_prompt(
-                instruction_text=instruction_text, input_text=input_text
-            )
+            prompt = self.get_prompt(instruction_text=instruction_text, input_text=input_text)
             completion = self.get_completion(entities=entities)
             example = input_text + "\n" + completion
 
@@ -188,9 +174,7 @@ class PromptCompletionsSftDataBuilder(SftDataBuilder):
 
         return samples
 
-    def add_few_shot_examples(
-        self, ds_items: Dict[str, List[Any]], few_shot_split: Dataset
-    ) -> Dict[str, List[Any]]:
+    def add_few_shot_examples(self, ds_items: Dict[str, List[Any]], few_shot_split: Dataset) -> Dict[str, List[Any]]:
         prompts = []
         for prompt in ds_items[PromptCompletionDatasetFeatures.PROMPT]:
             examples = random.sample(
@@ -216,9 +200,7 @@ class ConversationalSftDataBuilder(SftDataBuilder):
     def sanity_check(self):
         if PromptPlaceholders.EXAMPLES_TEXT in self.input_template:
             if not self.num_few_shot_examples or self.num_few_shot_examples == 0:
-                raise warnings.warn(
-                    f"You have added the examples placeholder but did not pass a valid value for num_few_shot_examples."
-                )
+                raise warnings.warn(f"You have added the examples placeholder but did not pass a valid value for num_few_shot_examples.")
 
         if self.num_few_shot_examples and self.num_few_shot_examples >= 1:
             assert self.few_shot_examples_split is not None
@@ -253,9 +235,7 @@ class ConversationalSftDataBuilder(SftDataBuilder):
                     {"role": "assistant", "content": completion},
                 ]
             else:
-                prompt = self.get_prompt(
-                    instruction_text=instruction_text, input_text=input_text
-                )
+                prompt = self.get_prompt(instruction_text=instruction_text, input_text=input_text)
                 messages = [
                     {"role": "user", "content": prompt},
                     {"role": "assistant", "content": completion},
@@ -266,9 +246,7 @@ class ConversationalSftDataBuilder(SftDataBuilder):
 
         return samples
 
-    def add_few_shot_examples(
-        self, ds_items: Dict[str, List[Any]], few_shot_split: Dataset
-    ) -> Dict[str, List[Any]]:
+    def add_few_shot_examples(self, ds_items: Dict[str, List[Any]], few_shot_split: Dataset) -> Dict[str, List[Any]]:
         new_messages = []
         for messages in ds_items[ConversationalDatasetFeatures.MESSAGES]:
             examples = random.sample(
@@ -283,9 +261,7 @@ class ConversationalSftDataBuilder(SftDataBuilder):
             _new_messages = []
             for message in messages:
                 if message["role"] == "user":
-                    message["content"] = message["content"].replace(
-                        "{{examples}}", examples_str
-                    )
+                    message["content"] = message["content"].replace("{{examples}}", examples_str)
                 _new_messages.append(message)
             new_messages.append(_new_messages)
 

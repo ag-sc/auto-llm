@@ -41,13 +41,32 @@ class SftTrainerWrapper(TrainerWrapper):
     def run(self):
         hf_model_config = AutoConfig.from_pretrained(self.config.auto_llm_trainer_args.model_name).to_dict()
 
-        model = AutoModelForCausalLM.from_pretrained(
-            pretrained_model_name_or_path=self.config.auto_llm_trainer_args.model_name,
-            token=os.getenv("HF_TOKEN"),
-            attn_implementation=self.config.auto_llm_trainer_args.attn_implementation,
-            low_cpu_mem_usage=True,
-            torch_dtype=torch.bfloat16,  # TODO: pass this as trainer arg?
-        )
+        try:
+            model = AutoModelForCausalLM.from_pretrained(
+                pretrained_model_name_or_path=self.config.auto_llm_trainer_args.model_name,
+                token=os.getenv("HF_TOKEN"),
+                attn_implementation=self.config.auto_llm_trainer_args.attn_implementation,
+                low_cpu_mem_usage=True,
+                torch_dtype=torch.bfloat16,  # TODO: pass this as trainer arg?
+            )
+
+        except ValueError as e:
+            # This is a quick hack to support Mistral-3 training.
+            # TODO: Refactor this with a cleaner resolution of model class. Maybe this is the case for many multi-modal models.
+            if "Ministral-3" in self.config.auto_llm_trainer_args.model_name:
+                from transformers import AutoProcessor, Mistral3ForConditionalGeneration
+
+                print(f"Using `Mistral3ForConditionalGeneration` for the model:", self.config.auto_llm_trainer_args.model_name)
+                model = Mistral3ForConditionalGeneration.from_pretrained(
+                    pretrained_model_name_or_path=self.config.auto_llm_trainer_args.model_name,
+                    token=os.getenv("HF_TOKEN"),
+                    attn_implementation=self.config.auto_llm_trainer_args.attn_implementation,
+                    low_cpu_mem_usage=True,
+                    torch_dtype=torch.bfloat16,  # TODO: pass this as trainer arg?
+                )
+            else:
+                raise Exception(e)
+
         tokenizer = AutoTokenizer.from_pretrained(
             pretrained_model_name_or_path=self.config.auto_llm_trainer_args.model_name,
             token=os.getenv("HF_TOKEN"),

@@ -1,6 +1,6 @@
 auto_llm_trainer_args:
   trainer_type: sft
-  model_name: Qwen/Qwen3.5-9B
+  model_name: mistralai/Ministral-3-8B-Instruct-2512-BF16
   attn_implementation: sdpa  # flash_attention_2
   truncation: True
   completion_only_loss: True
@@ -15,7 +15,7 @@ peft_config:
 
 tracker_config:
   wandb_project: german-ner-train
-  wandb_run_name: lora_humadex_german_ner_qwen-3.5-9b_conv_zero-shot
+  wandb_run_name: lora_humadex_german_ner_ministral-3-8B-instruct_conv_zero-shot
   wandb_run_type: training  
 
 trainer_data_builder_config:
@@ -58,7 +58,7 @@ trainer_data_builder_config:
   instruction_input_separator: "\n"
   parse_output_as_json: True
 
-  limit: 30000  # this dataset is pretty big, limiting samples to 30k  
+  limit: 30000  # this dataset is pretty big, limiting samples to 30k
 
 trainer_args:
   max_length: 1024
@@ -70,7 +70,7 @@ trainer_args:
   gradient_accumulation_steps: 32
   auto_find_batch_size: False
 
-  output_dir: /vol/auto_llm/sft_models/lora_humadex_german_ner_qwen-3.5-9b_conv_zero-shot
+  output_dir: /vol/auto_llm/sft_models/lora_humadex_german_ner_ministral-3-8B-instruct_conv_zero-shot
   gradient_checkpointing: True
   num_train_epochs: 1
   learning_rate: 1e-4
