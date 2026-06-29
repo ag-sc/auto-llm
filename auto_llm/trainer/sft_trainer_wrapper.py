@@ -3,7 +3,7 @@ from typing import Dict, Any
 
 import torch
 from accelerate import Accelerator, DistributedType
-from peft import LoraConfig, prepare_model_for_kbit_training # Importato prepare_model
+from peft import LoraConfig, prepare_model_for_kbit_training 
 from transformers import AutoModelForCausalLM, AutoTokenizer, AutoConfig, BitsAndBytesConfig, EarlyStoppingCallback
 from trl import SFTConfig, SFTTrainer
 
@@ -190,7 +190,7 @@ class SftTrainerWrapper(TrainerWrapper):
                 task_type=self.config.peft_config.task_type,
             )
 
-        # Read early-stopping settings from trainer args if provided, else use defaults
+        
         early_stopping_patience = getattr(
             self.config.trainer_args, "early_stopping_patience", 3
         )
