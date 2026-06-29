@@ -7,6 +7,8 @@ import seaborn as sns
 
 api = wandb.Api()
 runs = api.runs("llm4kmu/german-ner-eval")
+# Sort the runs (oldest/earliest first -> newest last)
+runs = sorted(runs, key=lambda run: run.created_at)
 
 results = []
 for run in tqdm(runs):
@@ -175,7 +177,7 @@ for task, group in df_long.groupby("task_name"):
     # plt.savefig(file_path, dpi=300, bbox_inches="tight")
     # print(f"Saved: {file_path}")
 
-    wandb.log({f"f1_results/{task}": wandb.Image(fig)}, step=0)
+    wandb.log({f"f1_results/{task}": wandb.Image(fig)})
     # wandb.run.summary[f"f1_results/{task}"] = wandb.Image(fig)
 
     plt.close(fig)
