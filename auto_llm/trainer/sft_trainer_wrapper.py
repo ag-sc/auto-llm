@@ -4,7 +4,7 @@ from typing import Dict, Any
 import torch
 from accelerate import Accelerator, DistributedType
 from peft import LoraConfig
-from transformers import AutoModelForCausalLM, AutoTokenizer, AutoConfig
+from transformers import AutoModelForCausalLM, AutoModelForImageTextToText, AutoTokenizer, AutoConfig
 from trl import SFTConfig, SFTTrainer
 
 from auto_llm.builder.trainer_data_builder.sft_data_builder import (
@@ -42,39 +42,46 @@ class SftTrainerWrapper(TrainerWrapper):
 
     def run(self):
         hf_model_config = AutoConfig.from_pretrained(self.config.auto_llm_trainer_args.model_name).to_dict()
+        model_type = hf_model_config.get("model_type")
 
-        try:
-            model = AutoModelForCausalLM.from_pretrained(
-                pretrained_model_name_or_path=self.config.auto_llm_trainer_args.model_name,
-                token=os.getenv("HF_TOKEN"),
-                attn_implementation=self.config.auto_llm_trainer_args.attn_implementation,
-                low_cpu_mem_usage=True,
-                torch_dtype=torch.bfloat16,  # TODO: pass this as trainer arg?
-            )
-
-        except ValueError as e:
-            # This is a quick hack to support Mistral-3 training.
-            # TODO: Refactor this with a cleaner resolution of model class. Maybe this is the case for many multi-modal models.
-            if "Ministral-3" in self.config.auto_llm_trainer_args.model_name:
-                from transformers import AutoProcessor, Mistral3ForConditionalGeneration
-
-                print(f"Using `Mistral3ForConditionalGeneration` for the model:", self.config.auto_llm_trainer_args.model_name)
-                model = Mistral3ForConditionalGeneration.from_pretrained(
-                    pretrained_model_name_or_path=self.config.auto_llm_trainer_args.model_name,
-                    token=os.getenv("HF_TOKEN"),
-                    attn_implementation=self.config.auto_llm_trainer_args.attn_implementation,
-                    low_cpu_mem_usage=True,
-                    torch_dtype=torch.bfloat16,  # TODO: pass this as trainer arg?
-                )
-            else:
-                raise Exception(e)
-
-        tokenizer = AutoTokenizer.from_pretrained(
+        # Most checkpoints load via AutoModelForCausalLM. Some (e.g. mistral3 /
+        # Ministral-3) are registered only as image-text-to-text (VLM) models, so
+        # try the causal-LM path first and fall back to the VLM class on failure.
+        # Trying first (rather than pre-deciding from the model_type mapping) is
+        # robust to mapping gaps; using the AutoModel class (rather than a hardcoded
+        # Mistral3 class) generalises to any image-text-to-text checkpoint. The text
+        # LM can still be LoRA-tuned on text-only data; LoRA is scoped below.
+        model_kwargs = dict(
             pretrained_model_name_or_path=self.config.auto_llm_trainer_args.model_name,
             token=os.getenv("HF_TOKEN"),
+            attn_implementation=self.config.auto_llm_trainer_args.attn_implementation,
+            low_cpu_mem_usage=True,
+            torch_dtype=torch.bfloat16,  # TODO: pass this as trainer arg?
+        )
+        try:
+            model = AutoModelForCausalLM.from_pretrained(**model_kwargs)
+            self._is_vlm = False
+        except ValueError:
+            # Not registered as a causal LM (e.g. Mistral3Config raises here).
+            model = AutoModelForImageTextToText.from_pretrained(**model_kwargs)
+            self._is_vlm = True
+
+        # Mistral ships its tokenizer via mistral_common (MistralCommonBackend); the
+        # default-loaded regex is wrong, so request the fix for correct tokenization.
+        tokenizer_kwargs = {"token": os.getenv("HF_TOKEN")}
+        if model_type == "mistral3":
+            tokenizer_kwargs["fix_mistral_regex"] = True
+        tokenizer = AutoTokenizer.from_pretrained(
+            pretrained_model_name_or_path=self.config.auto_llm_trainer_args.model_name,
+            **tokenizer_kwargs,
         )
 
-        tokenizer.pad_token = tokenizer.eos_token
+        # MistralCommonBackend manages its own pad/eos and may not allow assignment.
+        try:
+            if getattr(tokenizer, "pad_token", None) is None:
+                tokenizer.pad_token = tokenizer.eos_token
+        except (AttributeError, ValueError):
+            pass
 
         max_length = self.get_max_length(
             max_length=self.config.trainer_args.max_length,
@@ -168,11 +175,16 @@ class SftTrainerWrapper(TrainerWrapper):
 
         peft_config = None
         if self.config.peft_config:
+            target_modules = self.config.peft_config.target_modules
+            # For VLM checkpoints, "all-linear" would also wrap the (unused) vision
+            # tower; scope LoRA to the language-model projection layers only.
+            if getattr(self, "_is_vlm", False) and target_modules == "all-linear":
+                target_modules = r".*language_model.*\.(q_proj|k_proj|v_proj|o_proj|gate_proj|up_proj|down_proj)"
             peft_config = LoraConfig(
                 r=self.config.peft_config.r,
                 lora_alpha=self.config.peft_config.lora_alpha,
                 lora_dropout=self.config.peft_config.lora_dropout,
-                target_modules=self.config.peft_config.target_modules,
+                target_modules=target_modules,
                 task_type=self.config.peft_config.task_type,
             )
 
