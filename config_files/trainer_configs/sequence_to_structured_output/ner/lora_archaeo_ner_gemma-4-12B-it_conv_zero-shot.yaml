@@ -1,0 +1,91 @@
+auto_llm_trainer_args:
+  trainer_type: sft
+  model_name: google/gemma-4-12B-it
+  attn_implementation: sdpa  # flash_attention_2
+  truncation: True
+  completion_only_loss: True
+
+peft_config:
+  r: 16
+  lora_alpha: 32
+  lora_dropout: 0.05
+  target_modules: "all-linear"
+  task_type: "CAUSAL_LM"
+
+
+tracker_config:
+  wandb_project: german-ner-train
+  wandb_run_name: lora_archaeo_ner_gemma-4-12B-it_conv_zero-shot
+  wandb_run_type: training
+
+trainer_data_builder_config:
+  dataset_dir: llm-4-kmu/ArchaeoNER
+  instruction_template: |
+    Du bist ein präzises System zur Named Entity Recognition (NER). Deine Aufgabe ist es, strukturierte Entitäten aus dem bereitgestellten Text zu extrahieren und ausschließlich als valides JSON-Objekt zurückzugeben.
+
+    ### Entitätstypen:
+    * **ART**: Archäologische Artefakte und Objekte, d. h. von Menschen hergestellte oder bearbeitete Gegenstände (z. B. Keramik, Urnen, Werkzeuge).
+    * **CON**: Archäologische Befunde und Kontexte, d. h. räumlich oder funktional definierte Strukturen wie Gräber, Gruben, Gräberfelder oder Siedlungsbefunde.
+    * **LOC**: Geografische Ortsangaben wie Städte, Regionen, Länder oder archäologische Fundstätten.
+    * **MAT**: Materialien und Rohstoffe, aus denen Objekte bestehen oder die im archäologischen Kontext vorkommen (z. B. Holz, Metall, Ton).
+    * **PER**: Zeitliche Bezeichnungen wie archäologische Epochen, Perioden und Kulturen sowie Jahreszahlen und Datumsangaben (z. B. Jungneolithikum, Bronzezeit, 1990).
+    * **SPE**: Biologische Arten, d. h. Namen von Tier- oder Pflanzenarten, die im archäologischen Kontext erwähnt werden.
+
+    ### Regeln:
+    1. Extrahiere die Werte genau so, wie sie im Text vorkommen. Modifiziere oder korrigiere die Sätze oder Wörter nicht.
+    2. Wenn eine Entität im Text nicht vorkommt, gib ein leeres Array [] für diesen Schlüssel an.
+    3. WICHTIG: Das JSON muss absolut valide sein. Setze NIEMALS ein Komma nach dem letzten Element ("SPE"). Vermeide jegliche Syntaxfehler.
+    4. Antworte ausschließlich im folgenden JSON-Format, eingeschlossen in ```json ... ``` Code-Blöcke. Schreibe keinen einleitenden oder erklärenden Text.
+
+    ### Ziel-Format:
+    ```json
+    {
+      "ART": ["Wert für ART"],
+      "CON": ["Wert für CON"],
+      "LOC": ["Wert für LOC"],
+      "MAT": ["Wert für MAT"],
+      "PER": ["Wert für PER"],
+      "SPE": ["Wert für SPE"]
+    }
+    ```
+
+  input_template: |
+    ### Eingabetext:
+    "{{input}}"
+    ### Extrahierte NER-Tags im JSON-Format:
+
+  output_template: "```json\n{{output}}\n```"
+
+  dataset_type: conversational
+  use_system_message: True
+  instruction_input_separator: "\n"
+  parse_output_as_json: True
+
+trainer_args:
+  max_length: 1024
+  bf16: True
+  fp16: False
+
+  per_device_train_batch_size: 4
+  per_device_eval_batch_size: 4
+  gradient_accumulation_steps: 32
+  auto_find_batch_size: False
+
+  output_dir: /vol/auto_llm/sft_models/lora_archaeo_ner_gemma-4-12B-it_conv_zero-shot
+  gradient_checkpointing: True
+  num_train_epochs: 20
+  learning_rate: 1e-4
+  warmup_steps: 10
+
+  report_to: wandb
+  logging_steps: 10
+
+  # Evaluate once per epoch on the validation split; early-stop after 3 epochs
+  # without eval_loss improvement. save_strategy "no" + KeepBestAdapterCallback keep
+  # at most one checkpoint on disk at any time (always the best so far).
+  eval_strategy: epoch
+  save_strategy: "no"
+  metric_for_best_model: eval_loss
+  greater_is_better: false
+  early_stopping_patience: 3
+  early_stopping_threshold: 0.0

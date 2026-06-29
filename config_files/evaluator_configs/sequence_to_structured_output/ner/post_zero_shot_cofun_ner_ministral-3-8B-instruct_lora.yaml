@@ -1,0 +1,29 @@
+model: hf-mistral3
+model_args:
+  pretrained: mistralai/Ministral-3-8B-Instruct-2512-BF16
+  peft: /vol/auto_llm/sft_models/lora_cofun_ner_ministral-3-8B-instruct_conv_zero-shot
+  dtype: bfloat16
+
+include_path: tasks
+tasks:
+  - cofun_ner
+
+num_fewshot: 0
+batch_size: 16
+device: cuda:0
+
+apply_chat_template: true
+
+output_path: eval_results
+log_samples: true
+
+wandb_args:
+  project: german-ner-eval
+  entity: llm4kmu
+  name: post_cofun_ner_ministral-3-8B-instruct_lora
+  tags:
+    - finance
+    - cofun_ner
+    - zero_shot
+    - fine_tuned
+    - lora

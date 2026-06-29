@@ -1,0 +1,29 @@
+model: hf
+model_args:
+  pretrained: google/gemma-4-12B-it
+  peft: /vol/auto_llm/sft_models/lora_cofun_ner_gemma-4-12B-it_conv_zero-shot
+  dtype: bfloat16
+
+include_path: tasks
+tasks:
+  - cofun_ner
+
+num_fewshot: 0
+batch_size: 16
+device: cuda:0
+
+apply_chat_template: true
+
+output_path: eval_results
+log_samples: true
+
+wandb_args:
+  project: german-ner-eval
+  entity: llm4kmu
+  name: post_cofun_ner_gemma-4-12B-it_lora
+  tags:
+    - finance
+    - cofun_ner
+    - zero_shot
+    - fine_tuned
+    - lora
