@@ -192,6 +192,42 @@ class TrainerArgs(BaseModel):
         title="Save Total Limit",
         default=None,
     )
+    eval_steps: Optional[int | float] = Field(
+        description="Number of update steps between two evaluations if eval_strategy=steps.",
+        title="Eval Steps",
+        default=None,
+    )
+    save_only_model: bool = Field(
+        description="When checkpointing, whether to only save the model or also the optimizer/scheduler/rng state.",
+        title="Save Only Model",
+        default=False,
+    )
+    load_best_model_at_end: bool = Field(
+        description="Whether to load the best model found during training at the end. Requires matching eval/save strategies.",
+        title="Load Best Model At End",
+        default=False,
+    )
+    metric_for_best_model: Optional[str] = Field(
+        description="Metric to use to compare model checkpoints (e.g. 'eval_loss'). Also used by the early-stopping callback.",
+        title="Metric For Best Model",
+        default=None,
+    )
+    greater_is_better: Optional[bool] = Field(
+        description="Whether a higher value of metric_for_best_model is better. Use False for losses.",
+        title="Greater Is Better",
+        default=None,
+    )
+    early_stopping_patience: Optional[int] = Field(
+        description="If set, enables early stopping: training stops after this many evaluations without improvement. "
+        "Also activates the keep-best-only save behavior (at most one checkpoint kept on disk, always the best so far).",
+        title="Early Stopping Patience",
+        default=None,
+    )
+    early_stopping_threshold: float = Field(
+        description="Minimum change in metric_for_best_model to qualify as an improvement for early stopping.",
+        title="Early Stopping Threshold",
+        default=0.0,
+    )
 
 
 class TrackerConfig(BaseModel):

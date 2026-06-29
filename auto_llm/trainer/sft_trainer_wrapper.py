@@ -18,7 +18,9 @@ from auto_llm.dto.builder_config import SftDatasetType, DatasetSplit
 from auto_llm.dto.trainer_run_config import TrainerRunConfig
 from auto_llm.pre_processor.sft_pre_procesor import SftPreProcessor
 from auto_llm.registry.estimator_registry import CTX_LENGTH_KEYS
+from auto_llm.logger import force_blocking_std_streams
 from auto_llm.registry.tracker_registry import WANDB_PROJECT
+from auto_llm.trainer.callbacks import KeepBestAdapterCallback
 from auto_llm.trainer.trainer_wrapper import TrainerWrapper
 
 accelerator = Accelerator()
@@ -132,8 +134,14 @@ class SftTrainerWrapper(TrainerWrapper):
             use_reentrant = False
             ddp_find_unused_parameters = False
 
+        # early_stopping_* are not SFTConfig/TrainingArguments fields; they drive the
+        # KeepBestAdapterCallback below, so exclude them from the SFTConfig kwargs.
+        sft_args_dict = self.config.trainer_args.model_dump(
+            exclude={"early_stopping_patience", "early_stopping_threshold"}
+        )
+
         trainer_args = SFTConfig(
-            **self.config.trainer_args.model_dump(),
+            **sft_args_dict,
             dataset_kwargs={"skip_prepare_dataset": skip_prepare_dataset},
             completion_only_loss=completion_only_loss,
             gradient_checkpointing_kwargs={"use_reentrant": use_reentrant},
@@ -153,6 +161,11 @@ class SftTrainerWrapper(TrainerWrapper):
                 config=self.config.model_dump(),
             )
 
+            # wandb's console capture flips stdout/stderr back to non-blocking during
+            # init; re-assert blocking mode so heavy tqdm/eval writes can't raise
+            # BlockingIOError mid-run (see logger.force_blocking_std_streams).
+            force_blocking_std_streams()
+
         peft_config = None
         if self.config.peft_config:
             peft_config = LoraConfig(
@@ -171,6 +184,21 @@ class SftTrainerWrapper(TrainerWrapper):
             train_dataset=ds_dict[DatasetSplit.TRAIN],
             eval_dataset=ds_dict[DatasetSplit.VALIDATION],
         )
+
+        # If early stopping is configured, keep at most one checkpoint on disk (the best
+        # one by the validation metric) via a custom callback, and let it stop training.
+        # Use with save_strategy="no" so HuggingFace writes no checkpoints of its own.
+        keep_best_callback = None
+        if self.config.trainer_args.early_stopping_patience is not None:
+            keep_best_callback = KeepBestAdapterCallback(
+                output_dir=self.config.trainer_args.output_dir,
+                metric_name=self.config.trainer_args.metric_for_best_model or "eval_loss",
+                greater_is_better=bool(self.config.trainer_args.greater_is_better),
+                patience=self.config.trainer_args.early_stopping_patience,
+                threshold=self.config.trainer_args.early_stopping_threshold,
+            )
+            keep_best_callback.trainer = trainer
+            trainer.add_callback(keep_best_callback)
 
         self.logger.info("Train Dataset")
         self.logger.info(f"# train samples: {len(ds_dict['train'])}")
@@ -197,7 +225,16 @@ class SftTrainerWrapper(TrainerWrapper):
         #     state_dict=state_dict,
         # )
 
-        trainer.save_model(self.config.trainer_args.output_dir)
+        # When keep-best-only is active, the callback has already written the single best
+        # checkpoint to output_dir; saving here would overwrite it with the *last* (worse)
+        # model. Only fall back to saving if the callback never recorded an improvement.
+        if keep_best_callback is not None and keep_best_callback.best is not None:
+            self.logger.info(
+                f"Best {keep_best_callback.metric_name}={keep_best_callback.best} already saved "
+                f"to {self.config.trainer_args.output_dir} by KeepBestAdapterCallback."
+            )
+        else:
+            trainer.save_model(self.config.trainer_args.output_dir)
         tokenizer.save_pretrained(self.config.trainer_args.output_dir)
 
         self.logger.info(f"Model and Tokenizer saved in the path: {self.config.trainer_args.output_dir}")

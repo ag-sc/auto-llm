@@ -5,12 +5,15 @@ import shutil
 import lm_eval.models.mistral3
 import lm_eval.models.huggingface
 from auto_llm.evaluator.utils import hf_apply_chat_template, mistral3_create_tokenizer, run_lm_eval_harness
+from auto_llm.logger import force_blocking_std_streams
 
 # to get STDOUT in wandb. See: https://github.com/wandb/wandb/issues/2182#issuecomment-1447879531
 shutil._USE_CP_SENDFILE = False
 
 
 if __name__ == "__main__":
+    force_blocking_std_streams()
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--config_path")
     args = parser.parse_args()
