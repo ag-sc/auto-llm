@@ -57,6 +57,7 @@ df_long = results_df.melt(
 
 name_mapping = {
     "gpt-4o-mini-2024-07-18": "GPT-4o Mini",
+    "gpt-5.4-mini-2026-03-17": "GPT-5.4 Mini",
     "Ministral-3-8B-Instruct-2512-BF16": "Ministral 8B",
     "lora_Ministral-3-8B-Instruct-2512-BF16": "Ministral 8B\n(LoRA)",
     "Qwen3.5-9B": "Qwen 3.5 9B",
@@ -70,6 +71,7 @@ df_long["short_model"] = df_long["model"].map(name_mapping)
 
 short_model_order = [
     "GPT-4o Mini",
+    "GPT-5.4 Mini",
     "Ministral 8B",
     "Ministral 8B\n(LoRA)",
     "Qwen 3.5 9B",
@@ -80,6 +82,7 @@ short_model_order = [
 
 color_mapping = {
     "GPT-4o Mini": "#4A5568",
+    "GPT-5.4 Mini": "#64676D",
     "Ministral 8B": "#3182CE",
     "Ministral 8B\n(LoRA)": "#3182CE",
     "Qwen 3.5 9B": "#DD6B20",
