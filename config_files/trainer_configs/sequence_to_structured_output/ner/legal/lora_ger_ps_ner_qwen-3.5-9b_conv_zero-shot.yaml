@@ -81,13 +81,16 @@ trainer_args:
 
   output_dir: /vol/auto_llm/sft_models/lora_ger_ps_ner_qwen-3.5-9b_conv_zero-shot
   gradient_checkpointing: True
-  num_train_epochs: 1
+  num_train_epochs: 20
   learning_rate: 1e-4
   warmup_steps: 10
 
   report_to: wandb
   logging_steps: 10
 
-  eval_strategy: steps
-  save_strategy: epoch
-
+  eval_strategy: epoch
+  save_strategy: "no"
+  metric_for_best_model: eval_loss
+  greater_is_better: false
+  early_stopping_patience: 3
+  early_stopping_threshold: 0.0
