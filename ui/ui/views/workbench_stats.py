@@ -5,6 +5,7 @@ import reflex as rx
 
 from ..pages.configure import AppState
 from ..backend.workbench import Workbench
+from ..backend import ROOT_DIR
 from .. import styles
 
 
@@ -43,7 +44,7 @@ def render_individual_job(job):
     """
     return rx.card(
         rx.hstack(
-            rx.text(job["job_path"]),
+            rx.text(job["job_path_short"]),
             rx.spacer(),
             rx.moment(job["timestamp"], from_now=True),
             rx.button(rx.icon("eye"), variant="soft", size="1", on_click=lambda: WorkbenchState.view_job_details(job["job_path"])),
@@ -60,7 +61,7 @@ def workbench_stats_card(username: str) -> rx.Component:
             rx.hstack(
                 rx.hstack(rx.icon("folder-kanban", size=25), rx.heading("Workbench", size="5", weight="bold"), align="center"),
                 rx.button(
-                    rx.icon(tag="refresh-cw", size=20),
+                    rx.icon(tag="refresh-cw", size=15),
                     on_click=lambda: WorkbenchState.get_jobs(username=username),
                 ),
                 width="100%",
@@ -77,7 +78,7 @@ def workbench_stats_card(username: str) -> rx.Component:
             spacing="3",
             width="100%",
         ),
-        width="80%",
+        width="100%",
         box_shadow=styles.box_shadow_style,
         on_mount=lambda: WorkbenchState.get_jobs(username=username),
     )

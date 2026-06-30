@@ -35,3 +35,5 @@ venv/
 *alembic*
 *frontend.zip*
 *backend.zip*
+
+*artifacts*

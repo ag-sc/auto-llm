@@ -1,9 +1,17 @@
+import os
+
 import reflex as rx
 from passlib.hash import argon2
+
+# from ..backend.wandb_client import Client
+from auto_llm.tracker.tracker import WandbClient
 
 
 class UserModel(rx.Model, table=True):
     username: str = rx.Field()
+    firstname: str = rx.Field()
+    lastname: str = rx.Field()
+    organization: str = rx.Field()
     password_hash: str
     is_enabled: bool = True
 
@@ -20,6 +28,8 @@ class User(rx.State):
     username: str = ""
     password: str = ""
     logged_in: bool = False
+
+    user_details: UserModel = None
 
     # Password management temporary variables
     current_password: str = ""
@@ -52,6 +62,11 @@ class User(rx.State):
 
             if user and user.verify_password(self.password):
                 self.logged_in = True
+
+                self.user_details = user
+
+                get_wandb_client(user=self, do_login=True)
+
                 # self.password = ""  # Clean sensitive data from frontend memory
                 return rx.redirect("/overview")
             else:
@@ -101,10 +116,25 @@ class User(rx.State):
         return None
 
     @rx.var
-    def username_display(self) -> str:
+    def firstname_proc(self) -> str:
         if not self.logged_in or not self.username:
             return ""
-        return " ".join([x.title() for x in self.username.split("_")]).strip()
+
+        return self.user_details.firstname.strip().capitalize()
+
+    @rx.var
+    def lastname_proc(self) -> str:
+        if not self.logged_in or not self.username:
+            return ""
+
+        return self.user_details.lastname.strip().capitalize()
+
+    @rx.var
+    def organization_proc(self) -> str:
+        if not self.logged_in or not self.username:
+            return ""
+
+        return self.user_details.organization.strip()
 
     @rx.event
     def handle_sign_out(self):
@@ -118,3 +148,15 @@ class User(rx.State):
         self.password = ""
         self.current_password = ""
         self.new_password = ""
+
+
+def get_wandb_client(user: User, do_login: bool = False) -> WandbClient:
+    org = user.organization_proc.replace(" ", "-")
+    org = org.lower()
+    entity = f"llm4kmu-{org}"
+    client = WandbClient(entity=entity)
+
+    if do_login:
+        client.login(key=os.getenv("WANDB_KEY"))
+
+    return client

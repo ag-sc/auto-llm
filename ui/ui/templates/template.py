@@ -121,12 +121,12 @@ def template(
                     ],
                 ),
                 flex_direction=[
-                    "column",
-                    "column",
-                    "column",
-                    "column",
-                    "column",
-                    "row",
+                    "column",  # xs (mobile)
+                    "column",  # sm
+                    "column",  # md (tablet)
+                    "row",  # lg (laptop) <-- Changed from column
+                    "row",  # xl (normal monitor) <-- Changed from column
+                    "row",  # xxl (huge monitor)
                 ],
                 width="100%",
                 margin="auto",

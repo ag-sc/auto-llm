@@ -12,8 +12,8 @@ from auto_llm.configurator.config_generator import ConfiguratorOutput, Priority,
 from auto_llm.estimator.utils import get_gpu_params
 from auto_llm.tasks.registry import TASKS
 
-from ..backend import CONFIGS_DIR, OUTPUT_DIR
-from ..state.user import User
+from ..backend import CONFIGS_DIR, OUTPUT_DIR, EVAL_RESULTS_DIR
+from ..state.user import User, get_wandb_client
 
 GPU_PARAMS = get_gpu_params()
 
@@ -31,10 +31,10 @@ class AppState(rx.State):
     dataset_path: Optional[str] = ""
     task_category: Optional[str] = ""
     hardware_type: Optional[str] = "NVIDIA L40S"
-    hardware_count: Optional[str] = "1"
+    hardware_count: Optional[str] = "2"
 
     # models tab
-    selected_model: Optional[str] = ""
+    selected_models: Optional[List[str]] = []
 
     # prompts tab
     instruction_template: Optional[str] = ""
@@ -46,6 +46,13 @@ class AppState(rx.State):
     run_group: Optional[str] = ""
 
     start_execution: bool = False
+
+    def toggle_choice(self, choice: str, checked: bool):
+        """Add or remove the choice based on checkbox state."""
+        if checked:
+            self.selected_models.append(choice)
+        else:
+            self.selected_models.remove(choice)
 
     @rx.event
     def reset_state(self):
@@ -63,10 +70,10 @@ class AppState(rx.State):
         self.dataset_path: Optional[str] = ""
         self.task_category: Optional[str] = ""
         self.hardware_type: Optional[str] = "NVIDIA L40S"
-        self.hardware_count: Optional[str] = "1"
+        self.hardware_count: Optional[str] = "2"
 
         # models tab
-        self.selected_model: Optional[str] = ""
+        self.selected_models: Optional[List[str]] = []
 
         # prompts tab
         self.instruction_template: Optional[str] = ""
@@ -97,7 +104,7 @@ class AppState(rx.State):
         self.hardware_count: Optional[str] = data.get("hardware_count", None)
 
         # models tab
-        self.selected_model: Optional[str] = data.get("selected_model", None)
+        self.selected_models: Optional[List[str]] = data.get("selected_models", None)
 
         # prompts tab
         self.instruction_template: Optional[str] = data.get("instruction_template", None)
@@ -114,15 +121,22 @@ class AppState(rx.State):
     def dataset_options_markdown(self) -> str:
         datasets = Automator.get_datasets()
         prefix = "https://huggingface.co/datasets"
-        return "\n".join([f"* [`{d}`]({prefix}/{d})" for d in datasets])
+        return "\n".join([f"* {d} [(link)]({prefix}/{d})" for d in datasets])
 
     @rx.event
     async def handle_submit(self, form_data: dict):
-        if not all([form_data.get("dataset_path"), form_data.get("task_category"), form_data.get("hardware_type")]):
-            yield rx.window_alert("Please fill in all required fields!")
-
         self.is_loading = True
-        yield
+
+        if not all(
+            [
+                form_data.get("dataset_path"),
+                form_data.get("task_category"),
+                # form_data.get("hardware_type"),
+            ]
+        ):
+            yield rx.window_alert("Please fill in all required fields!")
+            self.is_loading = False
+            return
 
         # Logic to fetch models
         model_names, results_df = self.update_models(task=self.task_category, dataset=self.dataset_path, hardware_type=self.hardware_type, hardware_count=int(self.hardware_count))
@@ -158,17 +172,28 @@ class AppState(rx.State):
 
     @staticmethod
     def generate_configs(
-        model_names: List[str], task: str, dataset_path: str, instruction_template: str, input_template: str, output_template: str, configs_path: str
-    ) -> List[ConfiguratorOutput]:
+        model_names: List[str],
+        task: str,
+        dataset_path: str,
+        instruction_template: str,
+        input_template: str,
+        output_template: str,
+        configs_path: str,
+        output_path: str,
+        eval_results_path: str,
+        project_name: str,
+    ) -> List[ConfiguratorOutput]:  # type: ignore
         configurator = TrainEvalRunConfigurator(
             model_names=model_names,
             task=task,
             dataset_path=dataset_path,
             configs_path=configs_path,
-            output_path=OUTPUT_DIR,
+            output_path=output_path,
+            eval_results_path=eval_results_path,
             instruction_template=instruction_template,
             input_template=input_template,
             output_template=output_template,
+            entity_name=project_name,
         )
 
         configurator_outputs = configurator.generate()
@@ -178,18 +203,28 @@ class AppState(rx.State):
     async def handle_prompts_submit(self, form_data: dict):
         timestamp = datetime.datetime.now()
         timestamp_str = timestamp.strftime("%Y-%m-%d_%H-%M-%S")
-        configs_path = f"{CONFIGS_DIR}/{timestamp_str}_configs"
 
-        configs_group_path = f"{CONFIGS_DIR}/{timestamp_str}_configs/run_group.json"
+        user_state = await self.get_state(User)
+        client = get_wandb_client(user=user_state)
+        entity = client.get_entity()
+
+        configs_path = f"{CONFIGS_DIR}/{user_state.username}/{timestamp_str}_configs/"
+        output_path = f"{OUTPUT_DIR}/{user_state.username}/{timestamp_str}_sft_models/"
+        eval_results_path = f"{EVAL_RESULTS_DIR}/{user_state.username}/{timestamp_str}_eval_results/"
+
+        configs_group_path = f"{configs_path}/run_group.json"
 
         configurator_outputs = self.generate_configs(
-            model_names=[self.selected_model],
+            model_names=self.selected_models,
             task=self.task_category,
             dataset_path=self.dataset_path,
             instruction_template=self.instruction_template,
             input_template=self.input_template,
             output_template=self.output_template,
             configs_path=configs_path,
+            output_path=output_path,
+            eval_results_path=eval_results_path,
+            project_name=entity,
         )
 
         sorted_configurator_outputs = []

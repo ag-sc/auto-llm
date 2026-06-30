@@ -1,3 +1,4 @@
+import pandas as pd
 import reflex as rx
 
 from auto_llm.configurator.config_generator import ConfiguratorOutput, ConfigMode, Priority
@@ -6,7 +7,9 @@ from auto_llm.estimator.utils import get_gpu_params
 from auto_llm.tasks.registry import TASKS
 
 from ..state.app_state import AppState
+from ..state.user import User
 from ..state.configuration_state import ConfigurationState
+from .. import styles
 
 from ..components.status_badge import status_badge
 from ..templates import template
@@ -25,6 +28,51 @@ def info_popover(title: str, content: str):
             ),
             width="300px",
         ),
+    )
+
+
+def examples_popover():
+    return rx.dialog.root(
+        rx.dialog.trigger(rx.button("View Examples", variant="soft", size="3")),
+        rx.dialog.content(
+            rx.scroll_area(
+                rx.markdown(ConfigurationState.examples_html),
+                type="always",
+                scrollbars="both",
+                height="50vh",
+            ),
+            rx.dialog.close(rx.button("Close", mt="4")),
+            size="4",
+            width="100%",
+            height="100%",
+        ),
+        width="90vw",
+        height="60vh",
+        max_width="90vw",
+        max_height="60vh",
+        padding="2em",
+    )
+
+
+def explanation_popover():
+    result_desc = f"Please refer to the docs [here](https://ag-sc.github.io/auto-llm/fundamentals/evaluating/) for a detailed explanation on the evaluation metrics."
+
+    return rx.dialog.root(
+        rx.dialog.trigger(rx.button("Interpret Results", variant="soft", size="3")),
+        rx.dialog.content(
+            rx.hstack(rx.icon("star-check", size=16), rx.markdown("**How to interpret the results?**"), align="center"),
+            rx.markdown(ConfigurationState.result_explanation),
+            rx.hstack(rx.icon("octagon-alert", size=16), rx.markdown(result_desc), align="center"),
+            rx.dialog.close(rx.button("Close", mt="4")),
+            size="4",
+            width="100%",
+            height="100%",
+        ),
+        width="75vw",
+        height="80vh",
+        max_width="75vw",
+        max_height="80vh",
+        padding="2em",
     )
 
 
@@ -241,10 +289,17 @@ def show_configuration(configurator_output: ConfiguratorOutput):
     )
 
 
-@template(route="/configure", title="Configure", on_load=AppState.reset_state)
+@template(
+    route="/configure",
+    title="Configure",
+    on_load=[
+        User.check_logged_in,
+        # AppState.reset_state,
+    ],
+)
 def configure() -> rx.Component:
     dataset_path_descr = f"""
-    Path of the dataset. This can either be remote HuggingFace Datasets paths or local paths. 
+    Path of the dataset. We currently support remote HuggingFace Datasets paths. 
 
     Examples:
     {AppState.dataset_options_markdown}
@@ -255,32 +310,15 @@ def configure() -> rx.Component:
     - **Sequence To Sequence**
     - **Sequence To Label**
     - **Sequence To Structured Output**
+
+    Please read the documentation [here](https://ag-sc.github.io/auto-llm/fundamentals/tasks/) for a detailed overview of the supported tasks.
     """
 
     form = rx.form(
         rx.card(
             rx.vstack(
-                # --- Section: Dataset ---
                 rx.vstack(
-                    rx.hstack(
-                        rx.icon("database", size=20),
-                        rx.text("Dataset Path", weight="bold"),
-                        info_popover("Datasets", dataset_path_descr),
-                        align="center",
-                    ),
-                    rx.input(
-                        placeholder="e.g. llm-4-kmu/pubmed_mcqa",
-                        name="dataset_path",
-                        value=AppState.dataset_path,
-                        on_change=AppState.setvar("dataset_path"),
-                        width="100%",
-                        variant="surface",
-                        size="3",
-                    ),
-                    width="100%",
-                    align_items="start",
-                ),
-                rx.vstack(
+                    # --- Section: Dataset ---
                     rx.hstack(
                         rx.icon("layers", size=20),
                         rx.text("Task Category", weight="bold"),
@@ -300,6 +338,25 @@ def configure() -> rx.Component:
                     width="100%",
                     align_items="start",
                 ),
+                rx.vstack(
+                    rx.hstack(
+                        rx.icon("database", size=20),
+                        rx.text("Dataset Path", weight="bold"),
+                        info_popover("Datasets", dataset_path_descr),
+                        align="center",
+                    ),
+                    rx.input(
+                        placeholder="e.g. llm-4-kmu/pubmed_mcqa",
+                        name="dataset_path",
+                        value=AppState.dataset_path,
+                        on_change=AppState.setvar("dataset_path"),
+                        width="100%",
+                        variant="surface",
+                        size="3",
+                    ),
+                    width="100%",
+                    align_items="start",
+                ),
                 # --- Section: Task & Hardware ---
                 rx.grid(
                     rx.vstack(
@@ -309,10 +366,10 @@ def configure() -> rx.Component:
                             placeholder="Select GPU...",
                             name="hardware_type",
                             value=AppState.hardware_type,
-                            on_change=AppState.setvar("hardware_type"),
+                            # on_change=AppState.setvar("hardware_type"),
                             width="100%",
                             size="3",
-                            # disabled=True,
+                            disabled=True,
                         ),
                         align_items="start",
                     ),
@@ -323,10 +380,10 @@ def configure() -> rx.Component:
                             placeholder="1",
                             name="hardware_count",
                             value=AppState.hardware_count,
-                            on_change=AppState.setvar("hardware_count"),
+                            # on_change=AppState.setvar("hardware_count"),
                             width="100%",
                             size="3",
-                            # disabled=True,
+                            disabled=True,
                         ),
                         align_items="start",
                     ),
@@ -334,12 +391,24 @@ def configure() -> rx.Component:
                     spacing="4",
                     width="100%",
                 ),
-                rx.button(
-                    "Next",
-                    type="submit",
+                rx.hstack(
+                    rx.button(
+                        "Reset",
+                        type="button",
+                        width="50%",
+                        size="3",
+                        variant="outline",
+                        on_click=AppState.reset_state,
+                    ),
+                    rx.button(
+                        "Next",
+                        type="submit",
+                        width="50%",
+                        size="3",
+                        variant="solid",
+                    ),
+                    align="center",
                     width="100%",
-                    size="3",
-                    variant="solid",
                 ),
                 spacing="5",
                 padding="4",
@@ -375,20 +444,44 @@ def configure() -> rx.Component:
                     ),
                     width="100%",
                 ),
-                rx.select(
-                    AppState.model_choices,
-                    placeholder="Select a suggested model",
-                    width="100%",
-                    size="3",
-                    value=AppState.selected_model,
-                    on_change=AppState.setvar("selected_model"),
+                rx.box(
+                    rx.foreach(
+                        AppState.model_choices,
+                        lambda choice: rx.checkbox(
+                            choice,
+                            # Triggered when the checkbox state changes
+                            on_change=lambda checked: AppState.toggle_choice(choice, checked),
+                            checked=AppState.selected_models.contains(choice),
+                            spacing="2",
+                        ),
+                    ),
                 ),
-                rx.button(
-                    "Next",
-                    type="submit",
+                # rx.select(
+                #     AppState.model_choices,
+                #     placeholder="Select a suggested model",
+                #     width="100%",
+                #     size="3",
+                #     value=AppState.selected_model,
+                #     on_change=AppState.setvar("selected_model"),
+                # ),
+                rx.hstack(
+                    rx.button(
+                        "Reset",
+                        type="button",
+                        width="50%",
+                        size="3",
+                        variant="outline",
+                        on_click=AppState.reset_state,
+                    ),
+                    rx.button(
+                        "Next",
+                        type="submit",
+                        width="50%",
+                        size="3",
+                        variant="solid",
+                    ),
+                    align="center",
                     width="100%",
-                    size="3",
-                    variant="solid",
                 ),
                 width="100%",
             ),
@@ -482,12 +575,24 @@ def configure() -> rx.Component:
                     width="100%",
                     rows="5",
                 ),
-                rx.button(
-                    "Next",
-                    type="submit",
+                rx.hstack(
+                    rx.button(
+                        "Reset",
+                        type="button",
+                        width="50%",
+                        size="3",
+                        variant="outline",
+                        on_click=AppState.reset_state,
+                    ),
+                    rx.button(
+                        "Next",
+                        type="submit",
+                        width="50%",
+                        size="3",
+                        variant="solid",
+                    ),
+                    align="center",
                     width="100%",
-                    size="3",
-                    variant="solid",
                 ),
                 width="100%",
                 align_items="column",
@@ -542,11 +647,32 @@ def configure() -> rx.Component:
                 justify="between",
                 align="center",
             ),
-            rx.el.iframe(
-                src_doc=ConfigurationState.result_fig,
+            rx.card(
+                rx.el.iframe(
+                    src_doc=ConfigurationState.result_fig,
+                    width="100%",
+                    height="100%",
+                    style={"border": "none", "display": "block", "overflow": "hidden"},
+                ),
+                size="3",
+                box_shadow=styles.box_shadow_style,
                 width="100%",
-                height="100%",
-                style={"border": "none", "display": "block", "overflow": "hidden"},
+                height="60%",
+            ),
+            rx.box(height="5%"),
+            rx.box(
+                rx.hstack(
+                    explanation_popover(),
+                    examples_popover(),
+                    align="center",
+                    spacing="5",
+                    justify="center",
+                ),
+                size="3",
+                padding="4",
+                # box_shadow=styles.box_shadow_style,
+                width="100%",
+                height="10%",
             ),
             width="100%",
             height="100%",
@@ -558,35 +684,43 @@ def configure() -> rx.Component:
         height="80vh",
     )
 
-    return rx.tabs.root(
-        rx.tabs.list(
-            rx.tabs.trigger("Settings", value="settings"),
-            rx.tabs.trigger("Models", value="models"),
-            rx.tabs.trigger("Prompts", value="prompts"),
-            rx.tabs.trigger("Validate", value="validate"),
-            rx.tabs.trigger("Results", value="results"),
+    return rx.flex(
+        rx.box(
+            rx.tabs.root(
+                rx.tabs.list(
+                    rx.tabs.trigger("Settings", value="settings"),
+                    rx.tabs.trigger("Models", value="models"),
+                    rx.tabs.trigger("Prompts", value="prompts"),
+                    rx.tabs.trigger("Validate", value="validate"),
+                    rx.tabs.trigger("Results", value="results"),
+                ),
+                rx.tabs.content(
+                    form,
+                    value="settings",
+                ),
+                rx.tabs.content(
+                    model_results,
+                    value="models",
+                ),
+                rx.tabs.content(
+                    prompt_templates,
+                    value="prompts",
+                ),
+                rx.tabs.content(
+                    jobs_table,
+                    value="validate",
+                ),
+                rx.tabs.content(
+                    results_tab,
+                    value="results",
+                ),
+                default_value="settings",
+                value=AppState.current_tab,
+                on_change=AppState.set_current_tab,
+            ),
+            # flex="1",
         ),
-        rx.tabs.content(
-            form,
-            value="settings",
-        ),
-        rx.tabs.content(
-            model_results,
-            value="models",
-        ),
-        rx.tabs.content(
-            prompt_templates,
-            value="prompts",
-        ),
-        rx.tabs.content(
-            jobs_table,
-            value="validate",
-        ),
-        rx.tabs.content(
-            results_tab,
-            value="results",
-        ),
-        default_value="settings",
-        value=AppState.current_tab,
-        on_change=AppState.set_current_tab,
+        width="100%",
+        height="100%",
+        direction={"sm": "row", "md": "row"},
     )

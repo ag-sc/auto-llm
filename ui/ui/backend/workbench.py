@@ -4,7 +4,7 @@ import os
 from typing import Any, Dict, List
 
 
-from ..backend import CONFIGS_DIR
+from ..backend import CONFIGS_DIR, ROOT_DIR
 
 
 class Workbench:
@@ -31,7 +31,13 @@ class Workbench:
                 path = state_path.replace("configure_state.json", "")
 
                 if settings["username"] == username:
-                    job_details.append({"job_path": path, "timestamp": dt_object})
+                    job_details.append(
+                        {
+                            "job_path": path,
+                            "job_path_short": path.replace(ROOT_DIR, ""),
+                            "timestamp": dt_object,
+                        }
+                    )
 
         job_details.sort(key=lambda x: x["timestamp"], reverse=True)
 

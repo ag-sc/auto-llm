@@ -15,7 +15,7 @@ hover_accent_bg = {"_hover": {"background_color": accent_color}}
 content_width_vw = "100vw"
 sidebar_width = "16em"
 sidebar_content_width = "16em"
-max_width = "1480px"
+max_width = "90vw"  # "1480px"
 color_box_size = ["2.25rem", "2.25rem", "2.5rem"]
 
 

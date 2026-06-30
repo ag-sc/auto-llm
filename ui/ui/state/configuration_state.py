@@ -1,22 +1,55 @@
 import asyncio
 from typing import Any, Dict
 
+import pandas as pd
 import plotly
 import reflex as rx
 import yaml
 
-from auto_llm.configurator.config_generator import ConfiguratorOutput
+from auto_llm.configurator.config_generator import ConfigMode, ConfiguratorOutput
 from auto_llm.estimator.emission_estimator import EmissionEstimator
 from auto_llm.estimator.inference_flops_estimator import InferenceFlopsEstimator
 from auto_llm.estimator.runtime_estimator import RuntimeEstimator
 from auto_llm.estimator.trainer_flops_estimator import TrainerFlopsEstimator
 from auto_llm.estimator.utils import get_gpu_params, get_model_params
-from auto_llm.registry.tracker_registry import WANDB_PROJECT
+from auto_llm.registry.tracker_registry import WANDB_TRAIN_PROJECT, WANDB_EVAL_PROJECT
 
 from ..state.app_state import AppState
-from ..backend.wandb_client import Client
+from ..state.user import User, get_wandb_client
+
+# from ..backend.wandb_client import Client
 
 GPU_PARAMS = get_gpu_params()
+
+
+TEMPLATE = """\
+## Example {idx}
+
+### **Input Text**
+{input_text}
+
+### **Expected Output:**
+{expected_output}
+
+---
+
+### **Results**
+{results}
+"""
+
+RESULTS_TEMPLATE = """\
+**Model:** ``{run_name}``
+
+**Output:**<br>
+{generated_output}
+
+**Scores:**
+```json
+{scores}
+```
+
+---
+"""
 
 
 class ConfigurationState(rx.State):
@@ -31,9 +64,13 @@ class ConfigurationState(rx.State):
 
     current_html_content: str = ""
     result_fig: str = ""
+    result_explanation: str = ""
+    examples_df: pd.DataFrame = ""
+    examples_html: str = ""
 
     is_polling: bool = False
     is_loading_results: bool = False
+    is_results_loaded: bool = False
 
     config_statuses: Dict[str, str] = {}
 
@@ -50,8 +87,13 @@ class ConfigurationState(rx.State):
 
         self.current_html_content: str = ""
         self.result_fig: str = ""
+        self.result_explantion: str = ""
+        self.examples_df: pd.DataFrame = ""
+        self.examples_html: str = ""
 
         self.is_polling: bool = False
+
+        self.is_results_loaded: bool = False
 
         self.config_statuses: Dict[str, str] = {}
 
@@ -115,23 +157,24 @@ class ConfigurationState(rx.State):
 
     async def load_config_statuses(self):
         form_state = await self.get_state(AppState)
+        user_state = await self.get_state(User)
+        client = get_wandb_client(user=user_state)
         for cfg in form_state.configurator_outputs:
             try:
-                state = Client.get_run_state(run_id=cfg.run_id, project_name=WANDB_PROJECT)
+                project_name = WANDB_TRAIN_PROJECT if cfg.mode == ConfigMode.TRAINER_RUN_CFG else WANDB_EVAL_PROJECT
+                state = client.get_run_state(run_id=cfg.run_id, project_name=project_name)
                 self.config_statuses[cfg.run_id] = state
             except Exception:
                 self.config_statuses[cfg.run_id] = "pending"
 
-    def load_config_html(self, configurator_output: ConfiguratorOutput):
-        # if configurator_output.run_id:
-        #     self.current_html_content = Client.get_loss_plot(run_id=configurator_output.run_id, project_name="llm4kmu-train")
-        # else:
-        #     run = Client.get_run_details(run_name=configurator_output.run_name, project_name="llm4kmu-train", dt_object=datetime.datetime.now(), user_name="viju-sudhi")
-        #     self.current_html_content = Client.get_run_plot_html(run)
+    async def load_config_html(self, configurator_output: ConfiguratorOutput):
+        user_state = await self.get_state(User)
+        client = get_wandb_client(user=user_state)
+        project_name = WANDB_TRAIN_PROJECT if configurator_output.mode == ConfigMode.TRAINER_RUN_CFG else WANDB_EVAL_PROJECT
 
-        run_html = Client.get_run_url(
+        run_html = client.get_run_url(
             run_id=configurator_output.run_id,
-            project_name=WANDB_PROJECT,
+            project_name=project_name,
         )
         self.current_html_content = f'<iframe src="{run_html}" ' f'style="width:100%; height:80vh; border:none; display:block;" ' f"allowfullscreen></iframe>"
 
@@ -141,13 +184,22 @@ class ConfigurationState(rx.State):
         self.result_fig = ""
         yield
 
+        loop = asyncio.get_event_loop()
+        # Fetch the HTML string from your tracker Client
+        # result_fig = Client.get_eval_runs_of_group(group=group, project_name=WANDB_PROJECT)
+        user_state = await self.get_state(User)
+        client = get_wandb_client(user=user_state)
+        project_name = WANDB_EVAL_PROJECT  # results always come from the eval project
+
         try:
-            loop = asyncio.get_event_loop()
-            # Fetch the HTML string from your tracker Client
-            # result_fig = Client.get_eval_runs_of_group(group=group, project_name=WANDB_PROJECT)
-            result_fig = await loop.run_in_executor(None, Client.get_eval_runs_of_group, group, WANDB_PROJECT)
+            result_fig, result_explanation, examples_df = await loop.run_in_executor(None, client.get_eval_runs_of_group, group, project_name)
 
             self.result_fig = result_fig
+            self.result_explanation = result_explanation
+            self.examples_df = examples_df
+            self.examples_html = self.display_examples()
+
+            self.is_results_loaded = True
         except Exception as e:
             print(f"Error loading W&B: {e}")
             rx.window_alert(f"Failed to fetch data: {str(e)}")
@@ -168,11 +220,56 @@ class ConfigurationState(rx.State):
             # Sync with the State to update variables safely
             async with self:
                 form_state = await self.get_state(AppState)
+                user_state = await self.get_state(User)
+                client = get_wandb_client(user=user_state)
+
                 for cfg in form_state.configurator_outputs:
                     try:
-                        state = Client.get_run_state(run_id=cfg.run_id, project_name=WANDB_PROJECT)
+                        project_name = WANDB_TRAIN_PROJECT if cfg.mode == ConfigMode.TRAINER_RUN_CFG else WANDB_EVAL_PROJECT
+                        state = client.get_run_state(run_id=cfg.run_id, project_name=project_name)
                         self.config_statuses[cfg.run_id] = state
                     except Exception:
                         self.config_statuses[cfg.run_id] = "pending"
 
             await asyncio.sleep(5)
+
+    def display_examples(self):
+        samples_text = []
+
+        cols_to_drop = [
+            "id",
+            "data",
+            "input_len",
+            "labels",
+            "output_type",
+            "raw_predictions",
+            "filtered_predictions",
+        ]
+        for idx, group_df in self.examples_df.groupby("id"):
+            result_texts = []
+            for idx, item in group_df.iterrows():
+                filtered_item = item.copy()
+                for col in cols_to_drop:
+                    filtered_item.pop(col)
+
+                scores_json = filtered_item.to_json(indent=4)
+                result = dict(
+                    run_name=item["run_name"],
+                    generated_output=item["filtered_predictions"],
+                    scores=scores_json,
+                )
+                result_text = RESULTS_TEMPLATE.format(**result)
+
+                result_texts.append(result_text)
+
+            sample = dict(
+                idx=idx,
+                input_text=group_df.iloc[0]["data"],
+                expected_output=group_df.iloc[0]["labels"],
+                results="\n".join(result_texts),
+            )
+
+            sample_text = TEMPLATE.format(**sample)
+            samples_text.append(sample_text)
+
+        return samples_text[0]

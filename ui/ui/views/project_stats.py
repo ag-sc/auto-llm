@@ -1,8 +1,6 @@
 import reflex as rx
 from reflex.components.radix.themes.base import LiteralAccentColor
 
-from .. import styles
-
 
 def stats_card(project_name: str, project_url: str, num_runs: int, runtime: float, emission: float) -> rx.Component:
     return rx.card(
@@ -47,12 +45,12 @@ def stats_card(project_name: str, project_url: str, num_runs: int, runtime: floa
                     ),
                     rx.text(f"{runtime} hours", weight="medium"),
                     # emission
-                    rx.icon(
-                        tag="leaf",
-                        size=20,
-                        color=rx.color("green", 9),
-                    ),
-                    rx.text(f"{emission} CO2", weight="medium"),
+                    # rx.icon(
+                    #     tag="leaf",
+                    #     size=20,
+                    #     color=rx.color("green", 9),
+                    # ),
+                    # rx.text(f"{emission} CO2", weight="medium"),
                     spacing="2",
                     align="center",
                 ),
@@ -67,27 +65,33 @@ def stats_card(project_name: str, project_url: str, num_runs: int, runtime: floa
 
 
 def stats_cards(list_stats_cards) -> rx.Component:
-    return rx.card(
-        rx.vstack(
-            rx.hstack(rx.icon("panels-top-left", size=25), rx.heading("Projects", size="5", weight="bold"), align="center"),
-            rx.scroll_area(
-                rx.grid(
-                    list_stats_cards,
-                    gap="1rem",
-                    grid_template_columns=[
-                        "1fr",
-                        "repeat(1, 1fr)",
-                        "repeat(2, 1fr)",
-                        "repeat(3, 1fr)",
-                        "repeat(3, 1fr)",
-                    ],
-                    width="100%",
-                ),
-                type="always",
-                scrollbars="vertical",
-                height="30vh",
-            ),
+    return rx.scroll_area(
+        rx.grid(
+            list_stats_cards,
+            gap="1rem",
+            grid_template_columns=[
+                "1fr",
+                "repeat(1, 1fr)",
+                "repeat(2, 1fr)",
+                "repeat(3, 1fr)",
+                "repeat(3, 1fr)",
+            ],
+            width="100%",
         ),
-        width="80%",
-        box_shadow=styles.box_shadow_style,
+        type="always",
+        scrollbars="vertical",
+        height="30vh",
+    )
+
+
+def stats_cards_empty() -> rx.Component:
+    return rx.scroll_area(
+        rx.center(
+            rx.spinner(size="3"),
+            width="100%",
+            height="100%",
+        ),
+        type="always",
+        scrollbars="vertical",
+        height="30vh",
     )
