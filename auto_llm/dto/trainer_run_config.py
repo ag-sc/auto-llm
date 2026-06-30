@@ -195,6 +195,11 @@ class TrainerArgs(BaseModel):
 
 
 class TrackerConfig(BaseModel):
+    wandb_entity: Optional[str] = Field(
+        description="The W&B entity to which this run belongs.",
+        title="W&B Entity",
+        default=None,
+    )
     wandb_project: Optional[str] = Field(
         description="The W&B project name to which this training run belongs. This is used to group multiple training runs together in W&B for better organization and comparison.",
         title="W&B Project",

@@ -7,12 +7,7 @@ from auto_llm.configurator.config_generator import (
     Priority,
     ConfigMode,
 )
-from auto_llm.registry.configurator_registry import (
-    SLURM_EVALUATOR_RUN_SCRIPT, 
-    NATIVE_EVALUATOR_RUN_SCRIPT,
-    SLURM_TRAINER_RUN_SCRIPT, 
-    NATIVE_TRAINER_RUN_SCRIPT
-)
+from auto_llm.registry.configurator_registry import SLURM_EVALUATOR_RUN_SCRIPT, NATIVE_EVALUATOR_RUN_SCRIPT, SLURM_TRAINER_RUN_SCRIPT, NATIVE_TRAINER_RUN_SCRIPT
 
 # TODO: Implement python-based config executor
 
@@ -221,7 +216,6 @@ set -e
         print(f"Pipeline started in tmux session: {session_name}")
 
 
-
 class TaskSpoolerSequentialConfigExecutor:
     """
     Task-Spooler based Config Executor without adding dependencies based on priority.
@@ -253,13 +247,39 @@ class TaskSpoolerSequentialConfigExecutor:
                 cmds[key].append(self._get_evaluator_run_suffix(cfg_output))
 
         all_cmds = []
+        all_job_ids = []
         for prio_str, cmds_list in cmds.items():
             all_cmds.append(f"\n\n# Priority {Priority[prio_str].value} runs below")
 
+            if prio_str == Priority.PRIORITY_THREE.value:
+                # add a short delay before proceeding with evalaution. This helps the
+                # model weights to be saved before the evaluation starts.
+                all_cmds.append(f"sleep 60s # before executing eval runs of trained models")
+
+            job_ids_prio = []
+            if prio_str == Priority.PRIORITY_ONE.name:
+                dependencies = None
+            else:
+                job_ids = f",$".join(all_job_ids[-1])
+                if prio_str == Priority.PRIORITY_TWO.name:
+                    dependencies = f"-D ${job_ids}"  # the job will be run after the job of given IDs ends
+                elif prio_str == Priority.PRIORITY_THREE.name:
+                    dependencies = f"-W ${job_ids}"  # the job will be run after the job of given IDs ends well (exit code 0)
+                else:
+                    raise Exception(f"Unknown priority type {prio_str}")
+
             for idx, cmd in enumerate(cmds_list):
+                job_id_var = f"p{Priority[prio_str].value}j{idx+1}"
+                job_ids_prio.append(job_id_var)
+
                 # TODO: how to set the num of GPUs? Now setting 1 always.
-                cmd_w_prefix = f"ts -G 1 bash {cmd}"
+                if dependencies:
+                    cmd_w_prefix = f"{job_id_var}=$(ts -G 1 {dependencies} bash {cmd})"
+                else:
+                    cmd_w_prefix = f"{job_id_var}=$(ts -G 1 bash {cmd})"
+
                 all_cmds.append(cmd_w_prefix)
+            all_job_ids.append(job_ids_prio)
 
         print(all_cmds)
         run_script_path = f"{configs_path}/run.sh"
@@ -305,4 +325,4 @@ echo $pwd
 
         # tmux_cmd = f"tmux new-session -d -s {session_name} '{script_cmd}; exec bash'"
         subprocess.run(tmux_restart_cmd, shell=True)
-        print(f"Pipeline started in tmux session: {session_name}")        
+        print(f"Pipeline started in tmux session: {session_name}")

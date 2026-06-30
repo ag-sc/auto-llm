@@ -103,6 +103,8 @@ class Automator:
         api = HfApi()
         datasets = api.list_datasets(author="llm-4-kmu")
         dataset_names = [d.id for d in datasets]
+
+        dataset_names = [x for x in dataset_names if "qa" in x]
         return dataset_names
 
 

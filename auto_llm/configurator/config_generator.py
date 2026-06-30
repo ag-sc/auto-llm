@@ -15,7 +15,8 @@ from auto_llm.dto.trainer_run_config import (
     TrainerRunConfig,
 )
 from auto_llm.registry.evaluator_registry import LM_EVAL_HARNESS_CUSTOM_TASKS_PATH
-from auto_llm.registry.tracker_registry import WANDB_PROJECT
+
+from auto_llm.registry.tracker_registry import WANDB_EVAL_PROJECT
 
 
 class Priority(str, enum.Enum):
@@ -46,6 +47,8 @@ class TrainEvalRunConfigurator:
         dataset_path: str,
         output_path: str,
         configs_path: str,
+        eval_results_path: str,
+        entity_name: str,
         instruction_template: str,
         input_template: str,
         output_template: str,
@@ -57,6 +60,8 @@ class TrainEvalRunConfigurator:
 
         self.output_path = output_path
         self.configs_path = configs_path
+        self.eval_results_path = eval_results_path
+        self.entity_name = entity_name
         os.makedirs(self.configs_path, exist_ok=True)
 
         self.instruction_template = instruction_template
@@ -80,18 +85,24 @@ class TrainEvalRunConfigurator:
 
         trainer_config_outputs = []
         for model_name in self.model_names:
-            config_outputs = self._generate_trainer_config_outputs(model_name=model_name)
+            config_outputs = self._generate_trainer_config_outputs(
+                model_name=model_name,
+            )
             trainer_config_outputs.extend(config_outputs)
 
         evaluator_config_outputs = []
         # build evaluator configs for pre-trained models
         for model_name in self.model_names:
-            config_outputs = self._generate_evaluator_config_outputs(model_name=model_name)
+            config_outputs = self._generate_evaluator_config_outputs(
+                model_name=model_name,
+            )
             evaluator_config_outputs.extend(config_outputs)
 
         # build evaluator configs for fine-tuned models
         for config_output in trainer_config_outputs:
-            config_outputs = self._generate_evaluator_config_outputs(trainer_config_output=config_output)
+            config_outputs = self._generate_evaluator_config_outputs(
+                trainer_config_output=config_output,
+            )
             evaluator_config_outputs.extend(config_outputs)
 
         all_config_outputs = []
@@ -118,7 +129,13 @@ class TrainEvalRunConfigurator:
 
         return config_outputs
 
-    def get_trainer_run_config(self, dataset_type: str, model_name: str, model_output_dir: str, run_name: str) -> List[ConfiguratorOutput]:
+    def get_trainer_run_config(
+        self,
+        dataset_type: str,
+        model_name: str,
+        run_name: str,
+        model_output_dir: str = None,
+    ) -> List[ConfiguratorOutput]:
         config_outputs = []
         auto_llm_trainer_args = self.build_auto_llm_trainer_args(model_name=model_name)
 
@@ -163,6 +180,7 @@ class TrainEvalRunConfigurator:
             trainer_args=trainer_args,
             trainer_data_builder_config=trainer_data_builder_config,
             peft_config=peft_config,
+            entiy_name=self.entity_name,
             run_name=run_name,
         )
         config = trainer_run_config.model_dump(mode="json")
@@ -181,7 +199,11 @@ class TrainEvalRunConfigurator:
             priority=Priority.PRIORITY_TWO,
         )
 
-    def _generate_evaluator_config_outputs(self, model_name: str = None, trainer_config_output: ConfiguratorOutput = None):
+    def _generate_evaluator_config_outputs(
+        self,
+        model_name: str = None,
+        trainer_config_output: ConfiguratorOutput = None,
+    ):
         run_name = None
         # TODO: set dataset_type based on the type of model
         dataset_type = SftDatasetType.PROMPT_COMPLETIONS
@@ -222,17 +244,23 @@ class TrainEvalRunConfigurator:
 
         return config_outputs
 
-    def get_evaluator_run_config(self, model_args: str, run_name: str, priority: Priority) -> List[ConfiguratorOutput]:
+    def get_evaluator_run_config(
+        self,
+        model_args: str,
+        run_name: str,
+        priority: Priority,
+    ) -> List[ConfiguratorOutput]:
         config_outputs = []
 
         unique_run_id = str(uuid.uuid4().hex)
 
-        wandb_project = f"project={WANDB_PROJECT}"
+        wandb_entity = f"entity={self.entity_name}"
+        wandb_project = f"project={WANDB_EVAL_PROJECT}"
         wandb_run_name = f"name={run_name}"
         wandb_run_id = f"id={unique_run_id}"
         wandb_group = f"group={self.run_group}"
         wandb_job_type = f"job_type=evaluation"
-        wandb_args = f"{wandb_project},{wandb_run_name},{wandb_run_id},{wandb_group},{wandb_job_type}"
+        wandb_args = f"{wandb_entity},{wandb_project},{wandb_run_name},{wandb_run_id},{wandb_group},{wandb_job_type}"
 
         # TODO: evaluator can also take different parameters, including few-shots, etc. Handle this.
         task = f"{self.dataset_name}"
@@ -243,7 +271,7 @@ class TrainEvalRunConfigurator:
             "wandb_args": wandb_args,
             "write_out": True,
             "log_samples": True,
-            "output_path": "/vol/auto_llm/eval_results",
+            "output_path": self.eval_results_path,
             "include_path": LM_EVAL_HARNESS_CUSTOM_TASKS_PATH,
         }
         config_path = self.save_config_yaml(
@@ -272,13 +300,14 @@ class TrainEvalRunConfigurator:
         self,
         auto_llm_trainer_args: AutoLlmTrainerArgs,
         trainer_args: TrainerArgs,
+        entiy_name: str,
         trainer_data_builder_config: TrainerDataBuilderConfig,
         peft_config: LoraConfig = None,
         run_name: str = None,
     ):
         unique_run_id = str(uuid.uuid4().hex)
         tracker_config = TrackerConfig(
-            wandb_project=WANDB_PROJECT,
+            wandb_entity=entiy_name,
             wandb_run_name=run_name,
             wandb_run_id=unique_run_id,
             wandb_run_group=self.run_group,
