@@ -28,3 +28,13 @@ def test_dominated_points_dropped():
     energies = np.array([5.0, 10.0, 15.0])
     accuracies = np.array([90.0, 80.0, 70.0])
     assert compute_pareto_indices(energies, accuracies) == [0]
+
+
+def test_classify_dataset():
+    # Imported lazily: the module pulls in wandb, only available where the
+    # backfill actually runs (the cluster).
+    from auto_llm.evaluator.plots.wandb_pareto_plot import _classify_dataset
+
+    assert _classify_dataset("sft-openmedicalLLM_mixed-qwen3-4b-qlora") == "mixed"
+    assert _classify_dataset("sft-medqa-qwen3-4b") == "other"
+    assert _classify_dataset("pre-gemma-2-2b-it") == "other"

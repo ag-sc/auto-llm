@@ -78,6 +78,7 @@ def pareto_keys(label: str) -> Dict[str, str]:
         "rank": f"{prefix}/rank",
         "name": f"{prefix}/name",
         "variant": f"{prefix}/variant",
+        "dataset": f"{prefix}/dataset",
     }
 
 
@@ -97,6 +98,17 @@ def _classify_variant(run_name: str) -> str:
     if stem.endswith("-it") or "-it-" in stem:
         return "it"
     return "pt"
+
+
+def _classify_dataset(run_name: str) -> str:
+    """Return "mixed" for openmedicalLLM_mixed SFT runs, else "other".
+
+    Mixed-dataset SFT runs are named ``sft-openmedicalLLM_mixed-<model>[-qlora]``;
+    this orthogonal flag drives the black outline ring in the scatter layer so
+    they stand apart from the single-dataset (medqa / medmcqa) SFT runs that
+    share the same shape and per-run color.
+    """
+    return "mixed" if "openmedicalllm_mixed" in run_name.lower() else "other"
 
 # ---------------------------------------------------------------------------
 # Vega-Lite specification — layered scatter + Pareto frontier dashed line
@@ -173,6 +185,7 @@ PARETO_VEGA_SPEC: dict = {
                 "filled": True,
                 "size": 120,
                 "opacity": 0.85,
+                "strokeWidth": 2.5,
             },
             "encoding": {
                 "x": {
@@ -199,9 +212,19 @@ PARETO_VEGA_SPEC: dict = {
                     },
                     "legend": {"title": "Variant"},
                 },
+                "stroke": {
+                    "field": "${field:dataset}",
+                    "type": "nominal",
+                    "scale": {
+                        "domain": ["mixed", "other"],
+                        "range": ["black", "transparent"],
+                    },
+                    "legend": {"title": "Dataset"},
+                },
                 "tooltip": [
                     {"field": "${field:name}", "type": "nominal", "title": "Run"},
                     {"field": "${field:variant}", "type": "nominal", "title": "Variant"},
+                    {"field": "${field:dataset}", "type": "nominal", "title": "Dataset"},
                     {
                         "field": "${field:energy}",
                         "type": "quantitative",
@@ -248,6 +271,7 @@ class ParetoPoint:
     is_pareto: bool = False
     rank: int = -1
     variant: str = "pt"
+    dataset: str = "other"
 
 
 def _get_summary_value(summary: Any, key: str) -> Optional[float]:
@@ -372,6 +396,7 @@ def extract_pareto_points(
                 energy_wh=energy_kwh * 1000.0,
                 accuracy_pct=score * score_scale,
                 variant=_classify_variant(run.name),
+                dataset=_classify_dataset(run.name),
             )
         )
 
@@ -517,6 +542,7 @@ def backfill_pareto_flags(
             keys["rank"]: int(point.rank),
             keys["name"]: run.name,
             keys["variant"]: point.variant,
+            keys["dataset"]: point.dataset,
         }
         if dry_run:
             flag = "pareto" if point.is_pareto else "       "
@@ -659,6 +685,7 @@ def ensure_project_scatter_panels(
                 keys["is_optimal"],
                 keys["name"],
                 keys["variant"],
+                keys["dataset"],
             ]}},
             chart_name=chart_id,
             chart_fields={
@@ -667,6 +694,7 @@ def ensure_project_scatter_panels(
                 "is_pareto": keys["is_optimal"],
                 "name": keys["name"],
                 "variant": keys["variant"],
+                "dataset": keys["dataset"],
             },
             chart_strings={"title": title},
         )
