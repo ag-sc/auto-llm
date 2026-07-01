@@ -6,6 +6,12 @@ import plotly
 import reflex as rx
 import yaml
 
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
+
+# A shared executor to handle blocking W&B API network calls safely
+_executor = ThreadPoolExecutor(max_workers=5)
+
 from auto_llm.configurator.config_generator import ConfigMode, ConfiguratorOutput
 from auto_llm.estimator.emission_estimator import EmissionEstimator
 from auto_llm.estimator.inference_flops_estimator import InferenceFlopsEstimator
@@ -65,12 +71,13 @@ class ConfigurationState(rx.State):
     current_html_content: str = ""
     result_fig: str = ""
     result_explanation: str = ""
-    examples_df: pd.DataFrame = ""
+    examples_df: pd.DataFrame = pd.DataFrame()
     examples_html: str = ""
 
     is_polling: bool = False
     is_loading_results: bool = False
     is_results_loaded: bool = False
+    is_loading_examples_html: bool = False
 
     config_statuses: Dict[str, str] = {}
 
@@ -87,15 +94,26 @@ class ConfigurationState(rx.State):
 
         self.current_html_content: str = ""
         self.result_fig: str = ""
-        self.result_explantion: str = ""
-        self.examples_df: pd.DataFrame = ""
+        self.result_explanation: str = ""
+        self.examples_df: pd.DataFrame = pd.DataFrame()
         self.examples_html: str = ""
 
         self.is_polling: bool = False
-
         self.is_results_loaded: bool = False
+        self.is_loading_examples_html: bool = False
 
         self.config_statuses: Dict[str, str] = {}
+
+    @rx.event
+    def reset_results_state(self):
+        self.result_fig: str = ""
+        self.result_explanation: str = ""
+        self.examples_df: pd.DataFrame = pd.DataFrame()
+        self.examples_html: str = ""
+
+        self.is_polling: bool = False
+        self.is_results_loaded: bool = False
+        self.is_loading_examples_html: bool = False
 
     def load_config(self, configurator_output: ConfiguratorOutput):
         self.current_path = configurator_output.config_path
@@ -159,10 +177,14 @@ class ConfigurationState(rx.State):
         form_state = await self.get_state(AppState)
         user_state = await self.get_state(User)
         client = get_wandb_client(user=user_state)
+
         for cfg in form_state.configurator_outputs:
             try:
                 project_name = WANDB_TRAIN_PROJECT if cfg.mode == ConfigMode.TRAINER_RUN_CFG else WANDB_EVAL_PROJECT
-                state = client.get_run_state(run_id=cfg.run_id, project_name=project_name)
+
+                # Run the blocking synchronous W&B call in a separate thread safely
+                state = await asyncio.to_thread(client.get_run_state, run_id=cfg.run_id, project_name=project_name)
+
                 self.config_statuses[cfg.run_id] = state
             except Exception:
                 self.config_statuses[cfg.run_id] = "pending"
@@ -172,64 +194,89 @@ class ConfigurationState(rx.State):
         client = get_wandb_client(user=user_state)
         project_name = WANDB_TRAIN_PROJECT if configurator_output.mode == ConfigMode.TRAINER_RUN_CFG else WANDB_EVAL_PROJECT
 
-        run_html = client.get_run_url(
+        # Run the blocking synchronous W&B call in a separate thread safely
+        run_html = await asyncio.to_thread(
+            client.get_run_url,
             run_id=configurator_output.run_id,
             project_name=project_name,
         )
+
         self.current_html_content = f'<iframe src="{run_html}" ' f'style="width:100%; height:80vh; border:none; display:block;" ' f"allowfullscreen></iframe>"
 
     @rx.event
     async def load_config_group_results(self, group: str):
         self.is_loading_results = True
+        self.is_results_loaded = False
         self.result_fig = ""
         yield
 
         loop = asyncio.get_event_loop()
-        # Fetch the HTML string from your tracker Client
-        # result_fig = Client.get_eval_runs_of_group(group=group, project_name=WANDB_PROJECT)
         user_state = await self.get_state(User)
         client = get_wandb_client(user=user_state)
-        project_name = WANDB_EVAL_PROJECT  # results always come from the eval project
+        project_name = WANDB_EVAL_PROJECT
 
         try:
-            result_fig, result_explanation, examples_df = await loop.run_in_executor(None, client.get_eval_runs_of_group, group, project_name)
+            # Use the explicit thread executor instead of None
+            result_fig, result_explanation, examples_df = await loop.run_in_executor(_executor, client.get_eval_runs_of_group, group, project_name)
 
             self.result_fig = result_fig
             self.result_explanation = result_explanation
             self.examples_df = examples_df
             self.examples_html = self.display_examples()
 
-            self.is_results_loaded = True
         except Exception as e:
             print(f"Error loading W&B: {e}")
-            rx.window_alert(f"Failed to fetch data: {str(e)}")
+            if self.result_fig == "":
+                yield rx.toast.warning("No results found. Please retry later!")
         finally:
             self.is_loading_results = False
+            self.is_results_loaded = True
+
+            # print("is_results_loaded", self.is_results_loaded)
+            # print("is_loading_results", self.is_loading_results)
+            yield  # CRITICAL: Forces UI to register that loading has finished
 
     async def start_polling(self):
         """This starts the loop if it's not already running."""
         if self.is_polling:
             return
         self.is_polling = True
-
-        # We manually create a background task
         asyncio.create_task(self.poll_loop())
 
     async def poll_loop(self):
-        while self.is_polling:
-            # Sync with the State to update variables safely
-            async with self:
-                form_state = await self.get_state(AppState)
-                user_state = await self.get_state(User)
-                client = get_wandb_client(user=user_state)
+        loop = asyncio.get_event_loop()
 
-                for cfg in form_state.configurator_outputs:
+        while self.is_polling:
+            try:
+                # 1. Grab snapshot data from states quickly while inside the context lock
+                async with self:
+                    form_state = await self.get_state(AppState)
+                    user_state = await self.get_state(User)
+                    client = get_wandb_client(user=user_state)
+
+                    # Create a list of configurations to check so we can release the lock
+                    configs_to_check = [
+                        (cfg.run_id, WANDB_TRAIN_PROJECT if cfg.mode == ConfigMode.TRAINER_RUN_CFG else WANDB_EVAL_PROJECT) for cfg in form_state.configurator_outputs
+                    ]
+
+                # 2. Perform blocking I/O network calls OUTSIDE the state lock
+                new_statuses = {}
+                for run_id, project_name in configs_to_check:
                     try:
-                        project_name = WANDB_TRAIN_PROJECT if cfg.mode == ConfigMode.TRAINER_RUN_CFG else WANDB_EVAL_PROJECT
-                        state = client.get_run_state(run_id=cfg.run_id, project_name=project_name)
-                        self.config_statuses[cfg.run_id] = state
+                        # Offload blocking network call to thread pool
+                        state = await loop.run_in_executor(_executor, client.get_run_state, run_id, project_name)
+                        new_statuses[run_id] = state
                     except Exception:
-                        self.config_statuses[cfg.run_id] = "pending"
+                        new_statuses[run_id] = "pending"
+
+                # 3. Re-acquire the lock briefly just to write the updates to state variables
+                async with self:
+                    if not self.is_polling:  # Guard check in case polling stopped during I/O
+                        break
+                    self.config_statuses.update(new_statuses)
+
+            except Exception as e:
+                print(f"Error in background poll loop: {e}")
 
             await asyncio.sleep(5)
 

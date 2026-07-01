@@ -87,7 +87,12 @@ def stats_cards(list_stats_cards) -> rx.Component:
 def stats_cards_empty() -> rx.Component:
     return rx.scroll_area(
         rx.center(
-            rx.spinner(size="3"),
+            rx.vstack(
+                rx.spinner(size="3"),
+                rx.text("Please wait while we load your projects. This may take a couple of seconds. 🍵", font_weight="medium"),
+                align="center",
+                spacing="2",
+            ),
             width="100%",
             height="100%",
         ),

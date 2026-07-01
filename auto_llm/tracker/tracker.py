@@ -81,8 +81,9 @@ class WandbClient:
 
     def get_eval_runs_of_group(self, group: str, project_name: str):
 
+        fig = None
         explanation = ""
-        examples_df = None
+        examples_df = pd.DataFrame()
 
         runs = self.api.runs(path=f"{self.entity}/{project_name}")
 
@@ -129,7 +130,7 @@ class WandbClient:
 
             print("top_run_names", top_run_names)
 
-            value = round(sorted_group.head(1)["Value"].values[0] * 100, 2)
+            value = round(sorted_group.head(1)["Value"].values[0], 2)
             value_str = f"{value:.2f}%"
 
             num_runs = len(group_df)
@@ -204,9 +205,10 @@ class WandbClient:
             ),
         )
 
-        examples_df = self.get_examples_of_group(group=group, project_name=project_name)
+        # examples_df = self.get_examples_of_group(group=group, project_name=project_name)
+        fig = fig.to_html(full_html=False, include_plotlyjs="cdn")
 
-        return fig.to_html(full_html=False, include_plotlyjs="cdn"), explanation, examples_df
+        return fig, explanation, examples_df
 
     def get_examples_of_group(self, group: str, project_name: str):
         runs = self.api.runs(path=f"{self.entity}/{project_name}")

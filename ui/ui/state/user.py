@@ -36,6 +36,12 @@ class User(rx.State):
     new_password: str = ""
 
     @rx.event
+    def handle_key_down(self, key: str):
+        # Trigger sign-in only if the user pressed the Enter key
+        if key == "Enter":
+            return self.handle_sign_in()
+
+    @rx.event
     def handle_sign_up(self):
         with rx.session() as session:
             if not self.username or not self.password:

@@ -33,7 +33,23 @@ def info_popover(title: str, content: str):
 
 def examples_popover():
     return rx.dialog.root(
-        rx.dialog.trigger(rx.button("View Examples", variant="soft", size="3")),
+        rx.dialog.trigger(
+            rx.button(
+                "View Examples",
+                variant="soft",
+                size="3",
+                disabled=rx.cond(
+                    ConfigurationState.is_loading_results,  # False
+                    True,
+                    rx.cond(
+                        ConfigurationState.is_results_loaded,  # True
+                        False,
+                        True,
+                    ),
+                ),
+                loading=ConfigurationState.is_loading_results,
+            )
+        ),
         rx.dialog.content(
             rx.scroll_area(
                 rx.markdown(ConfigurationState.examples_html),
@@ -58,7 +74,23 @@ def explanation_popover():
     result_desc = f"Please refer to the docs [here](https://ag-sc.github.io/auto-llm/fundamentals/evaluating/) for a detailed explanation on the evaluation metrics."
 
     return rx.dialog.root(
-        rx.dialog.trigger(rx.button("Interpret Results", variant="soft", size="3")),
+        rx.dialog.trigger(
+            rx.button(
+                "Interpret Results",
+                variant="soft",
+                size="3",
+                disabled=rx.cond(
+                    ConfigurationState.is_loading_results,  # False
+                    True,
+                    rx.cond(
+                        ConfigurationState.is_results_loaded,  # True
+                        False,
+                        True,
+                    ),
+                ),
+                loading=ConfigurationState.is_loading_results,
+            )
+        ),
         rx.dialog.content(
             rx.hstack(rx.icon("star-check", size=16), rx.markdown("**How to interpret the results?**"), align="center"),
             rx.markdown(ConfigurationState.result_explanation),
@@ -98,13 +130,13 @@ def config_html_dialog(configurator_output: ConfiguratorOutput):
                         src_doc=ConfigurationState.current_html_content,
                         width="100%",
                         height="100%",
+                        loading="lazy",
                     ),
                     width="100%",
                     height="100%",
                 ),
                 rx.hstack(
                     rx.dialog.close(rx.button("Close", variant="soft")),
-                    # rx.button("Save Changes", on_click=ConfigState.save_config),
                     justify="end",
                     width="100%",
                 ),
@@ -141,27 +173,23 @@ def config_view_dialog(configurator_output: ConfiguratorOutput):
         rx.dialog.content(
             rx.vstack(
                 rx.dialog.title(f"Configuration"),
-                # rx.dialog.description(f"Path: {configurator_output.config_path}"),
                 rx.markdown(configuration_description),
                 rx.text_area(
                     value=ConfigurationState.current_yaml_content,
                     on_change=ConfigurationState.update_content,
-                    # 1. Font & Alignment
                     font_family="Source Code Pro, Menlo, Monaco, Lucide Console, monospace",
                     font_size="13px",
                     line_height="1.5",
-                    # 2. Sizing & Scrolling
                     width="100%",
                     height="450px",
-                    # 3. YAML Formatting Essentials (Custom CSS)
                     style={
-                        "white-space": "pre",  # Crucial: Preserves leading spaces/tabs
-                        "overflow_x": "auto",  # Horizontal scroll for long lines
-                        "tab_size": "2",  # YAML standard is 2 spaces
-                        "resize": "vertical",  # Let users pull the box larger
+                        "white-space": "pre",
+                        "overflow_x": "auto",
+                        "tab_size": "2",
+                        "resize": "vertical",
                         "padding": "1rem",
                         "border": "1px solid var(--gray-5)",
-                        "background": "var(--gray-2)",  # Suble gray background for code
+                        "background": "var(--gray-2)",
                     },
                 ),
                 rx.hstack(
@@ -208,7 +236,7 @@ def dialog_popover(config_path: str, config_yaml: str):
 def execute_configs_dialog():
     return (
         rx.dialog.root(
-            rx.dialog.trigger(rx.button("Execute", variant="soft", size="3")),
+            rx.dialog.trigger(rx.button("Execute", variant="soft", size="3", on_click=AppState.handle_validation_submit_pre)),
             rx.dialog.content(
                 rx.vstack(
                     rx.heading("Execution"),
@@ -247,20 +275,6 @@ def show_configuration(configurator_output: ConfiguratorOutput):
             align="center",
         ),
         rx.table.cell(rx.text(configurator_output.run_name)),
-        # rx.table.cell(),
-        # rx.table.cell(
-        #     rx.hstack(
-        #         rx.button(
-        #             rx.icon("view"),
-        #             variant="soft",
-        #             size="1",
-        #             on_click=ConfigurationState.load_estimates(path=configurator_output.config_path, gpu_name=AppState.hardware_type, gpu_count=AppState.hardware_count),
-        #         ),
-        #         rx.text(ConfigurationState.est_runtime),
-        #     ),
-        #     align="center",
-        # ),
-        # rx.table.cell(rx.text(ConfigurationState.est_emission)),
         rx.table.cell(
             rx.hstack(
                 config_view_dialog(configurator_output),
@@ -277,13 +291,6 @@ def show_configuration(configurator_output: ConfiguratorOutput):
             ),
             align="center",
         ),
-        on_mount=ConfigurationState.start_polling,
-        on_focus=ConfigurationState.start_polling,
-        on_blur=ConfigurationState.start_polling,
-        on_mouse_enter=ConfigurationState.start_polling,
-        on_mouse_over=ConfigurationState.start_polling,
-        on_mouse_leave=ConfigurationState.start_polling,
-        on_click=ConfigurationState.start_polling,
         style={"_hover": {"bg": rx.color("gray", 3)}},
         align="center",
     )
@@ -294,7 +301,6 @@ def show_configuration(configurator_output: ConfiguratorOutput):
     title="Configure",
     on_load=[
         User.check_logged_in,
-        # AppState.reset_state,
     ],
 )
 def configure() -> rx.Component:
@@ -318,7 +324,6 @@ def configure() -> rx.Component:
         rx.card(
             rx.vstack(
                 rx.vstack(
-                    # --- Section: Dataset ---
                     rx.hstack(
                         rx.icon("layers", size=20),
                         rx.text("Task Category", weight="bold"),
@@ -357,7 +362,6 @@ def configure() -> rx.Component:
                     width="100%",
                     align_items="start",
                 ),
-                # --- Section: Task & Hardware ---
                 rx.grid(
                     rx.vstack(
                         rx.hstack(rx.icon("microchip", size=20), rx.text("Hardware Type", weight="bold")),
@@ -366,7 +370,6 @@ def configure() -> rx.Component:
                             placeholder="Select GPU...",
                             name="hardware_type",
                             value=AppState.hardware_type,
-                            # on_change=AppState.setvar("hardware_type"),
                             width="100%",
                             size="3",
                             disabled=True,
@@ -380,7 +383,6 @@ def configure() -> rx.Component:
                             placeholder="1",
                             name="hardware_count",
                             value=AppState.hardware_count,
-                            # on_change=AppState.setvar("hardware_count"),
                             width="100%",
                             size="3",
                             disabled=True,
@@ -449,21 +451,12 @@ def configure() -> rx.Component:
                         AppState.model_choices,
                         lambda choice: rx.checkbox(
                             choice,
-                            # Triggered when the checkbox state changes
                             on_change=lambda checked: AppState.toggle_choice(choice, checked),
                             checked=AppState.selected_models.contains(choice),
                             spacing="2",
                         ),
                     ),
                 ),
-                # rx.select(
-                #     AppState.model_choices,
-                #     placeholder="Select a suggested model",
-                #     width="100%",
-                #     size="3",
-                #     value=AppState.selected_model,
-                #     on_change=AppState.setvar("selected_model"),
-                # ),
                 rx.hstack(
                     rx.button(
                         "Reset",
@@ -614,9 +607,6 @@ def configure() -> rx.Component:
                     _header_cell("Mode", "beaker"),
                     _header_cell("Run Name", "fingerprint"),
                     _header_cell("Details", "cog"),
-                    # _header_cell("Est. Runtime", "hourglass"),
-                    # _header_cell("Est. Co2 Emission", "leaf"),
-                    # _header_cell("Status", "cog"),
                 ),
             ),
             rx.table.body(rx.foreach(AppState.configurator_outputs, show_configuration)),
@@ -627,7 +617,7 @@ def configure() -> rx.Component:
         execute_configs_dialog(),
         align="center",
         spacing="2",
-        on_mount=ConfigurationState.load_config_statuses,
+        on_mount=ConfigurationState.start_polling,  # Polling is now securely initialized once here instead of flooding row events
     )
 
     results_tab = rx.card(
@@ -653,6 +643,7 @@ def configure() -> rx.Component:
                     width="100%",
                     height="100%",
                     style={"border": "none", "display": "block", "overflow": "hidden"},
+                    loading="lazy",
                 ),
                 size="3",
                 box_shadow=styles.box_shadow_style,
@@ -670,14 +661,13 @@ def configure() -> rx.Component:
                 ),
                 size="3",
                 padding="4",
-                # box_shadow=styles.box_shadow_style,
                 width="100%",
                 height="10%",
             ),
             width="100%",
             height="100%",
         ),
-        on_mount=ConfigurationState.load_config_group_results(AppState.run_group),
+        on_mount=ConfigurationState.reset_results_state,
         spacing="5",
         size="3",
         width="60vw",
@@ -718,7 +708,6 @@ def configure() -> rx.Component:
                 value=AppState.current_tab,
                 on_change=AppState.set_current_tab,
             ),
-            # flex="1",
         ),
         width="100%",
         height="100%",

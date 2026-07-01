@@ -1,7 +1,9 @@
+import asyncio
 import datetime
 import json
 import os
 from typing import Optional, List
+from concurrent.futures import ThreadPoolExecutor
 
 import pandas as pd
 import reflex as rx
@@ -17,42 +19,50 @@ from ..state.user import User, get_wandb_client
 
 GPU_PARAMS = get_gpu_params()
 
+# Bounded multi-user resource pools to prevent thread exhaustion or API rate limiting
+_api_executor = ThreadPoolExecutor(max_workers=10, thread_name_prefix="wandb_api")
+_disk_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="disk_io")
+
 
 class AppState(rx.State):
-    current_tab = "settings"
-
+    current_tab: str = "settings"
     is_rerouted: bool = False
-
     is_loading: bool = False
+
     model_choices: list[str] = []
     model_results: pd.DataFrame = pd.DataFrame()
 
     # settings tab
-    dataset_path: Optional[str] = ""
-    task_category: Optional[str] = ""
-    hardware_type: Optional[str] = "NVIDIA L40S"
-    hardware_count: Optional[str] = "2"
+    dataset_path: str = ""
+    task_category: str = ""
+    hardware_type: str = "NVIDIA L40S"
+    hardware_count: str = "2"
 
     # models tab
-    selected_models: Optional[List[str]] = []
+    selected_models: List[str] = []
 
     # prompts tab
-    instruction_template: Optional[str] = ""
-    input_template: Optional[str] = ""
-    output_template: Optional[str] = ""
+    instruction_template: str = ""
+    input_template: str = ""
+    output_template: str = ""
 
-    configurator_outputs: Optional[List[ConfiguratorOutput]] = []
-    configs_path: Optional[str] = ""
-    run_group: Optional[str] = ""
+    configurator_outputs: List[ConfiguratorOutput] = []
+    configs_path: str = ""
+    run_group: str = ""
 
     start_execution: bool = False
 
+    @rx.event
     def toggle_choice(self, choice: str, checked: bool):
-        """Add or remove the choice based on checkbox state."""
+        """Add or remove the choice safely with explicit array copy reassignment."""
+        current_models = list(self.selected_models)
         if checked:
-            self.selected_models.append(choice)
+            if choice not in current_models:
+                current_models.append(choice)
         else:
-            self.selected_models.remove(choice)
+            if choice in current_models:
+                current_models.remove(choice)
+        self.selected_models = current_models
 
     @rx.event
     def reset_state(self):
@@ -61,61 +71,58 @@ class AppState(rx.State):
             return
 
         self.current_tab = "settings"
-
-        self.is_loading: bool = False
-        self.model_choices: list[str] = []
-        self.model_results: pd.DataFrame = pd.DataFrame()
+        self.is_loading = False
+        self.model_choices = []
+        self.model_results = pd.DataFrame()
 
         # settings tab
-        self.dataset_path: Optional[str] = ""
-        self.task_category: Optional[str] = ""
-        self.hardware_type: Optional[str] = "NVIDIA L40S"
-        self.hardware_count: Optional[str] = "2"
+        self.dataset_path = ""
+        self.task_category = ""
+        self.hardware_type = "NVIDIA L40S"
+        self.hardware_count = "2"
 
         # models tab
-        self.selected_models: Optional[List[str]] = []
+        self.selected_models = []
 
         # prompts tab
-        self.instruction_template: Optional[str] = ""
-        self.input_template: Optional[str] = ""
-        self.output_template: Optional[str] = ""
+        self.instruction_template = ""
+        self.input_template = ""
+        self.output_template = ""
 
-        self.configurator_outputs: Optional[List[ConfiguratorOutput]] = []
-        self.configs_path: Optional[str] = ""
-        self.run_group: Optional[str] = ""
+        self.configurator_outputs = []
+        self.configs_path = ""
+        self.run_group = ""
+        self.start_execution = False
+        self.is_rerouted = False
 
-        self.start_execution: bool = False
-
-        self.is_rerouted: bool = False
-
+    @rx.event
     def load_from_json(self, data: dict):
         self.is_rerouted = True
-
         self.current_tab = "validate"
+        self.is_loading = False
 
-        self.is_loading: bool = False
-        self.model_choices: list[str] = data.get("model_choices", None)
-        self.model_results: pd.DataFrame = pd.DataFrame(data.get("model_results", None))
+        self.model_choices = data.get("model_choices") or []
+        self.model_results = pd.DataFrame(data.get("model_results") or [])
 
         # settings tab
-        self.dataset_path: Optional[str] = data.get("dataset_path", None)
-        self.task_category: Optional[str] = data.get("task_category", None)
-        self.hardware_type: Optional[str] = data.get("hardware_type", None)
-        self.hardware_count: Optional[str] = data.get("hardware_count", None)
+        self.dataset_path = data.get("dataset_path", "")
+        self.task_category = data.get("task_category", "")
+        self.hardware_type = data.get("hardware_type", "NVIDIA L40S")
+        self.hardware_count = data.get("hardware_count", "2")
 
         # models tab
-        self.selected_models: Optional[List[str]] = data.get("selected_models", None)
+        self.selected_models = data.get("selected_models") or []
 
         # prompts tab
-        self.instruction_template: Optional[str] = data.get("instruction_template", None)
-        self.input_template: Optional[str] = data.get("input_template", None)
-        self.output_template: Optional[str] = data.get("output_template", None)
+        self.instruction_template = data.get("instruction_template", "")
+        self.input_template = data.get("input_template", "")
+        self.output_template = data.get("output_template", "")
 
-        self.configurator_outputs: Optional[List[ConfiguratorOutput]] = [ConfiguratorOutput.model_validate(x) for x in data.get("configurator_outputs", None)]
-        self.configs_path: Optional[str] = data.get("configs_path", None)
-        self.run_group: Optional[str] = data.get("run_group", None)
-
-        self.start_execution: bool = True
+        raw_outputs = data.get("configurator_outputs") or []
+        self.configurator_outputs = [ConfiguratorOutput.model_validate(x) for x in raw_outputs]
+        self.configs_path = data.get("configs_path", "")
+        self.run_group = data.get("run_group", "")
+        self.start_execution = True
 
     @rx.var
     def dataset_options_markdown(self) -> str:
@@ -127,19 +134,16 @@ class AppState(rx.State):
     async def handle_submit(self, form_data: dict):
         self.is_loading = True
 
-        if not all(
-            [
-                form_data.get("dataset_path"),
-                form_data.get("task_category"),
-                # form_data.get("hardware_type"),
-            ]
-        ):
-            yield rx.window_alert("Please fill in all required fields!")
+        if not form_data.get("dataset_path") or not form_data.get("task_category"):
+            yield rx.toast.warning("Please fill in all required fields!")
             self.is_loading = False
             return
 
-        # Logic to fetch models
-        model_names, results_df = self.update_models(task=self.task_category, dataset=self.dataset_path, hardware_type=self.hardware_type, hardware_count=int(self.hardware_count))
+        loop = asyncio.get_running_loop()
+        # Offload blocking database/automator fetch to the bounded disk/heavy executor
+        model_names, results_df = await loop.run_in_executor(
+            _disk_executor, self.update_models, self.task_category, self.dataset_path, self.hardware_type, int(self.hardware_count)
+        )
 
         self.model_choices = model_names
         self.model_results = results_df
@@ -147,10 +151,11 @@ class AppState(rx.State):
         self.current_tab = "models"
 
         configured_task = TASKS.get(self.task_category)
-
-        self.instruction_template = configured_task.sample_trainer_run_config.trainer_data_builder_config.instruction_template
-        self.input_template = configured_task.sample_trainer_run_config.trainer_data_builder_config.input_template
-        self.output_template = configured_task.sample_trainer_run_config.trainer_data_builder_config.output_template
+        if configured_task and configured_task.sample_trainer_run_config:
+            builder_config = configured_task.sample_trainer_run_config.trainer_data_builder_config
+            self.instruction_template = builder_config.instruction_template
+            self.input_template = builder_config.input_template
+            self.output_template = builder_config.output_template
 
     def update_models(self, task: str, dataset: str, hardware_type: str, hardware_count: int):
         configured_task = TASKS.get(task)
@@ -162,12 +167,13 @@ class AppState(rx.State):
         )
         df = automator.get_models_df()
         cols = [df.columns[0]] + list(df.columns[2:])
-
-        df = df.round(2)
-        return automator.model_names, df[cols]
+        return automator.model_names, df[cols].round(2)
 
     @rx.event
     async def handle_models_submit(self, form_data: dict):
+        if not self.selected_models:
+            yield rx.toast.warning("Please select at least one model!")
+            return
         self.current_tab = "prompts"
 
     @staticmethod
@@ -182,7 +188,7 @@ class AppState(rx.State):
         output_path: str,
         eval_results_path: str,
         project_name: str,
-    ) -> List[ConfiguratorOutput]:  # type: ignore
+    ) -> List[ConfiguratorOutput]:
         configurator = TrainEvalRunConfigurator(
             model_names=model_names,
             task=task,
@@ -195,84 +201,96 @@ class AppState(rx.State):
             output_template=output_template,
             entity_name=project_name,
         )
-
-        configurator_outputs = configurator.generate()
-        return configurator_outputs
+        return configurator.generate()
 
     @rx.event
     async def handle_prompts_submit(self, form_data: dict):
-        timestamp = datetime.datetime.now()
-        timestamp_str = timestamp.strftime("%Y-%m-%d_%H-%M-%S")
+        if not all(
+            [
+                form_data.get("instruction_template"),
+                form_data.get("input_template"),
+                form_data.get("output_template"),
+            ]
+        ):
+            yield rx.toast.warning("Please fill in all template fields!")
+            return
+
+        timestamp_str = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
         user_state = await self.get_state(User)
         client = get_wandb_client(user=user_state)
         entity = client.get_entity()
 
-        configs_path = f"{CONFIGS_DIR}/{user_state.username}/{timestamp_str}_configs/"
-        output_path = f"{OUTPUT_DIR}/{user_state.username}/{timestamp_str}_sft_models/"
-        eval_results_path = f"{EVAL_RESULTS_DIR}/{user_state.username}/{timestamp_str}_eval_results/"
-
+        configs_path = f"{CONFIGS_DIR}/{user_state.username}/{timestamp_str}_configs"
+        output_path = f"{OUTPUT_DIR}/{user_state.username}/{timestamp_str}_sft_models"
+        eval_results_path = f"{EVAL_RESULTS_DIR}/{user_state.username}/{timestamp_str}_eval_results"
         configs_group_path = f"{configs_path}/run_group.json"
 
-        configurator_outputs = self.generate_configs(
-            model_names=self.selected_models,
-            task=self.task_category,
-            dataset_path=self.dataset_path,
-            instruction_template=self.instruction_template,
-            input_template=self.input_template,
-            output_template=self.output_template,
-            configs_path=configs_path,
-            output_path=output_path,
-            eval_results_path=eval_results_path,
-            project_name=entity,
+        loop = asyncio.get_running_loop()
+        configurator_outputs = await loop.run_in_executor(
+            _disk_executor,
+            self.generate_configs,
+            self.selected_models,
+            self.task_category,
+            self.dataset_path,
+            self.instruction_template,
+            self.input_template,
+            self.output_template,
+            configs_path,
+            output_path,
+            eval_results_path,
+            entity,
         )
 
-        sorted_configurator_outputs = []
+        sorted_outputs = []
         for p in [Priority.PRIORITY_ONE, Priority.PRIORITY_TWO, Priority.PRIORITY_THREE]:
-            for co in configurator_outputs:
-                if co.priority == p:
-                    sorted_configurator_outputs.append(co)
+            sorted_outputs.extend([co for co in configurator_outputs if co.priority == p])
 
-        self.configurator_outputs = sorted_configurator_outputs
+        self.configurator_outputs = sorted_outputs
 
-        with open(configs_group_path, "r") as f:
-            data = json.load(f)
+        def _read_group_and_save(group_path, state_data, username):
+            os.makedirs(os.path.dirname(group_path), exist_ok=True)
+            with open(group_path, "r") as f:
+                data = json.load(f)
 
-        self.run_group = data["run_group"]
+            with open(f"{configs_path}/configure_state.json", "w+") as f:
+                json.dump(state_data, f, indent=4)
+            with open(f"{configs_path}/settings.json", "w+") as f:
+                json.dump({"username": username, "timestamp": timestamp_str}, f, indent=4)
+            return data["run_group"]
 
-        user_state = await self.get_state(User)
-        username = user_state.username
-        print("saving app state for user", username)
-        self.save_app_state(timestamp=timestamp_str, path=configs_path, username=username)
+        try:
+            serializable_state = self._get_serializable_dict()
+            self.run_group = await loop.run_in_executor(_disk_executor, _read_group_and_save, configs_group_path, serializable_state, user_state.username)
+            self.current_tab = "validate"
+        except Exception as e:
+            yield rx.toast.warning(f"Failed to process and save group configs: {str(e)}")
 
+    @rx.event
+    async def handle_validation_submit_pre(self, form_data: dict):
+        if not self.configurator_outputs:
+            yield rx.toast.warning("No configurations found!")
+            return
         self.current_tab = "validate"
-
-    def save_app_state(self, timestamp: str, path: str, username: str):
-        data = self._get_serializable_dict()
-        state_path = f"{path}/configure_state.json"
-        with open(state_path, "w+") as f:
-            json.dump(data, f, indent=4)
-
-        settings_path = f"{path}/settings.json"
-
-        print("saving settings", username)
-        settings = {"username": username, "timestamp": timestamp}
-        with open(settings_path, "w+") as f:
-            json.dump(settings, f, indent=4)
 
     @rx.event
     async def handle_validation_submit(self, form_data: dict):
+        if not self.configurator_outputs:
+            yield rx.toast.warning("No configurations found!")
+            return
+
         self.current_tab = "validate"
 
         if not self.start_execution:
             self.start_execution = True
-            # TODO: set executors outside AppState
-            job_id_to_attach = os.getenv("JOB_ID_TO_ATTACH", None)
-            if not job_id_to_attach:
-                rx.toast.error(f"Executor needs a JobID to attach itself. Please set the environment variable `JOB_ID_TO_ATTACH`.")
-            # executor = SequentialConfigExecutor(configurator_outputs=self.configurator_outputs, job_id_to_attach=job_id_to_attach)
+            # job_id_to_attach = os.getenv("JOB_ID_TO_ATTACH", None)
+            # if not job_id_to_attach:
+            #     yield rx.toast.error("Executor needs a JobID to attach itself. Please set environment variable `JOB_ID_TO_ATTACH`.")
+
             executor = TaskSpoolerSequentialConfigExecutor(configurator_outputs=self.configurator_outputs)
-            executor.execute()
+
+            loop = asyncio.get_running_loop()
+            await loop.run_in_executor(_disk_executor, executor.execute)
             yield rx.toast.success("Your jobs are successfully submitted!")
 
     @rx.event
@@ -280,27 +298,19 @@ class AppState(rx.State):
         self.current_tab = value
 
     def _get_serializable_dict(self):
-        """Converts the state into a JSON-ready dictionary."""
-        # Define fields to exclude (like is_loading or computed rx.vars)
+        """Converts the active session parameters cleanly into a JSON ready dictionary."""
         exclude = ["is_loading", "parent_state", "router_data", "substates", "dirty_vars", "dirty_substates", "router", "is_hydrated"]
-
         state_dict = {}
-        for key, value in self.__dict__.items():
-            if key.startswith("_"):
+
+        for key in self.get_fields():
+            if key in exclude or key.startswith("_"):
                 continue
 
-            if key in exclude:
-                continue
-
-            # 1. Convert Sets to Lists
+            value = getattr(self, key)
             if isinstance(value, set):
                 state_dict[key] = list(value)
-
-            # 2. Convert DataFrames
             elif isinstance(value, pd.DataFrame):
                 state_dict[key] = value.to_dict(orient="records")
-
-            # 3. Handle Custom Objects
             elif key == "configurator_outputs" and value:
                 state_dict[key] = [obj.dict() if hasattr(obj, "dict") else str(obj) for obj in value]
             else:
