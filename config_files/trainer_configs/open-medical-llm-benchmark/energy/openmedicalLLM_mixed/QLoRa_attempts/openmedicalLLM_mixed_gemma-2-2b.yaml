@@ -6,7 +6,7 @@ auto_llm_trainer_args:
   completion_only_loss: True
   energy_profiling: true
   force_cpu_power: 450 # 2× AMD EPYC 7713 @ 225W
-  experiment_notes: "Config_learning_rate_2e-4_r32_alpha64"
+  experiment_notes: "Config_learning_rate_3e-4_r32_alpha64"
   # token_budget: 200000000 # 200M tokens
 
 peft_config:
@@ -37,15 +37,15 @@ trainer_args:
   auto_find_batch_size: True
 
   # training related
-  output_dir: /vol/auto_llm/sft_models/open-medical-llm-benchmark/energy/openmedicalLLM_mixed_gemma-2-2b_learning_rate_2e-4
+  output_dir: /vol/auto_llm/sft_models/open-medical-llm-benchmark/energy/openmedicalLLM_mixed_gemma-2-2b_learning_rate_3e-4
   gradient_checkpointing: True
   num_train_epochs: 5 # overridden by token_budget -> max_steps
-  learning_rate: 2e-4
+  learning_rate: 3e-4
   warmup_steps: 10
 
   # tracking/logging related
   report_to: wandb
-  run_name: openmedicalLLM_mixed_gemma-2-2b_energy_learning_rate_2e-4
+  run_name: openmedicalLLM_mixed_gemma-2-2b_energy_learning_rate_3e-4
   logging_steps: 10
   # Early stopping & checkpointing parameters (recommended)
   # When using "steps" evaluation, set eval_steps to control validation frequency.
