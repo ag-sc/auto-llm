@@ -144,21 +144,25 @@ class MedMixedDataBuilder(TaskDataBuilder):
         return Dataset.from_list(samples)
 
     def _build_pubmedqa(self) -> DatasetDict:
+        # Use the leaderboard's fold0 split (train 450 / val 50 / test 500).
+        # pqa_labeled ships as one undivided 1000-row blob. 
+        # fold0's splits are disjoint by construction, so the mixed
+        # TRAIN never overlaps the PubMedQA benchmark TEST.
         ds_dict = load_dataset(
-            "qiaojin/PubMedQA", name="pqa_labeled", trust_remote_code=True
+            "bigbio/pubmed_qa",
+            name="pubmed_qa_labeled_fold0_source", 
+            trust_remote_code=True,
         )
-        formatted = self._format_pubmedqa_split(ds_dict["train"])
-        split_dd = self.split_ds(ds=formatted)
 
         oversampled_train = concatenate_datasets(
-            [split_dd[DatasetSplit.TRAIN]] * PUBMEDQA_OVERSAMPLE_FACTOR
+            [self._format_pubmedqa_split(ds_dict["train"])] * PUBMEDQA_OVERSAMPLE_FACTOR
         )
 
         return DatasetDict(
             {
                 DatasetSplit.TRAIN: oversampled_train,
-                DatasetSplit.VALIDATION: split_dd[DatasetSplit.VALIDATION],
-                DatasetSplit.TEST: split_dd[DatasetSplit.TEST],
+                DatasetSplit.VALIDATION: self._format_pubmedqa_split(ds_dict["validation"]),
+                DatasetSplit.TEST: self._format_pubmedqa_split(ds_dict["test"]),
             }
         )
 
@@ -166,11 +170,11 @@ class MedMixedDataBuilder(TaskDataBuilder):
     def _format_pubmedqa_split(ds: Dataset) -> Dataset:
         samples = []
         for item in ds:
-            context = "\n".join(item["context"]["contexts"])
+            context = "\n".join(item["CONTEXTS"])
             input_text = (
                 f"{PUBMEDQA_INSTRUCTION}\n"
                 f"Abstract: {context}\n"
-                f"Question: {item['question']}"
+                f"Question: {item['QUESTION']}"
             )
             samples.append(
                 {
