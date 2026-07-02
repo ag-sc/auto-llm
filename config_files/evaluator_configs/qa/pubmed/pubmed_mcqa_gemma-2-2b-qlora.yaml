@@ -1,0 +1,11 @@
+model: hf
+tasks: medmcqa,medqa_4options,mmlu_anatomy_generative,mmlu_clinical_knowledge_generative,mmlu_college_biology_generative,mmlu_college_medicine_generative,mmlu_medical_genetics_generative,mmlu_professional_medicine_generative,pubmedqa
+model_args: "pretrained=google/gemma-2-2b,peft=/vol/auto_llm/sft_models/qa_pubmed_mcqa_gemma-2-2b_zero-shot_qlora,load_in_4bit=True,bnb_4bit_quant_type=nf4,bnb_4bit_use_double_quant=True,bnb_4bit_compute_dtype=bfloat16,trust_remote_code=True,attn_implementation=eager"
+
+wandb_args: "project=open-medical-llm-QLoRa-eval,name=pubmed_mcqa_gemma_2_2b-qlora"
+
+write_out: True
+log_samples: True
+output_path: /vol/auto_llm/eval_results
+
+include_path: tasks

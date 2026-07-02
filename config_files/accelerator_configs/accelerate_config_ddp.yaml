@@ -1,4 +1,4 @@
-num_processes: 4  # needs to be adjusted to num of gpus used
+num_processes: 1 # needs to be adjusted to num of gpus used
 
 compute_environment: LOCAL_MACHINE
 debug: false

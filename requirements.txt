@@ -1,12 +1,18 @@
 pydantic~=2.11.7
 transformers==4.53.2
 setuptools~=44.1.1
-# git+https://github.com/EleutherAI/lm-evaluation-harness.git@v0.4.9
+codecarbon==3.2.3
+lm_eval @ git+https://github.com/EleutherAI/lm-evaluation-harness.git@v0.4.9
 wandb==0.21.0
+wandb-workspaces>=0.1.10
 PyYAML~=6.0.2
 datasets==3.6.0
 aenum==3.1.16
 gradio==5.43.1
 peft==0.16.0
-torch==2.7.1
+trl==0.19.1
 flash-attn==2.8.3
+torch==2.7.1
+matplotlib>=3.8
+flash-attn==2.8.3
+bitsandbytes>=0.43.0

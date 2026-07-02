@@ -1,7 +1,7 @@
 auto_llm_trainer_args:
   trainer_type: sft
   model_name: google/gemma-2-2b
-  attn_implementation: eager # keep eager for gemma
+  attn_implementation: sdpa # keep eager for gemma
   truncation: True
   completion_only_loss: True
 
@@ -11,6 +11,12 @@ peft_config:
   lora_dropout: 0.05
   target_modules: "all-linear"
   task_type: "CAUSAL_LM"
+
+quantization_config:
+  load_in_4bit: True
+  bnb_4bit_quant_type: "nf4"
+  bnb_4bit_compute_dtype: "bfloat16"
+  bnb_4bit_use_double_quant: True
 
 trainer_data_builder_config:
   dataset_dir: /vol/auto_llm/processed_datasets/pico/EBM-NoDuplicates
@@ -29,7 +35,7 @@ trainer_args:
   # bsz related
   per_device_train_batch_size: 4
   per_device_eval_batch_size: 4
-  gradient_accumulation_steps: 8  # 4 processes, effective bsz=128
+  gradient_accumulation_steps: 16  # 4 processes, effective bsz=128
   auto_find_batch_size: True
 
   # training related
@@ -42,7 +48,7 @@ trainer_args:
 
   # tracking/logging related
   report_to: wandb
-  run_name: pico_ebm-NoDuplicates_gemma-2-2b_non-conv_zero-shot
+  run_name: pico_ebm-NoDuplicates_gemma-2-2b_zero-shot
   logging_steps: 0.1
 
   # eval/save related

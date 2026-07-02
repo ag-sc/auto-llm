@@ -53,7 +53,13 @@ class SftPreProcessor(PreProcessor):
         encodings = {**full_sequences_encodings, "labels": labels}
 
         if truncation:
-            encodings = self.truncate(encodings=encodings, max_length=max_length)
+            # With completion-only loss, targets are at sequence tail. Preserve
+            # the tail when truncating so target tokens are not dropped.
+            encodings = self.truncate(
+                encodings=encodings,
+                max_length=max_length,
+                preserve_tail=self.completion_only_loss,
+            )
 
         # TODO: instead of padding always up until the max length, look for max length in the corresponding batch and
         #  pad accordingly.
@@ -166,9 +172,9 @@ class SftPreProcessor(PreProcessor):
                 labels_list[:length] = [-100] * length
 
                 # throw a warning if all labels are -100. This means there is nothing to train upon.
-                if list(set(labels_list)):
+                if set(labels_list) == {-100}:
                     print(
-                        "***WARNING*** All labels are masked! Please check the input."
+                        "***WARNING*** All labels are masked! Please check the input. Labels list: ", labels_list
                     )
 
         return labels
@@ -189,13 +195,15 @@ class SftPreProcessor(PreProcessor):
 
     @staticmethod
     def truncate(
-        encodings: Dict[str, List[List[int]]], max_length: int
+        encodings: Dict[str, List[List[int]]],
+        max_length: int,
+        preserve_tail: bool = False,
     ) -> Dict[str, List[List[int]]]:
         truncated_encodings = {}
         for key, value in encodings.items():
             items = []
             for item in value:
-                item = item[:max_length]
+                item = item[-max_length:] if preserve_tail else item[:max_length]
                 items.append(item)
             truncated_encodings[key] = items
 

@@ -1,0 +1,61 @@
+auto_llm_trainer_args:
+  trainer_type: sft
+  model_name: meta-llama/Llama-3.1-8B
+  attn_implementation: sdpa
+  truncation: True
+  completion_only_loss: True
+  energy_profiling: true
+  force_cpu_power: 450 # 2× AMD EPYC 7713 @ 225W
+  
+  # token_budget: 200000000 # 200M tokens
+
+peft_config:
+  r: 16
+  lora_alpha: 32
+  lora_dropout: 0.05
+  target_modules: "all-linear"
+  task_type: "CAUSAL_LM"
+
+trainer_data_builder_config:
+  dataset_dir: /vol/auto_llm/processed_datasets/open-medical-llm-benchmark/openmedicalLLM_mixed
+  instruction_template: "You are a medical expert. Answer the following question accurately."
+  input_template: "{{input}}\nAnswer:"
+  output_template: " {{output}}"
+  dataset_type: prompt_completions
+  instruction_input_separator: "\n"
+  parse_output_as_json: False
+
+trainer_args:
+  max_length: 512
+  bf16: True
+  fp16: False
+
+  # bsz related
+  per_device_train_batch_size: 1
+  per_device_eval_batch_size: 1
+  gradient_accumulation_steps: 32
+  auto_find_batch_size: True
+
+  # training related
+  output_dir: /vol/auto_llm/sft_models/open-medical-llm-benchmark/energy/openmedicalLLM_mixed_llama-3.1-8b
+  gradient_checkpointing: True
+  num_train_epochs: 5 # overridden by token_budget -> max_steps
+  learning_rate: 1e-4
+  warmup_steps: 10
+
+  # tracking/logging related
+  report_to: wandb
+  run_name: openmedicalLLM_mixed_llama-3.1-8b_energy
+  logging_steps: 10
+
+  eval_strategy: "steps"         # or "epoch"
+  eval_steps: 50                  # run evaluation every 50 steps
+  save_strategy: "steps"         # must match eval_strategy when using step-based eval
+  save_steps: 50                  # save checkpoint every 50 steps (same as eval_steps)
+  load_best_model_at_end: true    # after training, load the best model found on the chosen metric
+  metric_for_best_model: "eval_loss"  # metric to monitor for best model
+  greater_is_better: false        # whether higher metric is better (false for loss)
+  save_total_limit: 2            # keep only the latest N checkpoints to save disk space
+  save_only_model: True          # skip optimizer/scheduler/rng state in checkpoints
+  early_stopping_patience: 5       # number of evaluations without improvement
+  early_stopping_threshold: 1e-4   # minimum improvement to reset patience

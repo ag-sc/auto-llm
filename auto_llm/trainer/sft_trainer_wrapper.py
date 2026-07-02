@@ -3,8 +3,8 @@ from typing import Dict, Any
 
 import torch
 from accelerate import Accelerator, DistributedType
-from peft import LoraConfig
-from transformers import AutoModelForCausalLM, AutoTokenizer, AutoConfig
+from peft import LoraConfig, prepare_model_for_kbit_training 
+from transformers import AutoModelForCausalLM, AutoTokenizer, AutoConfig, BitsAndBytesConfig, EarlyStoppingCallback
 from trl import SFTConfig, SFTTrainer
 
 from auto_llm.builder.trainer_data_builder.sft_data_builder import (
@@ -19,22 +19,15 @@ from auto_llm.dto.trainer_run_config import TrainerRunConfig
 from auto_llm.pre_processor.sft_pre_procesor import SftPreProcessor
 from auto_llm.registry.estimator_registry import CTX_LENGTH_KEYS
 from auto_llm.registry.tracker_registry import WANDB_TRAIN_PROJECT
+from auto_llm.profiler.energy_profiler import EnergyProfiler
+from auto_llm.profiler.wandb_energy_logger import WandbEnergyLogger
+from auto_llm.estimator.estimation_pipeline import EstimationPipeline
+from auto_llm.estimator.emission_comparator import EmissionComparator
 from auto_llm.trainer.trainer_wrapper import TrainerWrapper
 
 accelerator = Accelerator()
 
-
 class SftTrainerWrapper(TrainerWrapper):
-    """
-    A wrapper class for the Hugging Face TRL SFTTrainer.
-
-    This class handles the end-to-end training pipeline, including:
-    - Loading the pre-trained model and tokenizer from Hugging Face Hub.
-    - Building and pre-processing the dataset using the custom data builder.
-    - Executing `SFTTrainer` with the prepared model, data, and configurations.
-    - Saving the fine-tuned model and tokenizer to the specified output directory.
-    """
-
     def __init__(self, config: TrainerRunConfig):
         self.config = config
 
@@ -48,34 +41,83 @@ class SftTrainerWrapper(TrainerWrapper):
             token=os.getenv("HF_TOKEN"),
             attn_implementation=self.config.auto_llm_trainer_args.attn_implementation,
             low_cpu_mem_usage=True,
-            dtype=torch.bfloat16,  # TODO: pass this as trainer arg?
+            torch_dtype=torch.bfloat16,  # TODO: pass this as trainer arg?
         )
+        # START QLORA CONFIG 
+        bnb_config = None
+        if getattr(self.config, "quantization_config", None) is not None:
+            q = self.config.quantization_config
+            bnb_config = BitsAndBytesConfig(
+                load_in_4bit=q.load_in_4bit,
+                load_in_8bit=getattr(q, "load_in_8bit", False),
+                bnb_4bit_quant_type=q.bnb_4bit_quant_type,
+                bnb_4bit_use_double_quant=q.bnb_4bit_use_double_quant,
+                bnb_4bit_compute_dtype=getattr(torch, q.bnb_4bit_compute_dtype),
+            )
+            self.logger.info("Start QLoRa: applying BitsAndBytesConfig.")
+
+        model_kwargs = {
+            "pretrained_model_name_or_path": self.config.auto_llm_trainer_args.model_name,
+            "token": os.getenv("HF_TOKEN"),
+            "attn_implementation": self.config.auto_llm_trainer_args.attn_implementation,
+            "low_cpu_mem_usage": True,
+            "device_map": "auto", 
+        }
+        
+        if bnb_config:
+            model_kwargs["quantization_config"] = bnb_config
+        else:
+            model_kwargs["torch_dtype"] = torch.bfloat16
+            
+        model = AutoModelForCausalLM.from_pretrained(**model_kwargs)
+
+        
+        if self.config.quantization_config is not None:
+            model = prepare_model_for_kbit_training(
+                model,
+                use_gradient_checkpointing=self.config.trainer_args.gradient_checkpointing,
+            )
+        elif (
+            self.config.peft_config is not None
+            and self.config.trainer_args.gradient_checkpointing
+        ):
+            model.enable_input_require_grads()
+        # END QLORA CONFIG 
+
         tokenizer = AutoTokenizer.from_pretrained(
             pretrained_model_name_or_path=self.config.auto_llm_trainer_args.model_name,
             token=os.getenv("HF_TOKEN"),
         )
 
-        tokenizer.pad_token = tokenizer.eos_token
+        # When combining PEFT (frozen base weights) with gradient checkpointing,
+        # the embedding output has requires_grad=False which breaks the backward
+        # pass through checkpointed blocks. Enabling input require_grads fixes it.
+        if (
+            self.config.peft_config is not None
+            and self.config.trainer_args.gradient_checkpointing
+        ):
+            model.enable_input_require_grads()
 
+        tokenizer.pad_token = tokenizer.eos_token
         max_length = self.get_max_length(
             max_length=self.config.trainer_args.max_length,
             hf_model_config=hf_model_config,
         )
-
-        # While FT, pad to the right. See https://github.com/huggingface/transformers/issues/34842#issuecomment-2528550342.
         tokenizer.padding_side = "right"
 
         builder = self.get_trainer_data_builder(config=self.config)
         ds_dict = builder.build()
 
+        # Derive max_steps from token_budget so all models process the same
+        # number of tokens regardless of tokenizer differences.
+        if self.config.auto_llm_trainer_args.token_budget is not None:
+            self.apply_token_budget(max_length=max_length)
+
         pre_processor = SftPreProcessor(
             tokenizer=tokenizer,
             completion_only_loss=self.config.auto_llm_trainer_args.completion_only_loss,
-        )  # True
+        )
 
-        # TRL SftTrainer relies on `return_assistant_tokens_mask` in `apply_chat_template` to get the assistant mask
-        # tokens. However, this works only if there is *generation* keyword in the chat template. Hence,
-        # manually pre-processing dataset if conversational and demands only completion loss.
         skip_prepare_dataset = False
         completion_only_loss = False
         if self.config.auto_llm_trainer_args.completion_only_loss:
@@ -92,12 +134,8 @@ class SftTrainerWrapper(TrainerWrapper):
                 )
                 skip_prepare_dataset = True
             else:
-                # for non-conversational dataset, use TRL's dataset prep.
-                # TODO: decide if this is needed or custom pre-processor suffices
                 completion_only_loss = True
-                self.logger.info(
-                    "Using custom preprocessor for Non-conversational dataset"
-                )
+                self.logger.info("Using custom preprocessor for Non-conversational dataset")
                 ds_dict = ds_dict.map(
                     function=pre_processor.pre_process,
                     fn_kwargs=dict(
@@ -109,24 +147,38 @@ class SftTrainerWrapper(TrainerWrapper):
                 )
                 skip_prepare_dataset = True
 
-        use_reentrant = None
+        # Default to non-reentrant checkpointing (recommended by PyTorch and
+        # required for PEFT on single-GPU runs). FSDP still needs reentrant.
+        use_reentrant = False
         ddp_find_unused_parameters = None
         if accelerator.state.distributed_type == DistributedType.FSDP:
             use_reentrant = True
-        elif accelerator.state.distributed_type == DistributedType.MULTI_GPU:  # for ddp
+        elif accelerator.state.distributed_type == DistributedType.MULTI_GPU:
             use_reentrant = False
             ddp_find_unused_parameters = False
+        
+        sft_args_dict = self.config.trainer_args.model_dump(exclude={"wandb_project"})
+
+        sft_args_dict["eval_strategy"] = "steps"
+        sft_args_dict["save_strategy"] = "steps"
+        sft_args_dict["load_best_model_at_end"] = True
+        sft_args_dict["metric_for_best_model"] = "eval_loss"
+        sft_args_dict["greater_is_better"] = False
 
         trainer_args = SFTConfig(
-            **self.config.trainer_args.model_dump(),
+            **sft_args_dict,         
             dataset_kwargs={"skip_prepare_dataset": skip_prepare_dataset},
             completion_only_loss=completion_only_loss,
             gradient_checkpointing_kwargs={"use_reentrant": use_reentrant},
             ddp_find_unused_parameters=ddp_find_unused_parameters,
         )
 
+        wandb_project = (
+            self.config.trainer_args.wandb_project or WANDB_TRAIN_PROJECT
+        )
+
         if self.config.trainer_args.report_to == "wandb":
-            os.environ["WANDB_PROJECT"] = WANDB_TRAIN_PROJECT
+            os.environ["WANDB_PROJECT"] = wandb_project
 
         peft_config = None
         if self.config.peft_config:
@@ -138,6 +190,14 @@ class SftTrainerWrapper(TrainerWrapper):
                 task_type=self.config.peft_config.task_type,
             )
 
+        
+        early_stopping_patience = getattr(
+            self.config.trainer_args, "early_stopping_patience", 3
+        )
+        early_stopping_threshold = getattr(
+            self.config.trainer_args, "early_stopping_threshold", 0.0
+        )
+
         trainer = SFTTrainer(
             model=model,
             processing_class=tokenizer,
@@ -145,6 +205,12 @@ class SftTrainerWrapper(TrainerWrapper):
             peft_config=peft_config,
             train_dataset=ds_dict[DatasetSplit.TRAIN],
             eval_dataset=ds_dict[DatasetSplit.VALIDATION],
+            callbacks=[
+                EarlyStoppingCallback(
+                    early_stopping_patience=early_stopping_patience,
+                    early_stopping_threshold=early_stopping_threshold,
+                )
+            ]
         )
 
         self.logger.info("Train Dataset")
@@ -152,8 +218,6 @@ class SftTrainerWrapper(TrainerWrapper):
         self.logger.info(ds_dict["train"])
         for key, value in ds_dict["train"][0].items():
             self.logger.info(f"{key}\n{value}")
-
-        trainer.train()
 
         # from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
         #
@@ -172,19 +236,98 @@ class SftTrainerWrapper(TrainerWrapper):
         #     state_dict=state_dict,
         # )
 
-        trainer.save_model(self.config.trainer_args.output_dir)
-        tokenizer.save_pretrained(self.config.trainer_args.output_dir)
+        if self.config.auto_llm_trainer_args.energy_profiling:
+            log_to_wandb = self.config.trainer_args.report_to == "wandb"
+            output_dir = self.config.trainer_args.output_dir
+
+            # Pre-run: persist energy estimate
+            pipeline = EstimationPipeline(
+                output_dir=output_dir,
+                gpu_name=self.config.auto_llm_trainer_args.gpu_name,
+                is_eval=False,
+                config=self.config,
+            )
+            estimate = pipeline.run()
+
+            with EnergyProfiler(
+                output_dir=output_dir,
+                project_name=wandb_project,
+                experiment_name=self.config.trainer_args.run_name,
+                is_main_process=accelerator.is_main_process,
+                tracking_mode=self.config.auto_llm_trainer_args.tracking_mode,
+                force_cpu_power=self.config.auto_llm_trainer_args.force_cpu_power,
+                force_ram_power=self.config.auto_llm_trainer_args.force_ram_power,
+            ) as profiler:
+                trainer.train()
+                trainer.save_model(output_dir)
+                tokenizer.save_pretrained(output_dir)
+
+            # Post-run: compare estimated vs actual
+            comparator = EmissionComparator(
+                estimated_emissions=estimate or {},
+                actual_emissions=profiler.final_emissions_data,
+            )
+            comparison = comparator.compare()
+            if comparison:
+                EmissionComparator.save_comparison(comparison, output_dir)
+
+            # Log all energy metrics to a single wandb run
+            if log_to_wandb:
+                wandb_logger = WandbEnergyLogger(
+                    project=wandb_project,
+                    name=self.config.trainer_args.run_name,
+                )
+                wandb_logger.log(pipeline.get_wandb_metrics())
+                wandb_logger.log(profiler.get_wandb_metrics())
+                wandb_logger.log(comparator.get_wandb_metrics())
+                wandb_logger.flush()
+        else:
+            trainer.train()
+            trainer.save_model(self.config.trainer_args.output_dir)
+            tokenizer.save_pretrained(self.config.trainer_args.output_dir)
+
+        self.logger.info(f"Model and Tokenizer saved in: {self.config.trainer_args.output_dir}")
+
+    def apply_token_budget(self, max_length: int) -> None:
+        """Derive ``max_steps`` from ``token_budget`` and apply it to the config.
+
+        Ensures all models process the same number of tokens regardless of
+        tokenizer differences. Sets ``num_train_epochs`` to a large sentinel so
+        the dataloader does not exhaust before ``max_steps`` is reached.
+        """
+        token_budget = self.config.auto_llm_trainer_args.token_budget
+        bs = self.config.trainer_args.per_device_train_batch_size
+        ga = self.config.trainer_args.gradient_accumulation_steps
+
+        # For DDP/FSDP each process owns its own data-parallel shard, so
+        # effective batch scales with num_processes. On a single-process
+        # launch (python -m) num_processes==1 which is also correct.
+        ngpus = max(1, accelerator.num_processes)
+        visible_cuda = torch.cuda.device_count() if torch.cuda.is_available() else 0
+        if visible_cuda and visible_cuda != ngpus:
+            self.logger.warning(
+                f"accelerator.num_processes={ngpus} does not match "
+                f"torch.cuda.device_count()={visible_cuda}. Check that the "
+                f"accelerate config's num_processes matches the SLURM "
+                f"--gres=gpu:<N> allocation, otherwise the token budget "
+                f"math will be off."
+            )
+
+        tokens_per_step = max_length * bs * ga * ngpus
+        computed_max_steps = token_budget // tokens_per_step
+
+        self.config.trainer_args.max_steps = computed_max_steps
+        self.config.trainer_args.num_train_epochs = 100
 
         self.logger.info(
-            f"Model and Tokenizer saved in the path: {self.config.trainer_args.output_dir}"
+            f"Token budget: {token_budget:,} -> max_steps: {computed_max_steps:,} "
+            f"(tokens_per_step={tokens_per_step:,}, max_length={max_length}, "
+            f"batch_size={bs}, grad_accum={ga}, num_processes={ngpus}, "
+            f"cuda_device_count={visible_cuda})"
         )
 
     @staticmethod
-    def get_max_length(
-        hf_model_config: Dict[str, Any],
-        max_length: int = None,
-    ):
-        # Set max_length to the configured value, if it exists. Otherwise, find the model max context length.
+    def get_max_length(hf_model_config: Dict[str, Any], max_length: int = None):
         if not max_length:
             for key in CTX_LENGTH_KEYS:
                 if key in list(hf_model_config.keys()):
@@ -192,31 +335,15 @@ class SftTrainerWrapper(TrainerWrapper):
                     break
             else:
                 raise Exception(f"Max length can not be found in the model config!")
-
-            # Model max length can be as large as 131072. This is unnecessary while SFT. Setting a minimum of 1024,
-            # if max_length not configured by the user.
             max_length = min(1024, max_length)
         return max_length
 
     @staticmethod
     def get_trainer_data_builder(config: TrainerRunConfig) -> TrainerDataBuilder:
-        if (
-            config.trainer_data_builder_config.dataset_type
-            == SftDatasetType.CONVERSATIONAL
-        ):
-            builder = ConversationalSftDataBuilder(
-                **config.trainer_data_builder_config.model_dump()
-            )
-        elif (
-            config.trainer_data_builder_config.dataset_type
-            == SftDatasetType.PROMPT_COMPLETIONS
-        ):
-            builder = PromptCompletionsSftDataBuilder(
-                **config.trainer_data_builder_config.model_dump()
-            )
+        if config.trainer_data_builder_config.dataset_type == SftDatasetType.CONVERSATIONAL:
+            builder = ConversationalSftDataBuilder(**config.trainer_data_builder_config.model_dump())
+        elif config.trainer_data_builder_config.dataset_type == SftDatasetType.PROMPT_COMPLETIONS:
+            builder = PromptCompletionsSftDataBuilder(**config.trainer_data_builder_config.model_dump())
         else:
-            raise Exception(
-                f"Invalid dataset_type: {config.trainer_data_builder_config.dataset_type}"
-            )
-
+            raise Exception(f"Invalid dataset_type: {config.trainer_data_builder_config.dataset_type}")
         return builder

@@ -1,7 +1,7 @@
 from typing import Literal, List, Optional, Union
 
 from peft import TaskType
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from transformers import SchedulerType, IntervalStrategy
 from transformers.trainer_utils import SaveStrategy
 
@@ -33,6 +33,46 @@ class LoraConfig(BaseModel):
         default="CAUSAL_LM",
     )
 
+class QuantizationConfig(BaseModel):
+    load_in_4bit: bool = Field(
+        description="Load base weights in 4-bit (QLoRA). Mutually exclusive with load_in_8bit.",
+        title="Load In 4-bit",
+        default=True,
+    )
+    load_in_8bit: bool = Field(
+        description="Load base weights in 8-bit (LLM.int8). Mutually exclusive with load_in_4bit.",
+        title="Load In 8-bit",
+        default=False,
+    )
+    bnb_4bit_quant_type: Literal["nf4", "fp4"] = Field(
+        description="4-bit data type. NF4 is the QLoRA-recommended normal-float variant.",
+        title="4-bit Quant Type",
+        default="nf4",
+    )
+    bnb_4bit_use_double_quant: bool = Field(
+        description="Quantize the quantization constants for additional memory savings.",
+        title="4-bit Double Quant",
+        default=True,
+    )
+    bnb_4bit_compute_dtype: Literal["bfloat16", "float16", "float32"] = Field(
+        description="Dtype used for matmul/compute in quantized layers.",
+        title="4-bit Compute Dtype",
+        default="bfloat16",
+    )
+
+    @model_validator(mode="after")
+    def _check_mutually_exclusive(self) -> "QuantizationConfig":
+        if self.load_in_4bit and self.load_in_8bit:
+            raise ValueError(
+                "load_in_4bit and load_in_8bit are mutually exclusive"
+            )
+        if not self.load_in_4bit and not self.load_in_8bit:
+            raise ValueError(
+                "One of load_in_4bit or load_in_8bit must be True"
+            )
+        return self
+
+
 
 class AutoLlmTrainerArgs(BaseModel):
     trainer_type: Literal["sft"] = Field(
@@ -60,6 +100,60 @@ class AutoLlmTrainerArgs(BaseModel):
         description="Sets the loss computation of the Trainer. If set to True, input tokens are ignored for loss computation. This is useful while instruction tuning the model. If set to False, all tokens in the sequences are considered for the loss computation. This is the default causal language modeling objective.",
         title="Completion Only Loss",
         default=True,
+    )
+    energy_profiling: bool = Field(
+        default=False,
+        description="Enable CodeCarbon energy profiling to track energy consumption and CO₂ emissions during training.",
+        title="Energy Profiling",
+    )
+    gpu_name: Optional[str] = Field(
+        default=None,
+        description="GPU name used for energy estimation (must match a key in the GPU "
+        "params cache). When ``None``, the GPU is auto-detected at runtime "
+        "via ``torch.cuda.get_device_name``.",
+        title="GPU Name",
+    )
+    tracking_mode: Literal["machine", "process"] = Field(
+        default="machine",
+        description=(
+            "CodeCarbon tracking mode. 'machine' (default) reads whole-node "
+            "CPU load and scales by TDP — always bounded, recommended with "
+            "force_cpu_power on virtualised clusters. 'process' tracks only "
+            "the current process tree but can produce unbounded values on "
+            "cgroup-restricted SLURM jobs."
+        ),
+        title="Tracking Mode",
+    )
+    force_cpu_power: Optional[int] = Field(
+        default=None,
+        description=(
+            "Override CPU TDP (watts) used by CodeCarbon when RAPL is "
+            "unavailable. Essential on clusters where lscpu reports a "
+            "virtualised socket count (e.g. 450 for 2× AMD EPYC 7713 "
+            "at 225 W each). ``None`` means auto-detect."
+        ),
+        title="Force CPU Power",
+    )
+    force_ram_power: Optional[int] = Field(
+        default=None,
+        description=(
+            "Override RAM power consumption (watts). Estimate with "
+            "``sudo lshw -C memory -short | grep DIMM`` then multiply "
+            "number of slots × 5 W. ``None`` means use CodeCarbon's "
+            "heuristic."
+        ),
+        title="Force RAM Power",
+    )
+    token_budget: Optional[int] = Field(
+        default=None,
+        description=(
+            "Total number of tokens to process during training. When set, "
+            "max_steps is computed as token_budget / (max_length x "
+            "effective_batch_size) and num_train_epochs is ignored. "
+            "This ensures fair comparison across models with different "
+            "tokenizers."
+        ),
+        title="Token Budget",
     )
 
 
@@ -124,6 +218,15 @@ class TrainerArgs(BaseModel):
         title="Number of Training Epochs",
         default=5,
     )
+    max_steps: int = Field(
+        description=(
+            "Maximum number of training steps. When > 0, overrides "
+            "num_train_epochs. Typically computed automatically from "
+            "token_budget in AutoLlmTrainerArgs."
+        ),
+        title="Max Steps",
+        default=-1,
+    )
     learning_rate: float = Field(
         description="The initial learning rate for the optimizer.",
         title="Learning Rate",
@@ -150,6 +253,14 @@ class TrainerArgs(BaseModel):
         description="The tracker to use.",
         title="Report To",
         default="wandb",
+    )
+    wandb_project: Optional[str] = Field(
+        description=(
+            "Weights & Biases project name for training runs. If unset, "
+            "Auto-LLM falls back to the repository default project."
+        ),
+        title="Wandb Project",
+        default=None,
     )
     run_name: str = Field(
         description="The run name in the tracker.",
@@ -199,7 +310,6 @@ class TrainerArgs(BaseModel):
         default=None,
     )
 
-
 class TrainerRunConfig(BaseModel):
     auto_llm_trainer_args: AutoLlmTrainerArgs = Field(
         description="Args specific to AutoLLM Trainer",
@@ -216,5 +326,10 @@ class TrainerRunConfig(BaseModel):
     peft_config: Optional[LoraConfig] = Field(
         description="Configuration for PEFT technique",
         title="PEFT Config",
+        default=None,
+    )
+    quantization_config: Optional[QuantizationConfig] = Field(
+        description="Configuration for bitsandbytes quantization (QLoRA)",
+        title="Quantization Config",
         default=None,
     )
