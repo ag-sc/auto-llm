@@ -61,7 +61,7 @@ An overview over the Auto-LLM pipeline. You can click directly on the individual
 ///
 
 
-Based on the [**task (1)**](../tasks) relevant to your use-case, you select a [**dataset (2)**](../datasets) and the platform suggests a list of [**LLMs (3)**](../basics). The selected LLMs (TODO is it multiple or only one?) then get [**fine-tuned (4)**](../finetuning) using the training split of the chosen dataset. The [**energy consumed (5)**](../energy_consumption) during this fine-tuning gets recorded and can be viewed seperatly. After fine-tuning, all LLMs, with both the basic and the fine-tuned versions, get [**evaluated (6)**](../evaluating) on the unseen test-split of the chosen dataset, and a final overview enables you to see which model performs best on the given task and dataset.  
+Based on the [**task (1)**](../tasks) relevant to your use-case, you select a [**dataset (2)**](../datasets) and the platform suggests a list of [**LLMs (3)**](../basics). The selected LLMs then get [**fine-tuned (4)**](../finetuning) using the training split of the chosen dataset. The [**energy consumed (5)**](../energy_consumption) during this fine-tuning gets recorded and can be viewed seperatly. After fine-tuning, all LLMs, with both the basic and the fine-tuned versions, get [**evaluated (6)**](../evaluating) on the unseen test-split of the chosen dataset, and a final overview enables you to see which model performs best on the given task and dataset.  
 
 
 
