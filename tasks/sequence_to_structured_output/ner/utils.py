@@ -172,12 +172,14 @@ def get_per_sample_scores(expected_entities_dict: Dict[str, List], predicted_res
     for key, expected_value in expected_entities_dict.items():
         if not isinstance(expected_value, list):
             expected_value = [str(expected_value)] if expected_value else []
+        expected_value = [str(v) for v in expected_value]
 
         num_entity_keys_with_values += 1
 
         predicted_value = predicted_response_dict.get(key, [])
         if not isinstance(predicted_value, list):
             predicted_value = [str(predicted_value)] if predicted_value else []
+        predicted_value = [str(v) for v in predicted_value]
 
         # 1. Exact match between the Lists
         exact_match = get_exact_match(expected_value, predicted_value)
@@ -220,10 +222,12 @@ def get_per_label_scores(expected_entities_dict: Dict[str, List], predicted_resp
     for key, expected_value in expected_entities_dict.items():
         if not isinstance(expected_value, list):
             expected_value = [str(expected_value)] if expected_value else []
+        expected_value = [str(v) for v in expected_value]
 
         predicted_value = predicted_response_dict.get(key, [])
         if not isinstance(predicted_value, list):
             predicted_value = [str(predicted_value)] if predicted_value else []
+        predicted_value = [str(v) for v in predicted_value]
 
         # 1. Exact match between the Lists
         exact_match = get_exact_match(expected_value, predicted_value)
