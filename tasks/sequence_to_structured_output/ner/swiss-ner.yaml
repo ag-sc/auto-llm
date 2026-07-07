@@ -59,7 +59,7 @@ doc_to_target: "{{output_text}}"
 
 fewshot_config:
   sampler: default
-  split: test
+  split: validation
 
   doc_to_target: |
     ```json
