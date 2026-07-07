@@ -1,20 +1,25 @@
 tag:
   - ner
 
-task: europarl_ner
+task: europarl_ner_newsplit
 
-dataset_path: llm-4-kmu/europarl-ner
+dataset_path: parquet
+dataset_kwargs:
+  data_files:
+    test: /vol/auto_llm/sft_models/newsplit_data/europarl_ner/parquet/test.parquet
+    validation: /vol/auto_llm/sft_models/newsplit_data/europarl_ner/parquet/validation.parquet
 test_split: test
+validation_split: validation
 
 description: |
   Du bist ein präzises System zur Named Entity Recognition (NER). Deine Aufgabe ist es, strukturierte Entitäten aus dem bereitgestellten Text zu extrahieren und ausschließlich als valides JSON-Objekt zurückzugeben.
-  
+
   ### Entitätstypen:
   * **PER**: Personen (Namen von echten oder fiktiven Personen, z. B. "Kumar Ponnambalam").
   * **ORG**: Organisationen (Unternehmen, Institutionen, Parlamente, politische Vereinigungen, z. B. "Europäischen Parlaments", "Europäischen Union").
   * **LOC**: Orte und geografische Bezeichnungen (Länder, Städte, Regionen, z. B. "Sri Lanka").
   * **MISC**: Sonstige Entitäten (Veranstaltungen, Epochen, technologische Begriffe, Nationalitäten, Kunstwerke, z. B. "Millenium-Bug").
-  
+
   ### Regeln:
   1. Extrahiere die Werte genau so, wie sie im Text vorkommen. Modifiziere oder korrigiere die Sätze oder Wörter nicht.
   2. Wenn eine Entität im Text nicht vorkommt, gib ein leeres Array [] für diesen Schlüssel an.

@@ -4,6 +4,11 @@ import re
 from typing import Any, Dict, List, Union
 from thefuzz import fuzz
 
+# Corpus-level (micro) F1 config. partial_f1 counts a gold/pred entity pair as a
+# match when their token_set_ratio is at or above the threshold (lenient match).
+MICRO_FUZZY_SCORER = fuzz.token_set_ratio
+MICRO_FUZZY_THRESHOLD = 0.90
+
 # TODO: Is this the right approach? When there is no reference,
 # f1-score is usually undefined. But this reduces the overall score.
 # How to deal with this?
@@ -105,6 +110,77 @@ def get_exact_match(expected_value, predicted_value):
     return float(exact_match_score)
 
 
+def _exact_counts(gold_list, pred_list):
+    gs, ps = set(gold_list), set(pred_list)
+    tp = len(gs & ps)
+    return tp, len(ps - gs), len(gs - ps)  # tp, fp, fn
+
+
+def _fuzzy_counts(gold_list, pred_list):
+    # One-to-one greedy matching above the threshold; each entity used once.
+    pairs = []
+    for gi, g in enumerate(gold_list):
+        for pi, p in enumerate(pred_list):
+            s = MICRO_FUZZY_SCORER(g, p) / 100.0
+            if s >= MICRO_FUZZY_THRESHOLD:
+                pairs.append((s, gi, pi))
+    pairs.sort(reverse=True)
+    used_g, used_p = set(), set()
+    for _, gi, pi in pairs:
+        if gi in used_g or pi in used_p:
+            continue
+        used_g.add(gi)
+        used_p.add(pi)
+    tp = len(used_g)
+    return tp, len(pred_list) - tp, len(gold_list) - tp  # tp, fp, fn
+
+
+def get_micro_counts(expected_entities_dict: Dict[str, List], predicted_response_dict: Dict[str, List]):
+    """Pool (tp, fp, fn) over all labels of one sample for exact and fuzzy matching.
+
+    Returned per-sample and summed across the corpus by the micro_f1 / partial_f1
+    aggregations, so the reported F1 is a true corpus-level micro score.
+    """
+    if not isinstance(predicted_response_dict, dict):
+        predicted_response_dict = {}
+
+    e_tp = e_fp = e_fn = 0
+    f_tp = f_fp = f_fn = 0
+    for label in set(expected_entities_dict) | set(predicted_response_dict):
+        g = _to_str_list(expected_entities_dict.get(label, []))
+        p = _to_str_list(predicted_response_dict.get(label, []))
+        tp, fp, fn = _exact_counts(g, p)
+        e_tp += tp; e_fp += fp; e_fn += fn
+        tp, fp, fn = _fuzzy_counts(g, p)
+        f_tp += tp; f_fp += fp; f_fn += fn
+    return (e_tp, e_fp, e_fn), (f_tp, f_fp, f_fn)
+
+
+def _to_str_list(value):
+    if not isinstance(value, list):
+        value = [value] if value else []
+    return [str(v).strip() for v in value if str(v).strip() != ""]
+
+
+def _micro_f1_from_counts(items):
+    tp = sum(i[0] for i in items)
+    fp = sum(i[1] for i in items)
+    fn = sum(i[2] for i in items)
+    p = tp / (tp + fp) if (tp + fp) else 0.0
+    r = tp / (tp + fn) if (tp + fn) else 0.0
+    return 2 * p * r / (p + r) if (p + r) else 0.0
+
+
+def micro_f1(items):
+    """Aggregation: exact-string micro F1 over pooled per-sample (tp, fp, fn)."""
+    return _micro_f1_from_counts(items)
+
+
+def partial_f1(items):
+    """Aggregation: fuzzy (token_set_ratio) micro F1 over pooled per-sample counts."""
+    return _micro_f1_from_counts(items)
+
+
 def process_results(doc: Dict[str, Any], result: List[str]) -> Dict[str, float]:
     """Function to compute the metrics given the input and the generated response."""
     expected_entities_dict = doc.get("output_text", {})
@@ -142,6 +218,11 @@ def process_results(doc: Dict[str, Any], result: List[str]) -> Dict[str, float]:
 
     for metric_name, metric_value in per_sample_scores.items():
         consolidated_metrics_dict[f"{metric_name}_all_labels"] = metric_value
+
+    # Emit per-sample counts for the corpus-level (micro) F1 aggregations.
+    exact_counts, fuzzy_counts = get_micro_counts(expected_entities_dict, predicted_response_dict)
+    consolidated_metrics_dict["micro_f1"] = exact_counts
+    consolidated_metrics_dict["partial_f1"] = fuzzy_counts
 
     print("Input:", doc.get("input_text", {}))
     print("Expected Output:", expected_entities_dict)
