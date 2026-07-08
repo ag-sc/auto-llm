@@ -1,5 +1,11 @@
 import argparse
 
+from auto_llm.logger import disable_wandb_console_capture
+
+# Must run before anything can import W&B (patched on import), so console capture
+# is disabled and cannot raise BlockingIOError under SLURM's non-blocking pipes.
+disable_wandb_console_capture()
+
 import yaml
 from accelerate import Accelerator
 from accelerate.logging import get_logger

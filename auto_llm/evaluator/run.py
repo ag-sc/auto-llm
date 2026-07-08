@@ -1,6 +1,11 @@
 import argparse
 import shutil
 
+from auto_llm.logger import disable_wandb_console_capture
+
+# Must run before lm-eval (and thus W&B, patched on import) is imported, so console
+# capture is disabled and cannot raise BlockingIOError under SLURM's non-blocking pipes.
+disable_wandb_console_capture()
 
 import lm_eval.models.mistral3
 import lm_eval.models.huggingface
