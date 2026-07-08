@@ -89,6 +89,12 @@ DATASET_ORDER = [
 
 STRATEGY_ORDER = ["zero-shot", "few-shot", "lora"]
 
+# Datasets excluded from the per-strategy Average row (still shown per-dataset).
+# SwissNER is zero-shot only (18 test samples -> no few-shot/LoRA), so leaving it
+# in would inflate the zero-shot average relative to the other strategies and make
+# the columns incomparable.
+AVG_EXCLUDE = {"SwissNER"}
+
 # A run whose predictions are empty/unparseable above this fraction is treated as a
 # degenerate training collapse (immediate-EOS) and excluded from run selection.
 DEGENERATE_FAIL_RATE = 0.5
@@ -292,7 +298,7 @@ def write_tables(df, path):
                     v = lut.get((ds, c[0], c[1]), {}).get(metric)
                     v = None if v is None or (isinstance(v, float) and pd.isna(v)) else float(v)
                     vals.append(v)
-                    if v is not None:
+                    if v is not None and ds not in AVG_EXCLUDE:
                         col_accum[c].append(v)
                 fh.write(_fmt_latex_row(ds, vals) + "\n")
             avg = [(sum(col_accum[c]) / len(col_accum[c]) if col_accum[c] else None)
