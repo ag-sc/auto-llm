@@ -1,0 +1,57 @@
+site_name: Auto-LLM Documentation
+site_url: https://ag-sc.github.io/auto-llm/
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.expand
+
+extra_css:
+  - stylesheets/extra.css
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
+
+
+markdown_extensions:
+  - attr_list
+  - md_in_html
+  - pymdownx.blocks.caption
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
+
+nav:
+  - Home: index.md
+  - Fundamentals:
+      - Overview: fundamentals/overview.md
+      - Basics: fundamentals/basics.md
+      - Tasks: fundamentals/tasks.md
+      - Datasets: fundamentals/datasets.md
+      - Fine-tuning: fundamentals/finetuning.md
+      - Evaluating: fundamentals/evaluating.md
+      - Energy Consumption: fundamentals/energy_consumption.md
+  - Platform:
+      - Step-by-Step: platform/how_to_use.md
