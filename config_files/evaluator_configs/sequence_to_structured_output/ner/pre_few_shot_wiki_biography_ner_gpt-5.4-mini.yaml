@@ -4,9 +4,9 @@ model_args:
 
 include_path: tasks
 tasks:
-  - archaeo_ner
+  - wiki_biography_ner
 
-num_fewshot: 0
+num_fewshot: 5
 batch_size: 16
 device: cuda:0
 
@@ -18,8 +18,8 @@ log_samples: true
 wandb_args:
   project: german-ner-eval
   entity: llm4kmu
-  name: pre_zero_shot_archaeo_ner_gpt-5.4-mini
+  name: pre_few_shot_wiki_biography_ner_gpt-5.4-mini
   tags:
-    - archaeology
-    - archaeo_ner
-    - zero_shot
+    - biography
+    - wiki_biography_ner
+    - few_shot

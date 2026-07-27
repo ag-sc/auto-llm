@@ -1,0 +1,22 @@
+model: openai-chat-completions
+model_args:
+  pretrained: gpt-5.4-mini-2026-03-17
+
+apply_chat_template: True
+
+include_path: tasks
+tasks:
+  - humadex_german_ner
+
+num_fewshot: 5
+
+output_path: eval_results
+log_samples: true
+
+wandb_args:
+  project: german-ner-eval
+  name: pre_few_shot_humadex_german_ner_gpt-5.4-mini
+  tags:
+    - medical
+    - humadex_german_ner
+    - few_shot
