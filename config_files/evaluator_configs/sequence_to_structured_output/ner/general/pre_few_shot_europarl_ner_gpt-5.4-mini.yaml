@@ -6,7 +6,7 @@ apply_chat_template: True
 
 include_path: tasks
 tasks:
-  - europarl_ner
+  - europarl_ner_newsplit
 
 num_fewshot: 5
 
@@ -14,7 +14,7 @@ output_path: eval_results
 log_samples: true
 
 wandb_args:
-  project: german-ner-eval
+  project: german-ner-eval-newsplit
   name: pre_few_shot_europarl_ner_gpt-5.4-mini
   tags:
     - general
