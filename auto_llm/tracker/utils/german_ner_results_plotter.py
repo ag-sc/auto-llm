@@ -34,20 +34,46 @@ for run in tqdm(runs):
         else:
             model_prefix = pretrained_model
 
+        tags = run.tags
+        # print("tags", tags)
+
+        tag_ = None
+        for tag in tags:
+            if "shot" in tag:
+                tag_ = tag
+                break
+
         task_name = ""
         for key, value in run.summary.items():
             if "alias" in key:
                 task_name = value
                 # print(task_name)
 
-                f1 = run.summary.get(f"{task_name}/f1_score_all_labels")
-                exact_match = run.summary.get(f"{task_name}/exact_match_all_labels")
-                fuzzy_match = run.summary.get(f"{task_name}/fuzzy_match_all_labels")
+                # print("run.summary", run.summary)
+
+                micro_f1 = run.summary.get(f"{task_name}/micro_f1")
+                partial_match = run.summary.get(f"{task_name}/partial_f1")
+                # exact_match = run.summary.get(f"{task_name}/exact_match_all_labels")
+                # fuzzy_match = run.summary.get(f"{task_name}/fuzzy_match_all_labels")
                 # print(f1)
-                results.append(dict(task_name=task_name, model=model_prefix, f1=f1, exact_match=exact_match, fuzzy_match=fuzzy_match))
+                results.append(
+                    dict(
+                        task_name=task_name,
+                        model=model_prefix,
+                        micro_f1=micro_f1,
+                        partial_match=partial_match,
+                        tag=tag_,
+                        # exact_match=exact_match,
+                        # fuzzy_match=fuzzy_match,
+                    )
+                )
 
 results_df = pd.DataFrame(results)
 print(results_df)
+
+results_df.to_csv("results.csv")
+
+exit()
 
 # 1. Filter and melt for F1 score only
 df_long = results_df.melt(

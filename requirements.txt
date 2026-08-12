@@ -15,11 +15,6 @@ peft==0.16.0
 # flash-attn==2.8.3
 reflex>=0.7.13a1
 
-# plotly
-# pip install argon2_cffi
-# pip install passlib
-# reflex db init
-# reflex db makemigrations
-# reflex db migrate
-
-# pip install torch==2.7.1 torchvision==0.22.1 torchaudio==2.7.1 --index-url https://download.pytorch.org/whl/cu126 --force-reinstall
+# Note: For Ampere GPUs, using torch with cu126
+# pip freeze | grep -E "(cuda|cudnn|cublas|nvidia|torch)" | xargs pip uninstall -y
+# pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126
