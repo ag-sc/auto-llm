@@ -38,18 +38,18 @@ class AutoLlmTrainerArgs(BaseModel):
         title="Trainer Type",
         default="sft",
     )
-    model_name: str = Field(
+    model_name: Optional[str] = Field(
         description="Name of the model to further train",
         title="Model Name",
         examples=["google/gemma-2-2b-it"],
     )
-    attn_implementation: str = Field(
+    attn_implementation: Optional[str] = Field(
         description="Name of the model to further train",
         title="Model Name",
         examples=["eager", "sdpa", "flash_attention_2", "flash_attention_3"],
         default="flash_attention_2",
     )
-    truncation: bool = Field(
+    truncation: Optional[bool] = Field(
         description="Sets truncation of the input sequences",
         title="Truncation",
         default=True,
@@ -64,7 +64,7 @@ class AutoLlmTrainerArgs(BaseModel):
 class TrainerArgs(BaseModel):
     # The following parameters are a subset of transformers.training_args.TrainingArguments
     # model and tokenizer related
-    max_length: int = Field(
+    max_length: Optional[int] = Field(
         description="Maximum sequence length. This lets the tokenizer decide how long to pad and/or to truncate the input sequences",
         title="Maximum Length",
         default=2048,
@@ -230,6 +230,8 @@ class TrainerArgs(BaseModel):
     )
 
 
+"""
+# TODO Remove this as it is now in global_configs?
 class TrackerConfig(BaseModel):
     wandb_project: Optional[str] = Field(
         description="The W&B project name to which this training run belongs. This is used to group multiple training runs together in W&B for better organization and comparison.",
@@ -256,6 +258,7 @@ class TrackerConfig(BaseModel):
         title="W&B Run Group",
         default="training",
     )
+    """
 
 
 class TrainerRunConfig(BaseModel):
@@ -276,8 +279,10 @@ class TrainerRunConfig(BaseModel):
         title="PEFT Config",
         default=None,
     )
+    """
     tracker_config: Optional[TrackerConfig] = Field(
         description="Configuration for experiment trackers like W&B",
         title="Tracker Config",
         default=None,
     )
+    """

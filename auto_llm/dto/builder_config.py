@@ -47,15 +47,15 @@ class TrainerDataBuilderConfig(BaseModel):
         description="Number of samples to consider",
         default=None,
     )
-    instruction_template: str = Field(
+    instruction_template: Optional[str] = Field(
         title="Instruction Template",
         description="The template for the **instruction**. This is the text that goes to the ``system`` field in case of an instruction tuned model. You can also add placeholders to be replaced with input or examples.<br><br>Possible placeholders: ``{{input}}``, ``{{examples}}``",
     )
-    input_template: str = Field(
+    input_template: Optional[str] = Field(
         title="Input Template",
         description="The template for the **input text**. This is the text that goes to the ``user`` field in case of an instruction tuned model. You can also add placeholders to be replaced with input or examples.<br><br>Possible placeholders: ``{{input}}``, ``{{examples}}``",
     )
-    output_template: str = Field(
+    output_template: Optional[str] = Field(
         title="Output Template",
         description="The template for the **output text**. This is the template for the expected response from the model. You can also add placeholders to be replaced with output.<br><br>Possible placeholders: ``{{output}}``",
     )
