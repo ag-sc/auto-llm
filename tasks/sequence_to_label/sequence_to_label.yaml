@@ -1,0 +1,26 @@
+tag:
+  - seq2seq
+
+task: sequence_to_label
+
+test_split: test
+
+output_type: multiple_choice
+doc_to_text: |
+  Answer the following question based on the given abstract. Answer only with a yes/no/maybe.
+
+  {{input_text}}
+
+  Answer:
+doc_to_target: "{{output_text}}"
+doc_to_choice: ["yes", "no", "maybe"]
+
+# process_results: !function utils.process_results
+
+metric_list:
+  - metric: acc
+    aggregation: mean
+    higher_is_better: true
+
+metadata:
+  version: 1.0

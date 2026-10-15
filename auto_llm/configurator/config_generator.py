@@ -72,6 +72,8 @@ class TrainEvalRunConfigurator:
         self.run_group = self.dataset_name + "_" + group_id
         self.save_config_group()
 
+        self.eval_task_name = self.save_eval_task_yaml()
+
         self.trainer_run_configs_path = os.path.join(self.configs_path, "trainer_run_configs")
         self.evaluator_run_configs_path = os.path.join(self.configs_path, "evaluator_run_configs")
 
@@ -263,10 +265,11 @@ class TrainEvalRunConfigurator:
         wandb_args = f"{wandb_entity},{wandb_project},{wandb_run_name},{wandb_run_id},{wandb_group},{wandb_job_type}"
 
         # TODO: evaluator can also take different parameters, including few-shots, etc. Handle this.
-        task = f"{self.dataset_name}"
+        # task = f"{self.dataset_name}"
         eval_config = {
             "model": "hf",
-            "tasks": task,
+            "tasks": self.eval_task_name,
+            "dataset_path": self.dataset_path,
             "model_args": model_args,
             "wandb_args": wandb_args,
             "write_out": True,
@@ -349,6 +352,48 @@ class TrainEvalRunConfigurator:
             yaml.dump(config, f)
         print(f"Saved configuration: {config_path}")
         return config_path
+
+    def save_eval_task_yaml(self) -> str:
+        """
+        Generates a full lm-eval-harness task YAML from the generic task template
+        (``tasks/<task>/<task>.yaml``) by adding the ``dataset_path`` and a unique task name.
+
+        The file is written next to the template so that relative references such as
+        ``!function utils.process_results`` keep resolving, and so that it is discovered
+        via ``LM_EVAL_HARNESS_CUSTOM_TASKS_PATH``.
+
+        :return: name of the generated task
+        """
+        task_dir = os.path.join(LM_EVAL_HARNESS_CUSTOM_TASKS_PATH, self.task)
+        template_path = os.path.join(task_dir, f"{self.task}.yaml")
+        if not os.path.exists(template_path):
+            raise FileNotFoundError(f"Task template not found: {template_path}")
+
+        with open(template_path, "r") as f:
+            template_lines = f.read().splitlines()
+
+        # edit the template textually, since yaml.safe_load cannot handle custom tags like `!function`
+        task_name = f"{self.task}_{self.run_group}"
+        task_lines = []
+        task_key_found = False
+        for line in template_lines:
+            if line.startswith("dataset_path:"):
+                continue
+            if line.startswith("task:"):
+                task_key_found = True
+                task_lines.append(f"task: {task_name}")
+                task_lines.append(f"dataset_path: {json.dumps(self.dataset_path)}")
+                continue
+            task_lines.append(line)
+
+        if not task_key_found:
+            raise ValueError(f"Task template has no `task` key: {template_path}")
+
+        task_path = os.path.join(task_dir, f"{task_name}.yaml")
+        with open(task_path, "w+") as f:
+            f.write("\n".join(task_lines) + "\n")
+        print(f"Saved Eval Task: {task_path}")
+        return task_name
 
     def save_config_group(self):
         run_group_dict = {"run_group": self.run_group}
