@@ -26,6 +26,13 @@ class WorkbenchState(rx.State):
             with open(configure_state_path, "r") as f:
                 configure_state = json.load(f)
 
+            # Older jobs were saved without run_group/configs_path; recover them from the job folder
+            if not configure_state.get("run_group"):
+                with open(f"{job_path}/run_group.json", "r") as f:
+                    configure_state["run_group"] = json.load(f)["run_group"]
+            if not configure_state.get("configs_path"):
+                configure_state["configs_path"] = job_path
+
             app_state = await self.get_state(AppState)
             app_state.load_from_json(configure_state)
 

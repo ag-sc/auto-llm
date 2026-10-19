@@ -31,7 +31,46 @@ def info_popover(title: str, content: str):
     )
 
 
+def example_result_card(result) -> rx.Component:
+    return rx.card(
+        rx.vstack(
+            rx.hstack(
+                rx.vstack(
+                    rx.text(result.model_label, weight="bold", size="2"),
+                    rx.text(result.run_name, size="1", color_scheme="gray", trim="both"),
+                    spacing="1",
+                    min_width="0",
+                ),
+                rx.spacer(),
+                rx.hstack(
+                    rx.foreach(
+                        result.scores,
+                        lambda score: rx.badge(score.name, ": ", score.value, color_scheme=score.color, variant="soft", size="2"),
+                    ),
+                    spacing="2",
+                    wrap="wrap",
+                    justify="end",
+                ),
+                width="100%",
+                align="start",
+            ),
+            rx.box(
+                rx.text(result.output, size="2", white_space="pre-wrap", word_break="break-word"),
+                background_color=rx.color("gray", 2),
+                border_radius="var(--radius-2)",
+                padding="0.5em 0.75em",
+                width="100%",
+            ),
+            spacing="2",
+            width="100%",
+        ),
+        width="100%",
+    )
+
+
 def examples_popover():
+    example = ConfigurationState.current_example
+
     return rx.dialog.root(
         rx.dialog.trigger(
             rx.button(
@@ -51,22 +90,104 @@ def examples_popover():
             )
         ),
         rx.dialog.content(
-            rx.scroll_area(
-                rx.markdown(ConfigurationState.examples_html),
-                type="always",
-                scrollbars="both",
-                height="50vh",
+            rx.vstack(
+                rx.hstack(
+                    rx.dialog.title("Examples", margin="0"),
+                    rx.spacer(),
+                    rx.cond(
+                        ConfigurationState.num_examples > 0,
+                        rx.hstack(
+                            rx.icon_button(
+                                rx.icon("chevron-left", size=16),
+                                variant="soft",
+                                size="1",
+                                on_click=ConfigurationState.prev_example,
+                                disabled=ConfigurationState.example_index == 0,
+                            ),
+                            rx.text(
+                                ConfigurationState.example_index + 1,
+                                " / ",
+                                ConfigurationState.num_examples,
+                                size="2",
+                                color_scheme="gray",
+                            ),
+                            rx.icon_button(
+                                rx.icon("chevron-right", size=16),
+                                variant="soft",
+                                size="1",
+                                on_click=ConfigurationState.next_example,
+                                disabled=ConfigurationState.example_index >= ConfigurationState.num_examples - 1,
+                            ),
+                            align="center",
+                            spacing="2",
+                        ),
+                    ),
+                    width="100%",
+                    align="center",
+                ),
+                rx.cond(
+                    ConfigurationState.num_examples > 0,
+                    rx.box(
+                        rx.vstack(
+                            rx.text("Input", weight="bold", size="2", color_scheme="gray"),
+                            rx.box(
+                                rx.text(example.input_text, size="2", white_space="pre-wrap", word_break="break-word"),
+                                background_color=rx.color("gray", 2),
+                                border=f"1px solid {rx.color('gray', 5)}",
+                                border_radius="var(--radius-3)",
+                                padding="0.75em 1em",
+                                max_height="30vh",
+                                overflow_y="auto",
+                                width="100%",
+                            ),
+                            rx.text("Expected output", weight="bold", size="2", color_scheme="gray", padding_top="0.5em"),
+                            rx.box(
+                                rx.text(example.expected_output, size="2", white_space="pre-wrap", word_break="break-word", color=rx.color("blue", 11)),
+                                background_color=rx.color("blue", 2),
+                                border=f"1px solid {rx.color('blue', 6)}",
+                                border_radius="var(--radius-3)",
+                                padding="0.75em 1em",
+                                width="100%",
+                            ),
+                            rx.hstack(
+                                rx.text("Model outputs", weight="bold", size="2", color_scheme="gray"),
+                                rx.spacer(),
+                                rx.hstack(
+                                    rx.badge("best", color_scheme="green", variant="soft"),
+                                    rx.badge("middle", color_scheme="amber", variant="soft"),
+                                    rx.badge("worst", color_scheme="red", variant="soft"),
+                                    rx.badge("tied", color_scheme="gray", variant="soft"),
+                                    rx.text("per metric, across models", size="1", color_scheme="gray"),
+                                    spacing="1",
+                                    align="center",
+                                    wrap="wrap",
+                                ),
+                                width="100%",
+                                align="center",
+                                padding_top="0.5em",
+                            ),
+                            rx.foreach(example.results, example_result_card),
+                            spacing="2",
+                            width="100%",
+                            padding_right="1em",
+                        ),
+                        max_height="65vh",
+                        overflow_y="auto",
+                        overflow_x="hidden",
+                        width="100%",
+                    ),
+                    rx.callout("No examples available for this run group.", icon="info", width="100%"),
+                ),
+                rx.hstack(
+                    rx.dialog.close(rx.button("Close", variant="soft")),
+                    width="100%",
+                    justify="end",
+                ),
+                spacing="4",
+                width="100%",
             ),
-            rx.dialog.close(rx.button("Close", mt="4")),
-            size="4",
-            width="100%",
-            height="100%",
+            max_width="min(900px, 95vw)",
         ),
-        width="90vw",
-        height="60vh",
-        max_width="90vw",
-        max_height="60vh",
-        padding="2em",
     )
 
 

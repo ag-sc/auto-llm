@@ -1,5 +1,7 @@
 import asyncio
-from typing import Any, Dict
+import dataclasses
+import re
+from typing import Any, Dict, List
 
 import pandas as pd
 import plotly
@@ -28,34 +30,148 @@ from ..state.user import User, get_wandb_client
 GPU_PARAMS = get_gpu_params()
 
 
-TEMPLATE = """\
-## Example {idx}
+# Columns of the W&B eval-results table that are not scores
+EXAMPLE_NON_SCORE_COLS = [
+    "id",
+    "data",
+    "choices",
+    "input_len",
+    "labels",
+    "output_type",
+    "raw_predictions",
+    "filtered_predictions",
+    "run_name",
+]
 
-### **Input Text**
-{input_text}
+# Metrics where 1 means correct and 0 means wrong
+BINARY_METRICS = ["acc", "acc_norm", "exact_match"]
 
-### **Expected Output:**
-{expected_output}
 
----
+@dataclasses.dataclass
+class ExampleScore:
+    name: str
+    value: str
+    color: str
 
-### **Results**
-{results}
-"""
 
-RESULTS_TEMPLATE = """\
-**Model:** ``{run_name}``
+@dataclasses.dataclass
+class ExampleResult:
+    model_label: str
+    run_name: str
+    output: str
+    scores: List[ExampleScore]
 
-**Output:**<br>
-{generated_output}
 
-**Scores:**
-```json
-{scores}
-```
+@dataclasses.dataclass
+class Example:
+    sample_id: str
+    input_text: str
+    expected_output: str
+    results: List[ExampleResult]
 
----
-"""
+
+def _model_label(run_name: str) -> str:
+    if run_name.startswith("pre_"):
+        return "Pre-trained"
+    if run_name.startswith("fft_"):
+        return "Full fine-tuned"
+    if run_name.startswith("lora_"):
+        return "LoRA fine-tuned"
+    return run_name
+
+
+def _parse_choices(choices: Any) -> Dict[str, str]:
+    """Parses '0.  yes\n1.  no' into {'0': 'yes', '1': 'no'}."""
+    parsed = {}
+    for line in str(choices or "").splitlines():
+        match = re.match(r"\s*(\d+)\.\s*(.*)", line)
+        if match:
+            parsed[match.group(1)] = match.group(2).strip()
+    return parsed
+
+
+def _to_text(value: Any) -> str:
+    if isinstance(value, (list, tuple)):
+        value = value[0] if len(value) == 1 else ", ".join(str(v) for v in value)
+    return str(value).strip()
+
+
+def _color_scores_relative(results: List[ExampleResult]):
+    """Colors each non-binary metric by how a model compares to the others: best green, worst red, rest amber."""
+    values_by_metric: Dict[str, List[float]] = {}
+    for result in results:
+        for score in result.scores:
+            if score.name not in BINARY_METRICS:
+                values_by_metric.setdefault(score.name, []).append(float(score.value))
+
+    for result in results:
+        for score in result.scores:
+            values = values_by_metric.get(score.name)
+            if not values or min(values) == max(values):
+                continue
+            value = float(score.value)
+            if value == max(values):
+                score.color = "green"
+            elif value == min(values):
+                score.color = "red"
+            else:
+                score.color = "amber"
+
+
+def build_examples(examples_df: pd.DataFrame) -> List[Example]:
+    if examples_df.empty or "id" not in examples_df.columns:
+        return []
+
+    score_cols = [c for c in examples_df.columns if c not in EXAMPLE_NON_SCORE_COLS]
+    examples = []
+    for sample_id, group_df in examples_df.groupby("id", sort=False):
+        first = group_df.iloc[0]
+        choices = _parse_choices(first.get("choices"))
+
+        expected = _to_text(first.get("labels", ""))
+        expected = choices.get(expected, expected)
+
+        results = []
+        for _, item in group_df.iterrows():
+            output = _to_text(item.get("filtered_predictions", ""))
+            if output in choices:
+                output = f"{choices[output]} ({output})"
+
+            scores = []
+            for col in score_cols:
+                value = item[col]
+                if value == "" or value is None:
+                    continue
+                try:
+                    number = float(value)
+                except (TypeError, ValueError):
+                    continue
+                color = "gray"
+                if col in BINARY_METRICS:
+                    color = "green" if number >= 1 else "red"
+                scores.append(ExampleScore(name=col, value=f"{number:.2f}", color=color))
+
+            results.append(
+                ExampleResult(
+                    model_label=_model_label(item["run_name"]),
+                    run_name=item["run_name"],
+                    output=output or "(empty)",
+                    scores=scores,
+                )
+            )
+
+        _color_scores_relative(results)
+
+        examples.append(
+            Example(
+                sample_id=str(sample_id),
+                input_text=_to_text(first.get("data", "")),
+                expected_output=expected,
+                results=results,
+            )
+        )
+
+    return examples
 
 
 class ConfigurationState(rx.State):
@@ -72,7 +188,8 @@ class ConfigurationState(rx.State):
     result_fig: str = ""
     result_explanation: str = ""
     examples_df: pd.DataFrame = pd.DataFrame()
-    examples_html: str = ""
+    examples: List[Example] = []
+    example_index: int = 0
 
     is_polling: bool = False
     is_loading_results: bool = False
@@ -96,7 +213,8 @@ class ConfigurationState(rx.State):
         self.result_fig: str = ""
         self.result_explanation: str = ""
         self.examples_df: pd.DataFrame = pd.DataFrame()
-        self.examples_html: str = ""
+        self.examples = []
+        self.example_index = 0
 
         self.is_polling: bool = False
         self.is_results_loaded: bool = False
@@ -109,7 +227,8 @@ class ConfigurationState(rx.State):
         self.result_fig: str = ""
         self.result_explanation: str = ""
         self.examples_df: pd.DataFrame = pd.DataFrame()
-        self.examples_html: str = ""
+        self.examples = []
+        self.example_index = 0
 
         self.is_polling: bool = False
         self.is_results_loaded: bool = False
@@ -222,7 +341,8 @@ class ConfigurationState(rx.State):
             self.result_fig = result_fig
             self.result_explanation = result_explanation
             self.examples_df = examples_df
-            self.examples_html = self.display_examples()
+            self.examples = build_examples(examples_df)
+            self.example_index = 0
 
         except Exception as e:
             print(f"Error loading W&B: {e}")
@@ -280,43 +400,22 @@ class ConfigurationState(rx.State):
 
             await asyncio.sleep(5)
 
-    def display_examples(self):
-        samples_text = []
+    @rx.var
+    def current_example(self) -> Example:
+        if not self.examples:
+            return Example(sample_id="", input_text="", expected_output="", results=[])
+        return self.examples[min(self.example_index, len(self.examples) - 1)]
 
-        cols_to_drop = [
-            "id",
-            "data",
-            "input_len",
-            "labels",
-            "output_type",
-            "raw_predictions",
-            "filtered_predictions",
-        ]
-        for idx, group_df in self.examples_df.groupby("id"):
-            result_texts = []
-            for idx, item in group_df.iterrows():
-                filtered_item = item.copy()
-                for col in cols_to_drop:
-                    filtered_item.pop(col)
+    @rx.var
+    def num_examples(self) -> int:
+        return len(self.examples)
 
-                scores_json = filtered_item.to_json(indent=4)
-                result = dict(
-                    run_name=item["run_name"],
-                    generated_output=item["filtered_predictions"],
-                    scores=scores_json,
-                )
-                result_text = RESULTS_TEMPLATE.format(**result)
+    @rx.event
+    def next_example(self):
+        if self.example_index < len(self.examples) - 1:
+            self.example_index += 1
 
-                result_texts.append(result_text)
-
-            sample = dict(
-                idx=idx,
-                input_text=group_df.iloc[0]["data"],
-                expected_output=group_df.iloc[0]["labels"],
-                results="\n".join(result_texts),
-            )
-
-            sample_text = TEMPLATE.format(**sample)
-            samples_text.append(sample_text)
-
-        return samples_text[0]
+    @rx.event
+    def prev_example(self):
+        if self.example_index > 0:
+            self.example_index -= 1

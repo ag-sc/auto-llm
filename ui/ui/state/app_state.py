@@ -248,20 +248,22 @@ class AppState(rx.State):
 
         self.configurator_outputs = sorted_outputs
 
-        def _read_group_and_save(group_path, state_data, username):
-            os.makedirs(os.path.dirname(group_path), exist_ok=True)
+        def _read_group(group_path):
             with open(group_path, "r") as f:
-                data = json.load(f)
+                return json.load(f)["run_group"]
 
+        def _save_state(state_data, username):
             with open(f"{configs_path}/configure_state.json", "w+") as f:
                 json.dump(state_data, f, indent=4)
             with open(f"{configs_path}/settings.json", "w+") as f:
                 json.dump({"username": username, "timestamp": timestamp_str}, f, indent=4)
-            return data["run_group"]
 
         try:
+            # Set run_group/configs_path before serializing so they are persisted in configure_state.json
+            self.run_group = await loop.run_in_executor(_disk_executor, _read_group, configs_group_path)
+            self.configs_path = configs_path
             serializable_state = self._get_serializable_dict()
-            self.run_group = await loop.run_in_executor(_disk_executor, _read_group_and_save, configs_group_path, serializable_state, user_state.username)
+            await loop.run_in_executor(_disk_executor, _save_state, serializable_state, user_state.username)
             self.current_tab = "validate"
         except Exception as e:
             yield rx.toast.warning(f"Failed to process and save group configs: {str(e)}")

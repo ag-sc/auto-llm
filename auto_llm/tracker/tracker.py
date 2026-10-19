@@ -205,7 +205,10 @@ class WandbClient:
             ),
         )
 
-        # examples_df = self.get_examples_of_group(group=group, project_name=project_name)
+        try:
+            examples_df = self.get_examples_of_group(group=group, project_name=project_name)
+        except Exception as e:
+            print(f"Error loading examples: {e}")
         fig = fig.to_html(full_html=False, include_plotlyjs="cdn")
 
         return fig, explanation, examples_df
@@ -221,10 +224,14 @@ class WandbClient:
             if run.group != group:
                 continue
 
+            examples_key = None
             for key in run.summary.keys():
                 if "_eval_results" in key:
                     examples_key = key
                     break
+
+            if examples_key is None:
+                continue
 
             table_artifact = None
             for artifact in run.logged_artifacts():
@@ -232,10 +239,16 @@ class WandbClient:
                     table_artifact = artifact
                     break
 
+            if table_artifact is None:
+                continue
+
             table = table_artifact.get(examples_key)
             eval_results_df = table.get_dataframe().head(5)
             eval_results_df["run_name"] = run.name
             examples_df.append(eval_results_df)
+
+        if not examples_df:
+            return pd.DataFrame()
 
         combined_df = pd.concat(examples_df, axis=0)
         combined_df.columns = [str(col) for col in combined_df.columns]
