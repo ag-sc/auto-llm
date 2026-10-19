@@ -1,7 +1,7 @@
 import datetime
 import json
 import os
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 
 from ..backend import CONFIGS_DIR, ROOT_DIR
@@ -11,7 +11,12 @@ class Workbench:
     def __init__(self, path: str = CONFIGS_DIR):
         self.path = path
 
-    def get_jobs(self, username: str) -> List[Dict[str, Any]]:
+    def get_jobs(self, username: str, team: Optional[str] = None, user_teams: Optional[Dict[str, str]] = None) -> List[Dict[str, Any]]:
+        """
+        Returns the jobs of `username`, or, if `team` is given, the jobs of every user created for that team.
+        `user_teams` maps usernames to their organization and is used for older jobs that did not record a team.
+        """
+        user_teams = user_teams or {}
         job_details = []
         for x in os.walk(self.path):
             for file in x[2]:
@@ -30,7 +35,13 @@ class Workbench:
 
                 path = state_path.replace("configure_state.json", "")
 
-                if settings["username"] == username:
+                if team is not None:
+                    job_team = settings.get("team") or user_teams.get(settings["username"], "")
+                    is_visible = job_team.strip() == team
+                else:
+                    is_visible = settings["username"] == username
+
+                if is_visible:
                     job_details.append(
                         {
                             "job_path": path,

@@ -4,6 +4,7 @@ from typing import Any, Dict, List
 import reflex as rx
 
 from ..pages.configure import AppState
+from ..state.user import User, UserModel
 from ..backend.workbench import Workbench
 from ..backend import ROOT_DIR
 from .. import styles
@@ -14,8 +15,18 @@ class WorkbenchState(rx.State):
     is_auto_refresh: bool = False
 
     @rx.event
-    def get_jobs(self, username: str):
-        self.jobs = Workbench().get_jobs(username=username)
+    async def get_jobs(self):
+        user_state = await self.get_state(User)
+
+        if not user_state.is_admin:
+            self.jobs = Workbench().get_jobs(username=user_state.username)
+            return
+
+        # Admins see the jobs of every user of the currently selected team
+        with rx.session() as session:
+            user_teams = {u.username: u.organization for u in session.exec(UserModel.select()).all()}
+
+        self.jobs = Workbench().get_jobs(username=user_state.username, team=user_state.active_team, user_teams=user_teams)
 
     @rx.event
     async def view_job_details(self, job_path: str):
@@ -62,14 +73,14 @@ def render_individual_job(job):
     )
 
 
-def workbench_stats_card(username: str) -> rx.Component:
+def workbench_stats_card() -> rx.Component:
     return rx.card(
         rx.vstack(
             rx.hstack(
                 rx.hstack(rx.icon("folder-kanban", size=25), rx.heading("Workbench", size="5", weight="bold"), align="center"),
                 rx.button(
                     rx.icon(tag="refresh-cw", size=15),
-                    on_click=lambda: WorkbenchState.get_jobs(username=username),
+                    on_click=WorkbenchState.get_jobs,
                 ),
                 width="100%",
                 justify="between",
@@ -87,5 +98,5 @@ def workbench_stats_card(username: str) -> rx.Component:
         ),
         width="100%",
         box_shadow=styles.box_shadow_style,
-        on_mount=lambda: WorkbenchState.get_jobs(username=username),
+        on_mount=WorkbenchState.get_jobs,
     )

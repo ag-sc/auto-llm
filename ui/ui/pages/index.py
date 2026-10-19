@@ -1,4 +1,5 @@
 import asyncio
+import time
 import reflex as rx
 
 from ..state.user import User, get_wandb_client
@@ -11,6 +12,21 @@ from concurrent.futures import ThreadPoolExecutor
 # A shared executor to handle blocking W&B API network calls safely
 _executor = ThreadPoolExecutor(max_workers=5)
 
+# Project details are shared across all sessions of the same team (W&B entity) for a short while
+_PROJECT_DETAILS_TTL_SECONDS = 300
+_project_details_cache: dict[str, tuple[float, list[dict]]] = {}
+
+
+def _get_project_details(client, force: bool = False) -> list[dict]:
+    entity = client.get_entity()
+    cached = _project_details_cache.get(entity)
+    if not force and cached and time.monotonic() - cached[0] < _PROJECT_DETAILS_TTL_SECONDS:
+        return cached[1]
+
+    project_details = client.get_project_details()
+    _project_details_cache[entity] = (time.monotonic(), project_details)
+    return project_details
+
 
 class OverviewState(rx.State):
     entity: str = ""
@@ -19,28 +35,32 @@ class OverviewState(rx.State):
     is_loading: bool = False  # Prevent concurrent execution of the event handler
 
     @rx.event
+    async def refresh_overview_data(self):
+        async for event in self._load_overview_data(force=True):
+            yield event
+
+    @rx.event
     async def fetch_overview_data(self):
-        # Prevent concurrent execution or redundant fetching
-        if self.fetched_data or self.is_loading:
+        async for event in self._load_overview_data(force=False):
+            yield event
+
+    async def _load_overview_data(self, force: bool):
+        user_state = await self.get_state(User)
+        client = get_wandb_client(user=user_state)
+
+        # Prevent concurrent execution or redundant fetching (refetch when an admin switched teams)
+        if self.is_loading or (not force and self.fetched_data and self.entity == client.get_entity()):
             return
 
         self.is_loading = True
         yield
 
         loop = asyncio.get_event_loop()
-        user_state = await self.get_state(User)
-        client = get_wandb_client(user=user_state)
 
         try:
-            # 1. Fetch entity and project details in parallel or sequence inside the explicit thread executor
-            # Note: If client.get_entity and get_project_details are separate blocking methods,
-            # we wrap a lightweight helper or execute them via a combined function inside the executor.
-            def _fetch_all(c):
-                return c.get_entity(), c.get_project_details()
+            project_details = await loop.run_in_executor(_executor, _get_project_details, client, force)
 
-            entity, project_details = await loop.run_in_executor(_executor, _fetch_all, client)
-
-            self.entity = entity
+            self.entity = client.get_entity()
             self.project_details = project_details
             self.fetched_data = True
         except Exception as e:
@@ -65,13 +85,22 @@ def overview() -> rx.Component:
                         rx.hstack(
                             rx.icon("panels-top-left", size=25),
                             rx.heading("Projects", size="5", weight="bold"),
-                            rx.code(OverviewState.entity, size="2"),
+                            rx.cond(
+                                User.is_admin,
+                                rx.select(
+                                    User.teams,
+                                    value=User.selected_team,
+                                    on_change=User.set_team,
+                                    size="1",
+                                ),
+                                rx.code(OverviewState.entity, size="2"),
+                            ),
                             align="center",
                         ),
                         # 3. ROBUSTNESS: Disable the refresh button during active fetching
                         rx.button(
                             rx.icon(tag="refresh-cw", size=15),
-                            on_click=OverviewState.fetch_overview_data,
+                            on_click=OverviewState.refresh_overview_data,
                             loading=OverviewState.is_loading,
                         ),
                         width="100%",
@@ -101,7 +130,7 @@ def overview() -> rx.Component:
                 width="100%",
                 on_mount=OverviewState.fetch_overview_data,
             ),
-            workbench_stats_card(username=User.username),
+            workbench_stats_card(),
             spacing="5",
             width="60vw",
             height="80vh",

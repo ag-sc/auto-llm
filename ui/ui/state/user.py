@@ -2,9 +2,13 @@ import os
 
 import reflex as rx
 from passlib.hash import argon2
+from sqlmodel import select
 
 # from ..backend.wandb_client import Client
 from auto_llm.tracker.tracker import WandbClient
+
+# Users listed here can view and work on behalf of every team (organization)
+ADMIN_USERNAMES = {u.strip() for u in os.getenv("ADMIN_USERNAMES", "admin").split(",") if u.strip()}
 
 
 class UserModel(rx.Model, table=True):
@@ -30,6 +34,10 @@ class User(rx.State):
     logged_in: bool = False
 
     user_details: UserModel = None
+
+    # Team (organization) management; only admins can switch away from their own organization
+    selected_team: str = ""
+    teams: list[str] = []
 
     # Password management temporary variables
     current_password: str = ""
@@ -70,6 +78,11 @@ class User(rx.State):
                 self.logged_in = True
 
                 self.user_details = user
+                self.selected_team = user.organization
+
+                if self.is_admin:
+                    organizations = session.exec(select(UserModel.organization).distinct()).all()
+                    self.teams = sorted(set(organizations))
 
                 get_wandb_client(user=self, do_login=True)
 
@@ -142,6 +155,33 @@ class User(rx.State):
 
         return self.user_details.organization.strip()
 
+    @rx.var
+    def is_admin(self) -> bool:
+        return self.logged_in and self.username in ADMIN_USERNAMES
+
+    @rx.var
+    def active_team(self) -> str:
+        if not self.logged_in or not self.username:
+            return ""
+
+        if self.is_admin and self.selected_team:
+            return self.selected_team.strip()
+
+        return self.organization_proc
+
+    @rx.event
+    def set_team(self, team: str):
+        if not self.is_admin or team not in self.teams:
+            return rx.toast.error("You are not allowed to access this team.")
+
+        self.selected_team = team
+
+        # Imported lazily to avoid circular imports between the user state and the views
+        from ..pages.index import OverviewState
+        from ..views.workbench_stats import WorkbenchState
+
+        return [OverviewState.fetch_overview_data, WorkbenchState.get_jobs]
+
     @rx.event
     def handle_sign_out(self):
         self.reset_state()
@@ -154,10 +194,12 @@ class User(rx.State):
         self.password = ""
         self.current_password = ""
         self.new_password = ""
+        self.selected_team = ""
+        self.teams = []
 
 
 def get_wandb_client(user: User, do_login: bool = False) -> WandbClient:
-    org = user.organization_proc.replace(" ", "-")
+    org = user.active_team.replace(" ", "-")
     org = org.lower()
     entity = f"llm4kmu-{org}"
     client = WandbClient(entity=entity)

@@ -1,4 +1,5 @@
 import datetime
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List
 import pandas as pd
 import plotly.express as px
@@ -31,18 +32,22 @@ class WandbClient:
         """
         Fetches all runs from the project and returns them as a list of dictionaries.
         """
-        print("Getting proejct details:", self.entity)
-        project_details = []
-        for project in self.api.projects(entity=self.entity):
-            runs = self.api.runs(f"{self.entity}/{project.name}")
-            num_runs = runs.length
+        print("Getting project details:", self.entity)
+        projects = list(self.api.projects(entity=self.entity))
+        if not projects:
+            return []
 
-            # Total runtime (W&B stores runtime in seconds)
-            total_seconds = sum(run.summary.get("_wandb", {}).get("runtime", 0) for run in runs)
+        with ThreadPoolExecutor(max_workers=min(len(projects), 8)) as executor:
+            return list(executor.map(self._get_single_project_details, projects))
 
-            project_details.append({"name": project.name, "num_runs": num_runs, "runtime": round(total_seconds / 3600, 2), "url": f"https://wandb.ai/{self.entity}/{project.name}"})
+    def _get_single_project_details(self, project) -> Dict[str, Any]:
+        # lazy=False fetches the summaries with each page of runs; lazy runs would issue one extra request per run
+        runs = self.api.runs(f"{self.entity}/{project.name}", per_page=500, lazy=False)
 
-        return project_details
+        # Total runtime (W&B stores runtime in seconds)
+        total_seconds = sum(run.summary_metrics.get("_runtime", 0) or 0 for run in runs)
+
+        return {"name": project.name, "num_runs": len(runs), "runtime": round(total_seconds / 3600, 2), "url": f"https://wandb.ai/{self.entity}/{project.name}"}
 
     def get_run_details(self, run_name: str, project_name: str, dt_object: datetime.datetime, user_name: str):
         buffer_time = dt_object - datetime.timedelta(seconds=30)
