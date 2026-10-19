@@ -22,5 +22,6 @@ wandb_args:
 
 # Endpoint of the judge served by scripts/serve_llm_judge.sbatch (see its job log for the node).
 llm_judge:
-  base_url: http://worker-15.GPU.CIT-EC.NET:8000/v1
-  model: Qwen/Qwen2.5-7B-Instruct
+  base_url: http://worker-12.GPU.CIT-EC.NET:8000/v1
+  model: meta-llama/Llama-3.3-70B-Instruct
+

@@ -10,7 +10,7 @@
 VENV_PATH=${1:-venv}
 ENV_VARIABLES_PATH=${2:-/vol/auto_llm/env.sh}
 PORT=${3:-8000}
-JUDGE_MODEL=${4:-Qwen/Qwen2.5-7B-Instruct}
+JUDGE_MODEL=${4:-meta-llama/Llama-3.3-70B-Instruct}
 
 source "$VENV_PATH/bin/activate"
 source "$ENV_VARIABLES_PATH"
