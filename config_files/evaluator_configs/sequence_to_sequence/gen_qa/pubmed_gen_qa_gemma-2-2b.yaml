@@ -20,8 +20,7 @@ wandb_args:
   tags:
     - pubmed_gen_qa
 
-# Endpoint of the judge served by scripts/serve_llm_judge.sbatch (see its job log for the node).
+# Endpoint of the judge served with vLLM (see its job log for the node).
 llm_judge:
-  base_url: http://worker-12.GPU.CIT-EC.NET:8000/v1
-  model: meta-llama/Llama-3.3-70B-Instruct
-
+  base_url: http://worker-8.GPU.CIT-EC.NET:8000/v1
+  model: Qwen/Qwen3.5-27B

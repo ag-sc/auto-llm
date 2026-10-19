@@ -1,11 +1,22 @@
 from typing import Dict, Any, List
 
 import evaluate
+from tqdm import tqdm
 
 from auto_llm.evaluator.llm_judge import LLMJudge
 
 # used as aggregation in the task YAML (``!function utils.nan_safe_mean``)
 nan_safe_mean = LLMJudge.nan_safe_mean
+
+# Created on the first judged sample: ``process_results`` is called once per doc, so the total is unknown here.
+_JUDGE_PROGRESS = None
+
+
+def _update_judge_progress() -> None:
+    global _JUDGE_PROGRESS
+    if _JUDGE_PROGRESS is None:
+        _JUDGE_PROGRESS = tqdm(desc="Running LLM-as-a-Judge evaluation", unit=" samples")
+    _JUDGE_PROGRESS.update(1)
 
 
 BLEU = evaluate.load("bleu")
@@ -55,4 +66,5 @@ def process_results(doc: Dict[str, Any], result: List[str]):
                 reference=reference,
             )
         )
+        _update_judge_progress()
     return metrics
