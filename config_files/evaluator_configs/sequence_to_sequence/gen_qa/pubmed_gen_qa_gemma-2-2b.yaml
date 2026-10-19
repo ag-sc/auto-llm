@@ -1,7 +1,7 @@
 model: hf
 model_args:
-  pretrained: pretrained=google/gemma-2-2b
-  dtype: auto
+  pretrained: google/gemma-2-2b
+  dtype: bfloat16
 
 apply_chat_template: False
 
@@ -19,3 +19,8 @@ wandb_args:
   name: pre_few_shot_pubmed_gen_qa_gemma-2-2b
   tags:
     - pubmed_gen_qa
+
+# Endpoint of the judge served by scripts/serve_llm_judge.sbatch (see its job log for the node).
+llm_judge:
+  base_url: http://worker-15.GPU.CIT-EC.NET:8000/v1
+  model: Qwen/Qwen2.5-7B-Instruct

@@ -2,8 +2,10 @@ from typing import Dict, Any, List
 
 import evaluate
 
-from auto_llm.evaluator import llm_judge
-from auto_llm.evaluator.llm_judge import nan_safe_mean  # noqa: F401 (used as aggregation in the task YAML)
+from auto_llm.evaluator.llm_judge import LLMJudge
+
+# used as aggregation in the task YAML (``!function utils.nan_safe_mean``)
+nan_safe_mean = LLMJudge.nan_safe_mean
 
 
 BLEU = evaluate.load("bleu")
@@ -15,7 +17,7 @@ def process_results(doc: Dict[str, Any], result: List[str]):
     Function to compute the metrics given the input and the generated response.
     Reference-based metrics are None when the doc has no reference answer.
     LLM-as-a-Judge metrics are only returned when a judge endpoint is configured
-    (``LLM_JUDGE_BASE_URL``); otherwise they are omitted from the results.
+    (``llm_judge.base_url`` in the evaluator YAML); otherwise they are omitted from the results.
 
     :param doc: this includes the input
     :param result: this is the generated response
@@ -45,9 +47,9 @@ def process_results(doc: Dict[str, Any], result: List[str]):
             "rougeL": rouge_scores.get("rougeL"),
         }
 
-    if llm_judge.is_enabled():
+    if LLMJudge.is_enabled():
         metrics.update(
-            llm_judge.judge(
+            LLMJudge.get().judge(
                 question_context=doc["input_text"],
                 prediction=prediction,
                 reference=reference,

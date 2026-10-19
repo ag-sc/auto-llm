@@ -1,7 +1,8 @@
 import os
 import json
 import logging
-from typing import Any, Dict, List
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 import jinja2
 from lm_eval.config.evaluate_config import EvaluatorConfig, eval_logger
@@ -9,6 +10,8 @@ from lm_eval.loggers.wandb_logger import WandbLogger
 import numpy as np
 import pandas as pd
 import transformers
+
+from auto_llm.evaluator.llm_judge import LLMJudge
 
 
 class CustomWandbLogger(WandbLogger):
@@ -110,13 +113,36 @@ class CustomWandbLogger(WandbLogger):
         return pd.DataFrame(df_data)
 
 
+def log_llm_judge_to_wandb(wandb_logger: WandbLogger, records_path: Optional[Path]) -> None:
+    """
+    Logs the LLM judge's per-sample verdicts and reasons as the W&B table ``llm_judge/<judge_model>``
+    and uploads the records file (if saved) as the artifact ``llm_judge_<judge_model>``.
+    """
+    judge = LLMJudge.get()
+    if judge is None or not judge.records:
+        return
+    import wandb
+
+    judge_name = judge.model.replace("/", "__")
+    columns, rows = judge.records_as_table()
+    wandb_logger.run.log({f"llm_judge/{judge_name}": wandb.Table(columns=columns, data=rows)})
+    if records_path is not None:
+        artifact = wandb.Artifact(name=f"llm_judge_{judge_name}", type="llm_judge")
+        artifact.add_file(str(records_path))
+        wandb_logger.run.log_artifact(artifact)
+
+
 def run_lm_eval_harness(config_path: str):
     """
     This is taken as is from lm_eval/_cli/run.py (version: 0.4.12).
     We pass the `EvaluatorConfig` object directly to this function,
     so we skip the CLI argument parsing and validation steps.
     """
-    cfg = EvaluatorConfig.from_config(config_path)
+    # `llm_judge` is our own section, not an lm-eval option: configure the judge from it and drop it
+    # before building the EvaluatorConfig (which rejects unknown keys).
+    yaml_config = EvaluatorConfig.load_yaml_config(config_path)
+    LLMJudge.configure(yaml_config.pop("llm_judge", None))
+    cfg = EvaluatorConfig(**yaml_config)._configure()
 
     # Create and validate config (most validation now occurs in EvaluationConfig)
     from lm_eval import simple_evaluate
@@ -224,6 +250,21 @@ def run_lm_eval_harness(config_path: str):
         if cfg.log_samples:
             for task_name in results["configs"]:
                 evaluation_tracker.save_results_samples(task_name=task_name, samples=samples[task_name])
+
+        # LLM judge reasons, next to the samples file of the same run (same naming as lm-eval).
+        # Must come after `save_results_aggregated`, which sets `evaluation_tracker.date_id`.
+        judge_records_path = None
+        judge = LLMJudge.get()
+        if cfg.output_path and judge is not None:
+            output_dir = Path(cfg.output_path)
+            output_dir = output_dir.parent if output_dir.suffix == ".json" else output_dir / str(evaluation_tracker.general_config_tracker.model_name_sanitized)
+            judge_name = judge.model.replace("/", "__")
+            judge_records_path = judge.save_records(output_dir / f"llm_judge_{judge_name}_{evaluation_tracker.date_id}.jsonl")
+        if cfg.wandb_args:
+            try:
+                log_llm_judge_to_wandb(wandb_logger, judge_records_path)
+            except Exception as e:  # noqa: BLE001
+                eval_logger.info("Logging the LLM judge to W&B failed: %s", e)
 
         if evaluation_tracker.push_results_to_hub or evaluation_tracker.push_samples_to_hub:
             evaluation_tracker.recreate_metadata_card()

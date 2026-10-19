@@ -114,9 +114,16 @@ include_path: config_files/evaluator_configs/tasks
 #### LLM-as-a-Judge (generative QA)
 Generative QA tasks (e.g. ``pubmed_gen_qa``) report binary judge metrics: ``judge_correctness`` and ``judge_completeness`` (only when a reference answer exists), ``judge_faithfulness``, ``judge_relevance``, ``judge_fluency`` and ``judge_conciseness``.
 The judge runs as a separate vLLM server:
-- Start the server: ``sbatch scripts/serve_llm_judge.sbatch [judge_model] [port]`` (uses its own vLLM venv, see the script).
-- Point the evaluator to it (e.g. in ``env.sh``): ``export LLM_JUDGE_BASE_URL=http://<node>:<port>/v1`` and ``export LLM_JUDGE_MODEL=<judge_model>``. Optional: ``LLM_JUDGE_API_KEY``, ``LLM_JUDGE_TIMEOUT``, ``LLM_JUDGE_MAX_RETRIES``.
-- Run the evaluator as usual. If ``LLM_JUDGE_BASE_URL`` is not set, the judge is skipped and the judge metrics are omitted from the results (no YAML changes needed).
+- Start the server: ``sbatch scripts/serve_llm_judge.sbatch [venv_path] [env_path] [port] [judge_model]``. The job log prints the ``llm_judge`` section to use.
+- Point the evaluator to it in the evaluator YAML (environment variables are not read):
+  ```yaml
+  llm_judge:
+    base_url: http://<node>:<port>/v1
+    model: <judge_model>
+    # optional: api_key (must match ``vllm serve --api-key``), timeout, max_retries
+  ```
+- Run the evaluator as usual. Without ``llm_judge.base_url``, the judge is skipped and the judge metrics are omitted from the results.
+- The judge's per-sample reasons and verdicts are saved to ``<output_path>/<model>/llm_judge_<judge_model>_<timestamp>.jsonl`` (``/`` in the judge name becomes ``__``), next to the ``samples_<task>_<timestamp>.jsonl`` file of the same run. With ``wandb_args``, they are also logged to W&B as the table ``llm_judge/<judge_model>`` and the artifact ``llm_judge_<judge_model>``.
 </details>
 
 # Contact Us
