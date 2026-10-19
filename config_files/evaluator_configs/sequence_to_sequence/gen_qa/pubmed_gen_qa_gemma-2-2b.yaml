@@ -1,10 +1,21 @@
 model: hf
-tasks: pubmed_gen_qa
-model_args: pretrained=google/gemma-2-2b
-wandb_args: project=llm4kmu-eval,name=pubmed_gen_qa_gemma_2_2b
+model_args:
+  pretrained: pretrained=google/gemma-2-2b
+  dtype: auto
 
-write_out: True
-log_samples: True
-output_path: /vol/auto_llm/eval_results
+apply_chat_template: False
 
 include_path: tasks
+tasks:
+  - pubmed_gen_qa
+
+num_fewshot: 0
+
+output_path: eval_results
+log_samples: true
+
+wandb_args:
+  project: llm4kmu-eval
+  name: pre_few_shot_pubmed_gen_qa_gemma-2-2b
+  tags:
+    - pubmed_gen_qa

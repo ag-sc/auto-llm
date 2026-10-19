@@ -110,6 +110,13 @@ include_path: config_files/evaluator_configs/tasks
 - Running via SLURM:
   - Configure venv and config paths in the slurm script ``scripts/autollm_eval.sbatch``. 
   - Run the script: ``sbatch scripts/autollm_eval.sbatch``.
+
+#### LLM-as-a-Judge (generative QA)
+Generative QA tasks (e.g. ``pubmed_gen_qa``) report binary judge metrics: ``judge_correctness`` and ``judge_completeness`` (only when a reference answer exists), ``judge_faithfulness``, ``judge_relevance``, ``judge_fluency`` and ``judge_conciseness``.
+The judge runs as a separate vLLM server:
+- Start the server: ``sbatch scripts/serve_llm_judge.sbatch [judge_model] [port]`` (uses its own vLLM venv, see the script).
+- Point the evaluator to it (e.g. in ``env.sh``): ``export LLM_JUDGE_BASE_URL=http://<node>:<port>/v1`` and ``export LLM_JUDGE_MODEL=<judge_model>``. Optional: ``LLM_JUDGE_API_KEY``, ``LLM_JUDGE_TIMEOUT``, ``LLM_JUDGE_MAX_RETRIES``.
+- Run the evaluator as usual. If ``LLM_JUDGE_BASE_URL`` is not set, the judge is skipped and the judge metrics are omitted from the results (no YAML changes needed).
 </details>
 
 # Contact Us
