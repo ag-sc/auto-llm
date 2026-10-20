@@ -1,10 +1,12 @@
 import datetime
+import math
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import wandb
+from plotly.subplots import make_subplots
 
 from auto_llm.dto.builder_config import SftDatasetType
 
@@ -12,6 +14,23 @@ RUN_KIND_LABELS = {"pre": "Pre-trained", "fft": "Full fine-tuned", "lora": "LoRA
 
 # Metrics where a smaller value is better; everything else is treated as higher-is-better
 LOWER_IS_BETTER_METRICS = {"perplexity", "word_perplexity", "byte_perplexity", "bits_per_byte", "ter"}
+
+# Run overview: config values worth showing, as (label, candidate flattened config keys); the first key present wins
+RUN_VIEW_CONFIG_KEYS = [
+    ("Model", ["auto_llm_trainer_args.model_name", "_name_or_path", "model_name", "model"]),
+    ("Epochs", ["num_train_epochs"]),
+    ("Learning rate", ["learning_rate"]),
+    ("Batch size / device", ["per_device_train_batch_size"]),
+    ("Grad. accumulation", ["gradient_accumulation_steps"]),
+    ("Max length", ["max_length"]),
+    ("LoRA rank", ["peft_config.r", "lora_r"]),
+]
+# Logged keys not worth a chart or card (throughput, step counters used as the x-axis)
+RUN_VIEW_HIDDEN_KEYS = {"runtime", "samples_per_second", "steps_per_second", "epoch", "global_step", "total_flos"}
+# Keys shown first, in this order; everything else follows alphabetically
+RUN_VIEW_KEY_ORDER = ["loss", "mean_token_accuracy", "accuracy", "learning_rate", "grad_norm"]
+# A key needs at least this many logged points to be drawn as a curve; otherwise it is shown as a value
+RUN_VIEW_MIN_CURVE_POINTS = 3
 
 
 class WandbClient:
@@ -288,6 +307,112 @@ class WandbClient:
                 }
             )
         return insights
+
+    @staticmethod
+    def _flatten(d: Dict[str, Any], prefix: str = "") -> Dict[str, Any]:
+        flat = {}
+        for key, value in d.items():
+            if isinstance(value, dict):
+                flat.update(WandbClient._flatten(value, f"{prefix}{key}."))
+            else:
+                flat[f"{prefix}{key}"] = value
+        return flat
+
+    @staticmethod
+    def _split_key(key: str):
+        """'train/loss' -> ('train', 'loss'). Long task-specific prefixes (eval runs) collapse into 'results'."""
+        section, _, name = key.rpartition("/")
+        if len(section) > 20:
+            section = "results"
+        return section, name
+
+    @staticmethod
+    def _format_number(value: float) -> str:
+        if value == 0 or 1e-3 <= abs(value) < 1e5:
+            return f"{value:.4g}"
+        return f"{value:.3e}"
+
+    def get_run_view(self, run_id: str, project_name: str) -> Dict[str, Any]:
+        """
+        Collects everything for the in-app run overview, generically for any run:
+        run info and config highlights, keys with few logged points as values, and the rest as curves.
+        """
+        run = self.api.run(path=f"{self.entity}/{project_name}/{run_id}")
+
+        runtime = int(run.summary.get("_runtime") or 0)
+        info = [
+            {"label": "Type", "value": run.job_type or "-"},
+            {"label": "Created", "value": run.created_at.replace("T", " ").replace("Z", " UTC") if run.created_at else "-"},
+            {"label": "Runtime", "value": str(datetime.timedelta(seconds=runtime))},
+        ]
+        config = self._flatten(run.config)
+        for label, candidates in RUN_VIEW_CONFIG_KEYS:
+            value = next((config[k] for k in candidates if config.get(k) is not None), None)
+            if value is not None:
+                info.append({"label": label, "value": str(value)})
+
+        history = run.history(samples=500, pandas=True)
+        summary = {k: v for k, v in run.summary.items() if isinstance(v, (int, float)) and not isinstance(v, bool)}
+
+        def is_shown(key: str) -> bool:
+            name = key.rpartition("/")[2]
+            is_hidden = any(name == h or name.endswith("_" + h) for h in RUN_VIEW_HIDDEN_KEYS)  # also "train_runtime" etc.
+            return not key.startswith("_") and not key.endswith("_stderr") and not is_hidden
+
+        numeric_history = [c for c in history.columns if pd.api.types.is_numeric_dtype(history[c])]
+        keys = [k for k in numeric_history if is_shown(k)]
+        keys += [k for k in summary if is_shown(k) and k not in keys]  # summary-only values, e.g. final scores
+        keys.sort(key=lambda k: (RUN_VIEW_KEY_ORDER.index(k.rpartition("/")[2]) if k.rpartition("/")[2] in RUN_VIEW_KEY_ORDER else len(RUN_VIEW_KEY_ORDER), k))
+
+        x_key = "train/global_step" if "train/global_step" in history.columns else "_step"
+        curves, stats = [], []
+        for key in keys:
+            points = history[[x_key, key]].dropna() if key in history.columns and x_key in history.columns else pd.DataFrame()
+            section, name = self._split_key(key)
+            if len(points) >= RUN_VIEW_MIN_CURVE_POINTS:
+                curves.append((section, name, key, points))
+                continue
+            value = summary.get(key, points[key].iloc[-1] if len(points) else None)
+            if value is None or (isinstance(value, float) and math.isnan(value)):
+                continue
+            stderr = summary.get(f"{key}_stderr")
+            stats.append(
+                {
+                    "section": section,
+                    "name": name,
+                    "value": self._format_number(value),
+                    "stderr": f"± {self._format_number(stderr)}" if isinstance(stderr, (int, float)) and not math.isnan(stderr) else "",
+                }
+            )
+
+        fig = None
+        if curves:
+            cols = 2 if len(curves) > 1 else 1
+            rows = math.ceil(len(curves) / cols)
+            fig = make_subplots(
+                rows=rows,
+                cols=cols,
+                subplot_titles=[f"{section}/{name}" if section else name for section, name, _, _ in curves],
+                horizontal_spacing=0.08,
+                vertical_spacing=min(0.12, 0.6 / rows),
+            )
+            for idx, (_, name, key, points) in enumerate(curves):
+                fig.add_trace(
+                    go.Scatter(x=points[x_key], y=points[key], mode="lines+markers", name=name, marker=dict(size=4)),
+                    row=idx // cols + 1,
+                    col=idx % cols + 1,
+                )
+            fig.update_layout(
+                template="plotly_white",
+                showlegend=False,
+                height=230 * rows,
+                margin=dict(t=30, l=40, r=10, b=30),
+                font=dict(size=10),
+            )
+            fig.update_annotations(font_size=11)
+            fig.update_xaxes(title_text="step" if x_key == "_step" else "global step", title_font_size=9)
+
+        return {"url": run.url, "state": run.state, "info": info, "stats": stats, "figure": fig}
 
     def get_examples_of_group(self, group: str, project_name: str):
         runs = self.api.runs(path=f"{self.entity}/{project_name}")

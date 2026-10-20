@@ -4,11 +4,12 @@ import reflex as rx
 from auto_llm.configurator.config_generator import ConfiguratorOutput, ConfigMode, Priority
 from auto_llm.dto.builder_config import TrainerDataBuilderConfig
 from auto_llm.estimator.utils import get_gpu_params
+from auto_llm.registry.tracker_registry import WANDB_TRAIN_PROJECT, WANDB_EVAL_PROJECT
 from auto_llm.tasks.registry import TASKS
 
 from ..state.app_state import AppState
 from ..state.user import User
-from ..state.configuration_state import ConfigurationState, InsightRun, MetricInsight
+from ..state.configuration_state import ConfigurationState, InsightRun, MetricInsight, RunInfoItem, RunStat
 from .. import styles
 
 from ..components.status_badge import status_badge
@@ -329,7 +330,49 @@ def explanation_popover():
     )
 
 
-def config_html_dialog(configurator_output: ConfiguratorOutput):
+def _run_state_badge(state):
+    return rx.match(
+        state,
+        ("running", status_badge("running")),
+        ("finished", status_badge("finished")),
+        ("failed", status_badge("failed")),
+        ("crashed", status_badge("crashed")),
+        ("killed", status_badge("killed")),
+        rx.fragment(),
+    )
+
+
+def _run_info_item(item: RunInfoItem):
+    return rx.vstack(
+        rx.text(item.label, size="1", color_scheme="gray"),
+        rx.text(item.value, size="2", weight="medium", word_break="break-all"),
+        spacing="0",
+    )
+
+
+def _run_stat_card(stat: RunStat):
+    return rx.card(
+        rx.vstack(
+            rx.hstack(
+                rx.cond(stat.section != "", rx.text(stat.section, size="1", color_scheme="gray")),
+                rx.code(stat.name, variant="ghost", size="2"),
+                spacing="1",
+                align="center",
+            ),
+            rx.hstack(
+                rx.text(stat.value, size="5", weight="bold", font_family="monospace", line_height="1.2"),
+                rx.text(stat.stderr, size="1", color_scheme="gray"),
+                align="baseline",
+                spacing="2",
+            ),
+            spacing="1",
+        ),
+        size="1",
+    )
+
+
+def run_view_dialog(configurator_output: ConfiguratorOutput):
+    """In-app overview of the W&B run: drawn from the W&B API, so viewers need no W&B login."""
     return rx.dialog.root(
         rx.tooltip(
             rx.dialog.trigger(
@@ -337,40 +380,100 @@ def config_html_dialog(configurator_output: ConfiguratorOutput):
                     "monitor",
                     variant="soft",
                     size="1",
-                    on_click=lambda: ConfigurationState.load_config_html(configurator_output),
+                    on_click=ConfigurationState.load_run_view(configurator_output.run_id, configurator_output.run_name, configurator_output.mode),
                 ),
             ),
-            content="View W&B Run",
+            content="View run",
         ),
         rx.dialog.content(
             rx.vstack(
-                rx.dialog.title(f"View Run"),
-                rx.dialog.description(f"Run: {configurator_output.run_name}"),
-                rx.card(
-                    rx.el.iframe(
-                        src_doc=ConfigurationState.current_html_content,
-                        width="100%",
-                        height="100%",
-                        loading="lazy",
-                    ),
-                    width="100%",
-                    height="100%",
-                ),
                 rx.hstack(
-                    rx.dialog.close(rx.button("Close", variant="soft")),
-                    justify="end",
+                    rx.icon("activity", size=22, color=rx.color("accent", 10)),
+                    rx.dialog.title("Run overview", margin="0"),
+                    _run_state_badge(ConfigurationState.run_view_state),
+                    rx.spacer(),
+                    rx.tooltip(
+                        rx.icon_button(
+                            "refresh-cw",
+                            variant="soft",
+                            size="2",
+                            on_click=ConfigurationState.refresh_run_view,
+                            loading=ConfigurationState.is_loading_run_view,
+                        ),
+                        content="Refresh",
+                    ),
+                    rx.cond(
+                        ConfigurationState.run_view_url != "",
+                        rx.link(
+                            rx.button(rx.icon("external-link", size=16), "Open in W&B", variant="soft", size="2"),
+                            href=ConfigurationState.run_view_url,
+                            is_external=True,
+                        ),
+                    ),
+                    align="center",
+                    spacing="3",
                     width="100%",
                 ),
+                rx.dialog.description(ConfigurationState.run_view_name, size="2", color_scheme="gray", word_break="break-all"),
+                rx.cond(
+                    ConfigurationState.is_loading_run_view,
+                    rx.center(rx.spinner(size="3"), height="30vh", width="100%"),
+                    rx.cond(
+                        ConfigurationState.run_view_error != "",
+                        rx.callout(ConfigurationState.run_view_error, icon="info", color_scheme="gray", width="100%"),
+                        rx.vstack(
+                            rx.card(
+                                rx.grid(
+                                    rx.foreach(ConfigurationState.run_view_info, _run_info_item),
+                                    columns=rx.breakpoints(initial="2", sm="3", md="5"),
+                                    spacing="4",
+                                    width="100%",
+                                ),
+                                width="100%",
+                            ),
+                            rx.cond(
+                                ConfigurationState.run_view_stats.length() > 0,
+                                rx.grid(
+                                    rx.foreach(ConfigurationState.run_view_stats, _run_stat_card),
+                                    columns=rx.breakpoints(initial="2", sm="3", md="4"),
+                                    spacing="3",
+                                    width="100%",
+                                ),
+                            ),
+                            rx.cond(
+                                ConfigurationState.run_view_has_chart,
+                                rx.card(
+                                    rx.plotly(data=ConfigurationState.run_view_fig, use_resize_handler=True, width="100%"),
+                                    width="100%",
+                                ),
+                            ),
+                            spacing="3",
+                            width="100%",
+                        ),
+                    ),
+                ),
+                rx.hstack(rx.dialog.close(rx.button("Close", variant="soft")), justify="end", width="100%"),
                 spacing="3",
                 width="100%",
-                height="100%",
             ),
-            width="75vw",
-            height="80vh",
-            max_width="75vw",
-            max_height="80vh",
-            padding="2em",
+            max_width="min(1100px, 95vw)",
+            max_height="90vh",
+            overflow_y="auto",
+            size="4",
         ),
+    )
+
+
+def wandb_run_link(configurator_output: ConfiguratorOutput):
+    """Opens the run on wandb.ai in a new tab (built client-side, no backend round trip)."""
+    project_name = rx.cond(configurator_output.mode == ConfigMode.TRAINER_RUN_CFG, WANDB_TRAIN_PROJECT, WANDB_EVAL_PROJECT)
+    return rx.tooltip(
+        rx.link(
+            rx.icon_button("external-link", variant="soft", size="1"),
+            href=f"https://wandb.ai/{User.wandb_entity}/{project_name}/runs/{configurator_output.run_id}",
+            is_external=True,
+        ),
+        content="Open in W&B",
     )
 
 
@@ -499,7 +602,8 @@ def show_configuration(configurator_output: ConfiguratorOutput):
         rx.table.cell(
             rx.hstack(
                 config_view_dialog(configurator_output),
-                config_html_dialog(configurator_output),
+                run_view_dialog(configurator_output),
+                wandb_run_link(configurator_output),
                 rx.match(
                     current_status,
                     ("running", status_badge("running")),

@@ -169,6 +169,10 @@ class User(rx.State):
 
         return self.organization_proc
 
+    @rx.var
+    def wandb_entity(self) -> str:
+        return get_wandb_entity(self.active_team) if self.active_team else ""
+
     @rx.event
     def set_team(self, team: str):
         if not self.is_admin or team not in self.teams:

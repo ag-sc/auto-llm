@@ -5,6 +5,7 @@ from typing import Any, Dict, List
 
 import pandas as pd
 import plotly
+import plotly.graph_objects as go
 import reflex as rx
 import yaml
 
@@ -50,6 +51,17 @@ BINARY_METRICS = ["acc", "acc_norm", "exact_match"]
 # W&B run states after which a run's status no longer changes
 FINAL_RUN_STATES = {"finished", "crashed", "failed", "killed"}
 
+# Run overviews of runs in a final state never change, so they are cached per (entity, project, run_id)
+_run_view_cache: Dict[tuple, Dict[str, Any]] = {}
+# Creating a wandb.Api takes ~0.7s, so keep one client per W&B entity (team)
+_wandb_clients: Dict[str, WandbClient] = {}
+
+
+def _get_cached_client(entity: str) -> WandbClient:
+    if entity not in _wandb_clients:
+        _wandb_clients[entity] = WandbClient(entity=entity)
+    return _wandb_clients[entity]
+
 
 @dataclasses.dataclass
 class ExampleScore:
@@ -85,6 +97,20 @@ class MetricInsight:
     runs: List[InsightRun]
     verdict: str
     tone: str
+
+
+@dataclasses.dataclass
+class RunInfoItem:
+    label: str
+    value: str
+
+
+@dataclasses.dataclass
+class RunStat:
+    section: str
+    name: str
+    value: str
+    stderr: str
 
 
 @dataclasses.dataclass
@@ -209,7 +235,19 @@ class ConfigurationState(rx.State):
     est_runtime: str = ""
     est_emission: str = ""
 
-    current_html_content: str = ""
+    # In-app W&B run overview (Validate tab)
+    run_view_id: str = ""
+    run_view_name: str = ""
+    run_view_mode: str = ""
+    run_view_url: str = ""
+    run_view_state: str = ""
+    run_view_info: List[RunInfoItem] = []
+    run_view_stats: List[RunStat] = []
+    run_view_fig: go.Figure = go.Figure()
+    run_view_has_chart: bool = False
+    run_view_error: str = ""
+    is_loading_run_view: bool = False
+
     result_fig: str = ""
     result_insights: List[MetricInsight] = []
     examples_df: pd.DataFrame = pd.DataFrame()
@@ -237,7 +275,6 @@ class ConfigurationState(rx.State):
         self.est_runtime: str = ""
         self.est_emission: str = ""
 
-        self.current_html_content: str = ""
         self.result_fig: str = ""
         self.result_insights = []
         self.examples_df: pd.DataFrame = pd.DataFrame()
@@ -336,19 +373,54 @@ class ConfigurationState(rx.State):
             except Exception:
                 self.config_statuses[cfg.run_id] = "pending"
 
-    async def load_config_html(self, configurator_output: ConfiguratorOutput):
+    @rx.event
+    async def load_run_view(self, run_id: str, run_name: str, mode: str):
+        """Loads the in-app overview of a W&B run: info, config highlights, final values and curves."""
+        self.run_view_id, self.run_view_name, self.run_view_mode = run_id, run_name, mode
+        self.run_view_url = ""
+        self.run_view_state = ""
+        self.run_view_info = []
+        self.run_view_stats = []
+        self.run_view_fig = go.Figure()
+        self.run_view_has_chart = False
+        self.run_view_error = ""
+        self.is_loading_run_view = True
+        yield
+
         user_state = await self.get_state(User)
-        client = get_wandb_client(user=user_state)
-        project_name = WANDB_TRAIN_PROJECT if configurator_output.mode == ConfigMode.TRAINER_RUN_CFG else WANDB_EVAL_PROJECT
+        entity = get_wandb_entity(user_state.active_team)
+        project_name = WANDB_TRAIN_PROJECT if mode == ConfigMode.TRAINER_RUN_CFG.value else WANDB_EVAL_PROJECT
+        cache_key = (entity, project_name, run_id)
 
-        # Run the blocking synchronous W&B call in a separate thread safely
-        run_html = await asyncio.to_thread(
-            client.get_run_url,
-            run_id=configurator_output.run_id,
-            project_name=project_name,
-        )
+        try:
+            view = _run_view_cache.get(cache_key)
+            if view is None:
+                loop = asyncio.get_running_loop()
+                client = await loop.run_in_executor(_executor, _get_cached_client, entity)
+                view = await loop.run_in_executor(_executor, client.get_run_view, run_id, project_name)
+                if view["state"] in FINAL_RUN_STATES:
+                    _run_view_cache[cache_key] = view
 
-        self.current_html_content = f'<iframe src="{run_html}" ' f'style="width:100%; height:80vh; border:none; display:block;" ' f"allowfullscreen></iframe>"
+            self.run_view_url = view["url"]
+            self.run_view_state = view["state"]
+            self.run_view_info = [RunInfoItem(**i) for i in view["info"]]
+            self.run_view_stats = [RunStat(**st) for st in view["stats"]]
+            if view["figure"] is not None:
+                self.run_view_fig = view["figure"]
+                self.run_view_has_chart = True
+        except Exception as e:
+            if "Could not find run" in str(e):
+                self.run_view_error = "This run has not started logging to W&B yet. It is still queued or starting up."
+            else:
+                print(f"Error loading run view: {e}")
+                self.run_view_error = f"Could not load the run from W&B: {e}"
+        finally:
+            self.is_loading_run_view = False
+
+    @rx.event
+    async def refresh_run_view(self):
+        if self.run_view_id:
+            return ConfigurationState.load_run_view(self.run_view_id, self.run_view_name, self.run_view_mode)
 
     @rx.event
     async def load_config_group_results(self, group: str):
