@@ -62,7 +62,25 @@ def render_individual_job(job):
     """
     return rx.card(
         rx.hstack(
-            rx.text(job["job_path_short"]),
+            rx.vstack(
+                rx.hstack(
+                    rx.cond(
+                        job["dataset_name"] != "",
+                        rx.badge(rx.icon("database", size=12), job["dataset_name"], color_scheme="pink", variant="soft", size="2"),
+                    ),
+                    rx.code(job["run_group_hash"], variant="ghost", color_scheme="gray", size="1"),
+                    spacing="2",
+                    align="center",
+                    wrap="wrap",
+                ),
+                rx.hstack(
+                    rx.icon("folder", size=12, color=rx.color("gray", 10)),
+                    rx.text(job["job_path_short"], size="1", color_scheme="gray"),
+                    spacing="1",
+                    align="center",
+                ),
+                spacing="1",
+            ),
             rx.spacer(),
             rx.moment(job["timestamp"], from_now=True),
             rx.button(rx.icon("eye"), variant="soft", size="1", on_click=lambda: WorkbenchState.view_job_details(job["job_path"])),

@@ -2,11 +2,13 @@ import asyncio
 import datetime
 import json
 import os
+import re
 from typing import Optional, List
 from concurrent.futures import ThreadPoolExecutor
 
 import pandas as pd
 import reflex as rx
+from huggingface_hub import model_info
 
 from auto_llm.automator.automator import Automator
 from auto_llm.configurator.config_executor import SequentialConfigExecutor, TaskSpoolerSequentialConfigExecutor
@@ -22,6 +24,24 @@ GPU_PARAMS = get_gpu_params()
 # Bounded multi-user resource pools to prevent thread exhaustion or API rate limiting
 _api_executor = ThreadPoolExecutor(max_workers=10, thread_name_prefix="wandb_api")
 _disk_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="disk_io")
+
+# HuggingFace model ids look like "<owner>/<name>"
+HF_MODEL_ID_PATTERN = re.compile(r"^[\w.-]+/[\w.-]+$")
+
+
+def parse_custom_models(custom_models: str) -> List[str]:
+    """Splits the comma-separated custom models field into unique, non-empty model ids (order preserved)."""
+    models = [m.strip() for m in custom_models.split(",")]
+    return list(dict.fromkeys(m for m in models if m))
+
+
+def check_hf_model(model_name: str) -> Optional[str]:
+    """Returns an error message if the model can't be found or accessed on HuggingFace, else None."""
+    try:
+        model_info(model_name)
+        return None
+    except Exception as e:
+        return f"{model_name}: {type(e).__name__}"
 
 
 class AppState(rx.State):
@@ -40,6 +60,8 @@ class AppState(rx.State):
 
     # models tab
     selected_models: List[str] = []
+    custom_models: str = ""  # comma-separated HuggingFace model ids entered by the user
+    is_checking_models: bool = False
 
     # prompts tab
     instruction_template: str = ""
@@ -83,6 +105,8 @@ class AppState(rx.State):
 
         # models tab
         self.selected_models = []
+        self.custom_models = ""
+        self.is_checking_models = False
 
         # prompts tab
         self.instruction_template = ""
@@ -112,6 +136,8 @@ class AppState(rx.State):
 
         # models tab
         self.selected_models = data.get("selected_models") or []
+        self.custom_models = data.get("custom_models") or ""
+        self.is_checking_models = False
 
         # prompts tab
         self.instruction_template = data.get("instruction_template", "")
@@ -122,7 +148,8 @@ class AppState(rx.State):
         self.configurator_outputs = [ConfiguratorOutput.model_validate(x) for x in raw_outputs]
         self.configs_path = data.get("configs_path", "")
         self.run_group = data.get("run_group", "")
-        self.start_execution = True
+        # Only block execution if this job was actually submitted (the executor writes run.sh on submit)
+        self.start_execution = bool(self.configs_path) and os.path.exists(f"{self.configs_path}/run.sh")
 
     @rx.var
     def dataset_options_markdown(self) -> str:
@@ -169,11 +196,33 @@ class AppState(rx.State):
         cols = [df.columns[0]] + list(df.columns[2:])
         return automator.model_names, df[cols].round(2)
 
+    def _all_models(self) -> List[str]:
+        """Checked recommended models followed by the user's custom models, without duplicates."""
+        return list(dict.fromkeys(list(self.selected_models) + parse_custom_models(self.custom_models)))
+
     @rx.event
     async def handle_models_submit(self, form_data: dict):
-        if not self.selected_models:
-            yield rx.toast.warning("Please select at least one model!")
+        custom_models = parse_custom_models(self.custom_models)
+        if not self.selected_models and not custom_models:
+            yield rx.toast.warning("Please select or add at least one model!")
             return
+
+        invalid = [m for m in custom_models if not HF_MODEL_ID_PATTERN.match(m)]
+        if invalid:
+            yield rx.toast.warning(f"Please use full HuggingFace model names (e.g. meta-llama/Llama-3.2-3B-Instruct): {', '.join(invalid)}")
+            return
+
+        # Check the models exist on HuggingFace (and are accessible with our token) before generating configs for them
+        self.is_checking_models = True
+        yield
+        loop = asyncio.get_running_loop()
+        errors = await asyncio.gather(*[loop.run_in_executor(_api_executor, check_hf_model, m) for m in custom_models])
+        self.is_checking_models = False
+        errors = [e for e in errors if e]
+        if errors:
+            yield rx.toast.error(f"Could not find or access on HuggingFace: {'; '.join(errors)}")
+            return
+
         self.current_tab = "prompts"
 
     @staticmethod
@@ -230,7 +279,7 @@ class AppState(rx.State):
         configurator_outputs = await loop.run_in_executor(
             _disk_executor,
             self.generate_configs,
-            self.selected_models,
+            self._all_models(),
             self.task_category,
             self.dataset_path,
             self.instruction_template,
@@ -247,6 +296,8 @@ class AppState(rx.State):
             sorted_outputs.extend([co for co in configurator_outputs if co.priority == p])
 
         self.configurator_outputs = sorted_outputs
+        # Freshly generated configs have not been submitted yet
+        self.start_execution = False
 
         def _read_group(group_path):
             with open(group_path, "r") as f:
@@ -283,17 +334,26 @@ class AppState(rx.State):
 
         self.current_tab = "validate"
 
-        if not self.start_execution:
-            self.start_execution = True
-            # job_id_to_attach = os.getenv("JOB_ID_TO_ATTACH", None)
-            # if not job_id_to_attach:
-            #     yield rx.toast.error("Executor needs a JobID to attach itself. Please set environment variable `JOB_ID_TO_ATTACH`.")
+        if self.start_execution:
+            yield rx.toast.info("These configurations have already been submitted.")
+            return
 
-            executor = TaskSpoolerSequentialConfigExecutor(configurator_outputs=self.configurator_outputs)
+        # Set before awaiting so a double click can't submit twice
+        self.start_execution = True
+        # job_id_to_attach = os.getenv("JOB_ID_TO_ATTACH", None)
+        # if not job_id_to_attach:
+        #     yield rx.toast.error("Executor needs a JobID to attach itself. Please set environment variable `JOB_ID_TO_ATTACH`.")
 
-            loop = asyncio.get_running_loop()
+        executor = TaskSpoolerSequentialConfigExecutor(configurator_outputs=self.configurator_outputs)
+
+        loop = asyncio.get_running_loop()
+        try:
             await loop.run_in_executor(_disk_executor, executor.execute)
-            yield rx.toast.success("Your jobs are successfully submitted!")
+        except Exception as e:
+            self.start_execution = False
+            yield rx.toast.error(f"Failed to submit jobs: {str(e)}")
+            return
+        yield rx.toast.success("Your jobs are successfully submitted!")
 
     @rx.event
     async def set_current_tab(self, value: str):
@@ -301,7 +361,7 @@ class AppState(rx.State):
 
     def _get_serializable_dict(self):
         """Converts the active session parameters cleanly into a JSON ready dictionary."""
-        exclude = ["is_loading", "parent_state", "router_data", "substates", "dirty_vars", "dirty_substates", "router", "is_hydrated"]
+        exclude = ["is_loading", "is_checking_models", "parent_state", "router_data", "substates", "dirty_vars", "dirty_substates", "router", "is_hydrated"]
         state_dict = {}
 
         for key in self.get_fields():

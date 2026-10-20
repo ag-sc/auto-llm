@@ -139,9 +139,9 @@ class SequentialConfigExecutor:
         for cfg_output in self.configurator_outputs:
             key = cfg_output.priority.name
             if cfg_output.mode == ConfigMode.TRAINER_RUN_CFG:
-                cmds[key].append(self._get_trainer_run_suffix(cfg_output))
+                cmds[key].append((cfg_output, self._get_trainer_run_suffix(cfg_output)))
             elif cfg_output.mode == ConfigMode.EVALUATOR_RUN_CFG:
-                cmds[key].append(self._get_evaluator_run_suffix(cfg_output))
+                cmds[key].append((cfg_output, self._get_evaluator_run_suffix(cfg_output)))
 
         all_cmds = []
         all_job_ids = []
@@ -160,23 +160,31 @@ class SequentialConfigExecutor:
                 else:
                     raise Exception(f"Unknown priority type {prio_str}")
 
-            for idx, cmd in enumerate(cmds_list):
+            for idx, (cfg_output, cmd) in enumerate(cmds_list):
+                all_cmds.append(
+                    f'echo "[$(date \'+%F %T\')] Starting priority={Priority[prio_str].value} run_name={cfg_output.run_name} '
+                    f'run_id={cfg_output.run_id} config={cfg_output.config_path}"'
+                )
                 cmd_w_prefix = f"srun --jobid $JOB_ID bash {cmd}"
 
                 all_cmds.append(cmd_w_prefix)
             all_job_ids.append(job_ids_prio)
 
+        all_cmds.append(f'\necho "[$(date \'+%F %T\')] All {len(self.configurator_outputs)} runs finished"')
+
         print(all_cmds)
         run_script_path = f"{configs_path}/run.sh"
         with open(run_script_path, "w") as f:
+            # set -e: stop at the first failing run instead of continuing with the next priority
             text = f"""
 #!/bin/bash
+set -eo pipefail
 ROOT_DIR={ROOT_DIR}
 cd $ROOT_DIR
-exho $pwd
+echo $PWD
+trap 'echo "[$(date "+%F %T")] FAILED (exit $?) at line $LINENO: $BASH_COMMAND"' ERR
 
 JOB_ID={self.job_id_to_attach}
-set -e
             """
             f.write(text.strip())
             f.write("\n".join(all_cmds))
@@ -207,13 +215,23 @@ set -e
 
     @staticmethod
     def start_runs(script_path: str):
-        session_name = "auto_llm_runs"
-        script_cmd = f"bash {script_path}"
-        tmux_restart_cmd = f"tmux kill-session -t {session_name} 2>/dev/null || true; tmux new-session -d -s {session_name} '{script_cmd}; exec bash'"
+        # Unlike the task-spooler executor, this run.sh runs the jobs in the foreground (srun) for hours,
+        # so start it detached in its own session (no shared tmux session that a concurrent submit could kill).
+        log_path = Path(script_path).with_name("run.log")
+        with open(log_path, "w") as log:
+            proc = subprocess.Popen(
+                ["bash", script_path], stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, start_new_session=True
+            )
 
-        # tmux_cmd = f"tmux new-session -d -s {session_name} '{script_cmd}; exec bash'"
-        subprocess.run(tmux_restart_cmd, shell=True)
-        print(f"Pipeline started in tmux session: {session_name}")
+        # Catch immediate failures (e.g. invalid JOB_ID) so they reach the caller
+        try:
+            returncode = proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            print(f"Pipeline started (pid {proc.pid}), log: {log_path}")
+            return
+        if returncode != 0:
+            raise RuntimeError(f"Pipeline failed to start (exit {returncode}), see {log_path}")
+        print(f"Pipeline finished, log: {log_path}")
 
 
 class TaskSpoolerSequentialConfigExecutor:
@@ -242,19 +260,14 @@ class TaskSpoolerSequentialConfigExecutor:
         for cfg_output in self.configurator_outputs:
             key = cfg_output.priority.name
             if cfg_output.mode == ConfigMode.TRAINER_RUN_CFG:
-                cmds[key].append(self._get_trainer_run_suffix(cfg_output))
+                cmds[key].append((cfg_output, self._get_trainer_run_suffix(cfg_output)))
             elif cfg_output.mode == ConfigMode.EVALUATOR_RUN_CFG:
-                cmds[key].append(self._get_evaluator_run_suffix(cfg_output))
+                cmds[key].append((cfg_output, self._get_evaluator_run_suffix(cfg_output)))
 
         all_cmds = []
         all_job_ids = []
         for prio_str, cmds_list in cmds.items():
             all_cmds.append(f"\n\n# Priority {Priority[prio_str].value} runs below")
-
-            if prio_str == Priority.PRIORITY_THREE.value:
-                # add a short delay before proceeding with evalaution. This helps the
-                # model weights to be saved before the evaluation starts.
-                all_cmds.append(f"sleep 60s # before executing eval runs of trained models")
 
             job_ids_prio = []
             if prio_str == Priority.PRIORITY_ONE.name:
@@ -268,9 +281,15 @@ class TaskSpoolerSequentialConfigExecutor:
                 else:
                     raise Exception(f"Unknown priority type {prio_str}")
 
-            for idx, cmd in enumerate(cmds_list):
+            for idx, (cfg_output, cmd) in enumerate(cmds_list):
                 job_id_var = f"p{Priority[prio_str].value}j{idx+1}"
                 job_ids_prio.append(job_id_var)
+
+                if prio_str == Priority.PRIORITY_THREE.name:
+                    # add a short delay before evaluating trained models. This helps the model weights
+                    # to be saved before the evaluation starts. The sleep must be part of the queued job:
+                    # run.sh only enqueues, so a sleep there would not delay the job itself.
+                    cmd = f'-c "sleep 60s && bash {cmd}"'
 
                 # TODO: how to set the num of GPUs? Now setting 1 always.
                 if dependencies:
@@ -279,16 +298,28 @@ class TaskSpoolerSequentialConfigExecutor:
                     cmd_w_prefix = f"{job_id_var}=$(ts -G 1 bash {cmd})"
 
                 all_cmds.append(cmd_w_prefix)
+                # One key=value line per job in run.log, mapping the ts job id to its run
+                depends_on = f"${job_ids}" if dependencies else "-"
+                all_cmds.append(
+                    f'echo "ts_job=${job_id_var} priority={Priority[prio_str].value} run_name={cfg_output.run_name} '
+                    f'run_id={cfg_output.run_id} depends_on={depends_on} config={cfg_output.config_path}"'
+                )
             all_job_ids.append(job_ids_prio)
+
+        all_cmds.append(f'\necho "[$(date \'+%F %T\')] All {len(self.configurator_outputs)} jobs queued"')
 
         print(all_cmds)
         run_script_path = f"{configs_path}/run.sh"
         with open(run_script_path, "w") as f:
+            # set -e: stop queuing if any ts call fails, so later jobs don't get broken dependencies
             text = f"""
 #!/bin/bash
+set -eo pipefail
 ROOT_DIR={ROOT_DIR}
 cd $ROOT_DIR
-echo $pwd
+echo $PWD
+trap 'echo "[$(date "+%F %T")] FAILED (exit $?) at line $LINENO: $BASH_COMMAND"' ERR
+echo "[$(date '+%F %T')] Queuing {len(self.configurator_outputs)} jobs on task-spooler (TS_SOCKET=${{TS_SOCKET:-default}})"
 """
             f.write(text.strip())
             f.write("\n".join(all_cmds))
@@ -319,10 +350,12 @@ echo $pwd
 
     @staticmethod
     def start_runs(script_path: str):
-        session_name = "auto_llm_runs"
-        script_cmd = f"bash {script_path}"
-        tmux_restart_cmd = f"tmux kill-session -t {session_name} 2>/dev/null || true; tmux new-session -d -s {session_name} '{script_cmd}; exec bash'"
-
-        # tmux_cmd = f"tmux new-session -d -s {session_name} '{script_cmd}; exec bash'"
-        subprocess.run(tmux_restart_cmd, shell=True)
-        print(f"Pipeline started in tmux session: {session_name}")
+        # run.sh only enqueues jobs in task-spooler and exits quickly; the ts daemon runs them.
+        # Running it directly (no shared tmux session) avoids concurrent submissions killing each other
+        # and lets failures propagate to the caller.
+        log_path = Path(script_path).with_name("run.log")
+        with open(log_path, "w") as log:
+            result = subprocess.run(["bash", script_path], stdout=log, stderr=subprocess.STDOUT)
+        if result.returncode != 0:
+            raise RuntimeError(f"Submitting jobs failed (exit {result.returncode}), see {log_path}")
+        print(f"Jobs queued in task-spooler, log: {log_path}")

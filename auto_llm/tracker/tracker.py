@@ -6,6 +6,13 @@ import plotly.express as px
 import plotly.graph_objects as go
 import wandb
 
+from auto_llm.dto.builder_config import SftDatasetType
+
+RUN_KIND_LABELS = {"pre": "Pre-trained", "fft": "Full fine-tuned", "lora": "LoRA fine-tuned"}
+
+# Metrics where a smaller value is better; everything else is treated as higher-is-better
+LOWER_IS_BETTER_METRICS = {"perplexity", "word_perplexity", "byte_perplexity", "bits_per_byte", "ter"}
+
 
 class WandbClient:
     def __init__(self, entity: str = "llm4kmu"):
@@ -84,6 +91,16 @@ class WandbClient:
         run = self.get_run(run_id=run_id, project_name=project_name)
         return run.state
 
+    def get_run_states(self, run_ids: List[str], project_name: str) -> Dict[str, str]:
+        """
+        Fetches the states of several runs with a single query.
+        Runs that have not been created in W&B yet are missing from the result.
+        """
+        if not run_ids:
+            return {}
+        runs = self.api.runs(path=f"{self.entity}/{project_name}", filters={"name": {"$in": list(run_ids)}}, per_page=len(run_ids))
+        return {run.id: run.state for run in runs}
+
     def get_eval_runs_of_group(self, group: str, project_name: str):
 
         fig = None
@@ -116,50 +133,14 @@ class WandbClient:
             results.append(result)
 
         if len(results) == 0:
-            return ""
+            return "", [], examples_df
 
         df = pd.DataFrame(results)
         df = df.drop_duplicates(subset="run", keep="last")
 
         df_melted = df.melt(id_vars=["run"], value_vars=metric_names, var_name="Metric", value_name="Value")
 
-        explanation = ""
-        grouped = df_melted.groupby("Metric")
-        for metric_name, group_df in grouped:
-            sorted_group = group_df.sort_values(by="Value", ascending=False)
-
-            metric_name = metric_name.split("/")[-1]
-
-            top_value_raw = sorted_group.head(1)["Value"].values[0]
-            top_run_names = group_df[group_df["Value"] == top_value_raw]["run"].tolist()
-
-            print("top_run_names", top_run_names)
-
-            value = round(sorted_group.head(1)["Value"].values[0], 2)
-            value_str = f"{value:.2f}%"
-
-            num_runs = len(group_df)
-
-            # TODO: avoid hard-coding and map run names to model types more robustly
-            best_models = []
-            for run in top_run_names:
-                if "pre" in run:
-                    best_models.append("Pre-trained model")
-                elif "fft" in run:
-                    best_models.append("Full Weights fine-tuned model")
-                elif "lora" in run:
-                    best_models.append("LoRa fine-tuned model")
-                else:
-                    best_models.append(run)
-
-            if len(best_models) == num_runs:
-                explanation += f"* All models perform similarly for the metric `{metric_name}` with a value of ``{value_str}%``. This implies there is no particular gain from fine-tuning for this task for this metric.\n"
-
-            if len(best_models) == 1:
-                explanation += f"* Out of the `{num_runs}` evaluation run(s), the ``{best_models[0]}`` ({top_run_names[0]}) yields the best result for the metric `{metric_name}` with a value of ``{value}%``.\n"
-
-            if len(best_models) > 1:
-                explanation += f"* Out of the `{num_runs}` evaluation run(s), ``{', '.join(best_models)}`` ({', '.join(top_run_names)}) yield the best result for the metric `{metric_name}` with a value of ``{value}%``.\n"
+        insights = self.build_metric_insights(df_melted, group=group)
 
         # Update the figure to use the melted data
         fig = px.bar(
@@ -216,7 +197,97 @@ class WandbClient:
             print(f"Error loading examples: {e}")
         fig = fig.to_html(full_html=False, include_plotlyjs="cdn")
 
-        return fig, explanation, examples_df
+        return fig, insights, examples_df
+
+    @staticmethod
+    def describe_run(run_name: str, group: str) -> Dict[str, str]:
+        """
+        Splits a run name "<pre|fft|lora>_<dataset>_<model>_<dataset_type>" into its model kind and model name.
+        """
+        kind, _, rest = run_name.partition("_")
+        if kind not in RUN_KIND_LABELS:
+            return {"kind": "other", "kind_label": run_name, "model": ""}
+
+        dataset_name = group.rpartition("_")[0]
+        if dataset_name and rest.startswith(dataset_name + "_"):
+            rest = rest[len(dataset_name) + 1 :]
+        for dataset_type in SftDatasetType:
+            if rest.endswith("_" + dataset_type.value):
+                rest = rest[: -len(dataset_type.value) - 1]
+                break
+        return {"kind": kind, "kind_label": RUN_KIND_LABELS[kind], "model": rest}
+
+    @staticmethod
+    def _relative_bar(value: float, best_value: float, lower_is_better: bool) -> int:
+        if lower_is_better:
+            return int(round(100 * best_value / value)) if value > 0 else 0
+        return int(round(100 * value / best_value)) if best_value > 0 else 0
+
+    def build_metric_insights(self, df_melted: pd.DataFrame, group: str) -> List[Dict[str, Any]]:
+        """
+        Summarizes each metric: every run's score, the best run(s), and how fine-tuning compares to the pre-trained model.
+        """
+        insights = []
+        for metric_key, group_df in df_melted.groupby("Metric"):
+            metric_name = metric_key.split("/")[-1]
+            # lm-eval appends the filter name ("acc,none"); "none" carries no information
+            if metric_name.endswith(",none"):
+                metric_name = metric_name[: -len(",none")]
+            group_df = group_df.dropna(subset=["Value"])
+            if group_df.empty:
+                continue
+
+            lower_is_better = metric_name.split(",")[0] in LOWER_IS_BETTER_METRICS
+            group_df = group_df.sort_values(by="Value", ascending=lower_is_better)
+            best_value = group_df["Value"].iloc[0]
+
+            runs = []
+            for _, row in group_df.iterrows():
+                is_best = abs(row["Value"] - best_value) <= 1e-9
+                runs.append(
+                    {
+                        **self.describe_run(row["run"], group),
+                        "run_name": row["run"],
+                        "value": f"{row['Value']:.3f}",
+                        # bar length relative to the best score, so the best model always has the full bar
+                        "bar": self._relative_bar(row["Value"], best_value, lower_is_better),
+                        "is_best": is_best,
+                    }
+                )
+
+            best_runs = [r for r in runs if r["is_best"]]
+            pre_values = group_df[[self.describe_run(r, group)["kind"] == "pre" for r in group_df["run"]]]["Value"]
+
+            if len(best_runs) == len(runs) and len(runs) > 1:
+                tone = "gray"
+                verdict = f"All {len(runs)} models score the same. Fine-tuning brings no gain on this metric."
+            elif all(r["kind"] == "pre" for r in best_runs):
+                tone = "amber"
+                verdict = "The pre-trained model is best. Fine-tuning does not improve this metric."
+            elif any(r["kind"] == "pre" for r in best_runs):
+                tone = "gray"
+                verdict = "Fine-tuning matches but does not beat the pre-trained model on this metric."
+            else:
+                tone = "green"
+                winners = " and ".join(f"{r['kind_label']}" + (f" ({r['model']})" if r["model"] else "") for r in best_runs)
+                verdict = f"{winners} {'are' if len(best_runs) > 1 else 'is'} best"
+                if not pre_values.empty:
+                    best_pre = pre_values.min() if lower_is_better else pre_values.max()
+                    gain = (best_pre - best_value) if lower_is_better else (best_value - best_pre)
+                    verdict += f", {gain:.3f} better than the best pre-trained model"
+                verdict += "."
+
+            insights.append(
+                {
+                    "metric": metric_name,
+                    "best_value": f"{best_value:.3f}",
+                    "direction": "lower is better" if lower_is_better else "higher is better",
+                    "runs": runs,
+                    "verdict": verdict,
+                    "tone": tone,
+                }
+            )
+        return insights
 
     def get_examples_of_group(self, group: str, project_name: str):
         runs = self.api.runs(path=f"{self.entity}/{project_name}")

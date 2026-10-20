@@ -8,7 +8,7 @@ from auto_llm.tasks.registry import TASKS
 
 from ..state.app_state import AppState
 from ..state.user import User
-from ..state.configuration_state import ConfigurationState
+from ..state.configuration_state import ConfigurationState, InsightRun, MetricInsight
 from .. import styles
 
 from ..components.status_badge import status_badge
@@ -191,9 +191,80 @@ def examples_popover():
     )
 
 
-def explanation_popover():
-    result_desc = f"Please refer to the docs [here](https://ag-sc.github.io/auto-llm/fundamentals/evaluating/) for a detailed explanation on the evaluation metrics."
+def _insight_run_row(run: InsightRun):
+    """One model's score for a metric: model kind, model name, a bar relative to the top score, and the value."""
+    return rx.hstack(
+        rx.tooltip(
+            rx.badge(
+                run.kind_label,
+                color_scheme=rx.match(run.kind, ("pre", "gray"), ("fft", "blue"), ("lora", "violet"), "gray"),
+                variant="soft",
+                min_width="9.5em",
+                justify="center",
+            ),
+            content=run.run_name,
+        ),
+        rx.text(run.model, size="2", color_scheme="gray", min_width="11em", white_space="nowrap"),
+        rx.progress(value=run.bar, color_scheme=rx.cond(run.is_best, "green", "gray"), size="2", flex="1"),
+        rx.text(
+            run.value,
+            size="2",
+            weight=rx.cond(run.is_best, "bold", "regular"),
+            font_family="monospace",
+            min_width="3.5em",
+            text_align="right",
+        ),
+        rx.cond(run.is_best, rx.icon("trophy", size=14, color=rx.color("amber", 9)), rx.box(width="14px")),
+        width="100%",
+        align="center",
+        spacing="3",
+    )
 
+
+def _metric_insight_card(insight: MetricInsight):
+    return rx.card(
+        rx.vstack(
+            rx.hstack(
+                rx.hstack(
+                    rx.icon("gauge", size=16, color=rx.color("accent", 10)),
+                    rx.code(insight.metric, variant="soft", size="3"),
+                    align="center",
+                    spacing="2",
+                ),
+                rx.spacer(),
+                rx.vstack(
+                    rx.text(insight.best_value, size="5", weight="bold", font_family="monospace", line_height="1"),
+                    rx.text("best · ", insight.direction, size="1", color_scheme="gray"),
+                    spacing="1",
+                    align="end",
+                ),
+                width="100%",
+                align="center",
+            ),
+            rx.vstack(rx.foreach(insight.runs, _insight_run_row), width="100%", spacing="2"),
+            rx.callout.root(
+                rx.callout.icon(
+                    rx.match(
+                        insight.tone,
+                        ("green", rx.icon("trending-up", size=16)),
+                        ("amber", rx.icon("triangle-alert", size=16)),
+                        rx.icon("equal", size=16),
+                    )
+                ),
+                rx.callout.text(insight.verdict, size="2"),
+                color_scheme=insight.tone,
+                variant="surface",
+                size="1",
+                width="100%",
+            ),
+            spacing="3",
+            width="100%",
+        ),
+        width="100%",
+    )
+
+
+def explanation_popover():
     return rx.dialog.root(
         rx.dialog.trigger(
             rx.button(
@@ -213,19 +284,48 @@ def explanation_popover():
             )
         ),
         rx.dialog.content(
-            rx.hstack(rx.icon("star-check", size=16), rx.markdown("**How to interpret the results?**"), align="center"),
-            rx.markdown(ConfigurationState.result_explanation),
-            rx.hstack(rx.icon("octagon-alert", size=16), rx.markdown(result_desc), align="center"),
-            rx.dialog.close(rx.button("Close", mt="4")),
+            rx.vstack(
+                rx.hstack(
+                    rx.icon("badge-check", size=22, color=rx.color("accent", 10)),
+                    rx.dialog.title("How to interpret the results?", margin="0"),
+                    align="center",
+                    spacing="2",
+                ),
+                rx.text(
+                    "For each metric, the bars compare every evaluated model against the best score. The best model is marked with a trophy.",
+                    size="2",
+                    color_scheme="gray",
+                ),
+                rx.scroll_area(
+                    rx.cond(
+                        ConfigurationState.result_insights.length() > 0,
+                        rx.vstack(rx.foreach(ConfigurationState.result_insights, _metric_insight_card), spacing="3", width="100%"),
+                        rx.text("No evaluation metrics found for this run group yet.", color_scheme="gray"),
+                    ),
+                    type="auto",
+                    scrollbars="vertical",
+                    max_height="60vh",
+                    padding_right="3",
+                ),
+                rx.callout.root(
+                    rx.callout.icon(rx.icon("book-open", size=16)),
+                    rx.callout.text(
+                        "Please refer to the ",
+                        rx.link("docs", href="https://ag-sc.github.io/auto-llm/fundamentals/evaluating/", is_external=True),
+                        " for a detailed explanation of the evaluation metrics.",
+                    ),
+                    color_scheme="gray",
+                    variant="soft",
+                    size="1",
+                    width="100%",
+                ),
+                rx.hstack(rx.dialog.close(rx.button("Close", variant="soft")), justify="end", width="100%"),
+                spacing="4",
+                width="100%",
+            ),
+            max_width="min(900px, 95vw)",
             size="4",
-            width="100%",
-            height="100%",
         ),
-        width="75vw",
-        height="80vh",
-        max_width="75vw",
-        max_height="80vh",
-        padding="2em",
     )
 
 
@@ -579,6 +679,26 @@ def configure() -> rx.Component:
                     ),
                 ),
                 rx.hstack(
+                    rx.icon("package-plus", size=20),
+                    rx.text("Custom Models", weight="bold"),
+                    width="100%",
+                    margin_top="2",
+                ),
+                rx.text(
+                    "Add open-source models from HuggingFace of your choice. Use the full name of the model e.g. meta-llama/Llama-3.2-3B-Instruct. "
+                    "You can use comma-separated list for more models.",
+                    size="2",
+                    color_scheme="gray",
+                ),
+                rx.input(
+                    placeholder="meta-llama/Llama-3.2-3B-Instruct, Qwen/Qwen2.5-7B-Instruct",
+                    name="custom_models",
+                    value=AppState.custom_models,
+                    on_change=AppState.setvar("custom_models"),
+                    size="3",
+                    width="100%",
+                ),
+                rx.hstack(
                     rx.button(
                         "Reset",
                         type="button",
@@ -593,6 +713,7 @@ def configure() -> rx.Component:
                         width="50%",
                         size="3",
                         variant="solid",
+                        loading=AppState.is_checking_models,
                     ),
                     align="center",
                     width="100%",
@@ -739,6 +860,7 @@ def configure() -> rx.Component:
         align="center",
         spacing="2",
         on_mount=ConfigurationState.start_polling,  # Polling is now securely initialized once here instead of flooding row events
+        on_unmount=ConfigurationState.stop_polling,
     )
 
     results_tab = rx.card(

@@ -198,11 +198,14 @@ class User(rx.State):
         self.teams = []
 
 
-def get_wandb_client(user: User, do_login: bool = False) -> WandbClient:
-    org = user.active_team.replace(" ", "-")
+def get_wandb_entity(team: str) -> str:
+    org = team.replace(" ", "-")
     org = org.lower()
-    entity = f"llm4kmu-{org}"
-    client = WandbClient(entity=entity)
+    return f"llm4kmu-{org}"
+
+
+def get_wandb_client(user: User, do_login: bool = False) -> WandbClient:
+    client = WandbClient(entity=get_wandb_entity(user.active_team))
 
     if do_login:
         client.login(key=os.getenv("WANDB_KEY"))

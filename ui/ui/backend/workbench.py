@@ -42,10 +42,16 @@ class Workbench:
                     is_visible = settings["username"] == username
 
                 if is_visible:
+                    run_group = state.get("run_group") or self._read_run_group(path)
+                    # run_group is "<dataset_name>_<hash>" (see TrainEvalRunConfigurator); dataset names may contain underscores
+                    dataset_name, _, run_group_hash = run_group.rpartition("_")
                     job_details.append(
                         {
                             "job_path": path,
                             "job_path_short": path.replace(ROOT_DIR, ""),
+                            "run_group": run_group,
+                            "dataset_name": dataset_name,
+                            "run_group_hash": run_group_hash,
                             "timestamp": dt_object,
                         }
                     )
@@ -53,3 +59,12 @@ class Workbench:
         job_details.sort(key=lambda x: x["timestamp"], reverse=True)
 
         return job_details
+
+    @staticmethod
+    def _read_run_group(job_path: str) -> str:
+        """Older jobs did not save run_group in configure_state.json; fall back to the job's run_group.json."""
+        try:
+            with open(os.path.join(job_path, "run_group.json"), "r") as f:
+                return json.load(f)["run_group"]
+        except (OSError, ValueError, KeyError):
+            return ""

@@ -21,9 +21,10 @@ from auto_llm.estimator.runtime_estimator import RuntimeEstimator
 from auto_llm.estimator.trainer_flops_estimator import TrainerFlopsEstimator
 from auto_llm.estimator.utils import get_gpu_params, get_model_params
 from auto_llm.registry.tracker_registry import WANDB_TRAIN_PROJECT, WANDB_EVAL_PROJECT
+from auto_llm.tracker.tracker import WandbClient
 
 from ..state.app_state import AppState
-from ..state.user import User, get_wandb_client
+from ..state.user import User, get_wandb_client, get_wandb_entity
 
 # from ..backend.wandb_client import Client
 
@@ -46,6 +47,9 @@ EXAMPLE_NON_SCORE_COLS = [
 # Metrics where 1 means correct and 0 means wrong
 BINARY_METRICS = ["acc", "acc_norm", "exact_match"]
 
+# W&B run states after which a run's status no longer changes
+FINAL_RUN_STATES = {"finished", "crashed", "failed", "killed"}
+
 
 @dataclasses.dataclass
 class ExampleScore:
@@ -60,6 +64,27 @@ class ExampleResult:
     run_name: str
     output: str
     scores: List[ExampleScore]
+
+
+@dataclasses.dataclass
+class InsightRun:
+    kind: str
+    kind_label: str
+    model: str
+    run_name: str
+    value: str
+    bar: int
+    is_best: bool
+
+
+@dataclasses.dataclass
+class MetricInsight:
+    metric: str
+    best_value: str
+    direction: str
+    runs: List[InsightRun]
+    verdict: str
+    tone: str
 
 
 @dataclasses.dataclass
@@ -186,7 +211,7 @@ class ConfigurationState(rx.State):
 
     current_html_content: str = ""
     result_fig: str = ""
-    result_explanation: str = ""
+    result_insights: List[MetricInsight] = []
     examples_df: pd.DataFrame = pd.DataFrame()
     examples: List[Example] = []
     example_index: int = 0
@@ -197,6 +222,9 @@ class ConfigurationState(rx.State):
     is_loading_examples_html: bool = False
 
     config_statuses: Dict[str, str] = {}
+
+    # Incremented on every start/stop so that only the most recently started poll loop keeps running
+    _poll_generation: int = 0
 
     @rx.event
     def reset_state(self):
@@ -211,7 +239,7 @@ class ConfigurationState(rx.State):
 
         self.current_html_content: str = ""
         self.result_fig: str = ""
-        self.result_explanation: str = ""
+        self.result_insights = []
         self.examples_df: pd.DataFrame = pd.DataFrame()
         self.examples = []
         self.example_index = 0
@@ -225,7 +253,7 @@ class ConfigurationState(rx.State):
     @rx.event
     def reset_results_state(self):
         self.result_fig: str = ""
-        self.result_explanation: str = ""
+        self.result_insights = []
         self.examples_df: pd.DataFrame = pd.DataFrame()
         self.examples = []
         self.example_index = 0
@@ -336,10 +364,14 @@ class ConfigurationState(rx.State):
 
         try:
             # Use the explicit thread executor instead of None
-            result_fig, result_explanation, examples_df = await loop.run_in_executor(_executor, client.get_eval_runs_of_group, group, project_name)
+            result_fig, insights, examples_df = await loop.run_in_executor(_executor, client.get_eval_runs_of_group, group, project_name)
+
+            if not result_fig:
+                yield rx.toast.warning("No results found. Please retry later!")
+                return
 
             self.result_fig = result_fig
-            self.result_explanation = result_explanation
+            self.result_insights = [MetricInsight(**{**i, "runs": [InsightRun(**r) for r in i["runs"]]}) for i in insights]
             self.examples_df = examples_df
             self.examples = build_examples(examples_df)
             self.example_index = 0
@@ -356,44 +388,61 @@ class ConfigurationState(rx.State):
             # print("is_loading_results", self.is_loading_results)
             yield  # CRITICAL: Forces UI to register that loading has finished
 
-    async def start_polling(self):
-        """This starts the loop if it's not already running."""
-        if self.is_polling:
-            return
+    @rx.event
+    def start_polling(self):
+        """Starts a status poll loop for the mounted jobs table, superseding any older loop."""
+        self._poll_generation += 1
         self.is_polling = True
-        asyncio.create_task(self.poll_loop())
+        return ConfigurationState.poll_loop(self._poll_generation)
 
-    async def poll_loop(self):
-        loop = asyncio.get_event_loop()
+    @rx.event
+    def stop_polling(self):
+        self._poll_generation += 1
+        self.is_polling = False
 
-        while self.is_polling:
+    @rx.event(background=True)
+    async def poll_loop(self, generation: int):
+        # Must be a background event: only there does `async with self` lock the state and
+        # push the changes to the browser on exit. A plain asyncio task updates the state in
+        # memory, but the browser only sees it when some other event happens to run.
+        loop = asyncio.get_running_loop()
+        client = None
+
+        while True:
             try:
-                # 1. Grab snapshot data from states quickly while inside the context lock
+                # 1. Grab snapshot data from states quickly while inside the state lock
                 async with self:
+                    if not self.is_polling or self._poll_generation != generation:
+                        return
                     form_state = await self.get_state(AppState)
                     user_state = await self.get_state(User)
-                    client = get_wandb_client(user=user_state)
+                    entity = get_wandb_entity(user_state.active_team)
 
-                    # Create a list of configurations to check so we can release the lock
-                    configs_to_check = [
-                        (cfg.run_id, WANDB_TRAIN_PROJECT if cfg.mode == ConfigMode.TRAINER_RUN_CFG else WANDB_EVAL_PROJECT) for cfg in form_state.configurator_outputs
-                    ]
+                    run_ids_by_project = {WANDB_TRAIN_PROJECT: [], WANDB_EVAL_PROJECT: []}
+                    for cfg in form_state.configurator_outputs:
+                        project_name = WANDB_TRAIN_PROJECT if cfg.mode == ConfigMode.TRAINER_RUN_CFG else WANDB_EVAL_PROJECT
+                        run_ids_by_project[project_name].append(cfg.run_id)
 
-                # 2. Perform blocking I/O network calls OUTSIDE the state lock
+                # 2. Perform blocking W&B calls outside the state lock: one query per project instead of one per run
+                if client is None or client.get_entity() != entity:
+                    client = await loop.run_in_executor(_executor, WandbClient, entity)
+
                 new_statuses = {}
-                for run_id, project_name in configs_to_check:
-                    try:
-                        # Offload blocking network call to thread pool
-                        state = await loop.run_in_executor(_executor, client.get_run_state, run_id, project_name)
-                        new_statuses[run_id] = state
-                    except Exception:
-                        new_statuses[run_id] = "pending"
+                for project_name, run_ids in run_ids_by_project.items():
+                    states = await loop.run_in_executor(_executor, client.get_run_states, run_ids, project_name)
+                    # Runs not created in W&B yet are still queued or starting up
+                    new_statuses.update({run_id: states.get(run_id, "pending") for run_id in run_ids})
 
-                # 3. Re-acquire the lock briefly just to write the updates to state variables
+                # 3. Re-acquire the lock briefly to write the updates; leaving the block pushes them to the browser
                 async with self:
-                    if not self.is_polling:  # Guard check in case polling stopped during I/O
-                        break
+                    if not self.is_polling or self._poll_generation != generation:
+                        return
                     self.config_statuses.update(new_statuses)
+
+                    # Nothing left to change once every run has ended
+                    if new_statuses and all(state in FINAL_RUN_STATES for state in new_statuses.values()):
+                        self.is_polling = False
+                        return
 
             except Exception as e:
                 print(f"Error in background poll loop: {e}")
