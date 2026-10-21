@@ -9,6 +9,15 @@ tasks:
   - archaeo_ner
   - wiki_biography_ner
   - fairagro_de_ner
+  - europarl-ner #should it be newsplit?
+  - swiss-ner
+  - nostad-ner
+  - ehri_holocaust_ner
+  - zurich_state_archive_ner
+  - german_ler_ner
+  - ger_ps_ns
+  - ger_med_ner
+  - humadex_german_ner
 
 num_fewshot: 5
 batch_size: 16
