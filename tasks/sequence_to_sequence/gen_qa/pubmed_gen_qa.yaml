@@ -15,17 +15,35 @@ process_results: !function utils.process_results
 
 metric_list:
   - metric: bleu
-    aggregation: mean
+    aggregation: !function utils.nan_safe_mean
     higher_is_better: true
   - metric: rouge1
-    aggregation: mean
+    aggregation: !function utils.nan_safe_mean
     higher_is_better: true
   - metric: rouge2
-    aggregation: mean
+    aggregation: !function utils.nan_safe_mean
     higher_is_better: true
   - metric: rougeL
-    aggregation: mean
+    aggregation: !function utils.nan_safe_mean
+    higher_is_better: true
+  - metric: judge_correctness
+    aggregation: !function utils.nan_safe_mean
+    higher_is_better: true
+  - metric: judge_completeness
+    aggregation: !function utils.nan_safe_mean
+    higher_is_better: true
+  - metric: judge_faithfulness
+    aggregation: !function utils.nan_safe_mean
+    higher_is_better: true
+  - metric: judge_relevance
+    aggregation: !function utils.nan_safe_mean
+    higher_is_better: true
+  - metric: judge_fluency
+    aggregation: !function utils.nan_safe_mean
+    higher_is_better: true
+  - metric: judge_conciseness
+    aggregation: !function utils.nan_safe_mean
     higher_is_better: true
 
 metadata:
-  version: 1.0
+  version: 1.1
