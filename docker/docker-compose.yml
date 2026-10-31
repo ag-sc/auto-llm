@@ -1,0 +1,57 @@
+# AutoLLM UI in Docker.
+#   docker compose -f docker/docker-compose.yml up -d --build
+# Host networking keeps ports 3000 (frontend) and 8000 (backend) on localhost,
+# so the existing nginx config from deploy_ui.sh works unchanged.
+services:
+  autollm-ui:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        UID: "${UID:-1000}"
+        GID: "${GID:-1000}"
+    image: autollm-ui:latest
+    container_name: autollm-ui
+    command: ["${AUTOLLM_UI_MODE:-prod}"]
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      TS_SOCKET: /tmp/shared_gpu_queue
+      ENV_VARIABLES_PATH: /home/ubuntu/env.sh
+      ADMIN_USERNAMES: "${ADMIN_USERNAMES:-admin}"
+    volumes:
+      # Repo at the same absolute path as on the host: run.sh files written by the UI
+      # are executed by the host ts server, so paths must match.
+      - type: bind
+        source: /home/ubuntu/auto-llm
+        target: /home/ubuntu/auto-llm
+      # Generated configs / model outputs / eval results (ui/ui/backend ROOT_DIR).
+      - type: bind
+        source: /home/ubuntu/.auto_llm_cache
+        target: /home/ubuntu/.auto_llm_cache
+      - type: bind
+        source: /home/ubuntu/env.sh
+        target: /home/ubuntu/env.sh
+        read_only: true
+      # Host task-spooler: client binary, the NVML lib it links against, and the socket.
+      # create_host_path: false makes compose fail rather than create a directory
+      # where the socket should be.
+      - type: bind
+        source: /usr/local/bin/ts
+        target: /usr/local/bin/ts
+        read_only: true
+        bind: { create_host_path: false }
+      - type: bind
+        source: /usr/lib/x86_64-linux-gnu/libnvidia-ml.so.1
+        target: /usr/lib/x86_64-linux-gnu/libnvidia-ml.so.1
+        read_only: true
+        bind: { create_host_path: false }
+      - type: bind
+        source: /tmp/shared_gpu_queue
+        target: /tmp/shared_gpu_queue
+        bind: { create_host_path: false }
+      # Keep Reflex's bun/node download between restarts.
+      - reflex-data:/home/ubuntu/.local/share/reflex
+
+volumes:
+  reflex-data:

@@ -1,0 +1,10 @@
+venv
+wandb
+artifacts
+**/__pycache__
+**/*.pyc
+ui/.web
+ui/.states
+ui/*.db
+ui/*.zip
+.git
