@@ -27,6 +27,23 @@ from auto_llm.tracker.tracker import WandbClient
 from ..state.app_state import AppState
 from ..state.user import User, get_wandb_client, get_wandb_entity
 
+
+# How long a poll loop keeps running after its browser tab disconnected. Covers short
+# network drops; a closed or reloaded tab never sends on_unmount, so without this check
+# its loop would poll W&B forever.
+_POLL_DISCONNECT_GRACE_SECONDS = 60
+
+
+def _is_client_connected(client_token: str) -> bool:
+    """Whether a browser tab with this token currently has a live websocket to this backend."""
+    try:
+        from reflex.utils.prerequisites import get_and_validate_app
+
+        namespace = get_and_validate_app().app.event_namespace
+        return namespace is None or client_token in namespace.token_to_sid
+    except Exception:
+        return True  # if Reflex internals change, keep the old behaviour rather than stop polling
+
 # from ..backend.wandb_client import Client
 
 GPU_PARAMS = get_gpu_params()
@@ -479,8 +496,18 @@ class ConfigurationState(rx.State):
         # memory, but the browser only sees it when some other event happens to run.
         loop = asyncio.get_running_loop()
         client = None
+        client_token = self.router.session.client_token
+        disconnected_since = None
 
         while True:
+            # Stop once the browser tab has been gone for a while (closed or reloaded tabs never unmount).
+            if _is_client_connected(client_token):
+                disconnected_since = None
+            else:
+                disconnected_since = disconnected_since or loop.time()
+                if loop.time() - disconnected_since > _POLL_DISCONNECT_GRACE_SECONDS:
+                    return
+
             try:
                 # 1. Grab snapshot data from states quickly while inside the state lock
                 async with self:

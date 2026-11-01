@@ -16,7 +16,7 @@ services:
     network_mode: host
     restart: unless-stopped
     environment:
-      TS_SOCKET: /tmp/shared_gpu_queue
+      TS_SOCKET: /tmp/shared_gpu_queue  # only shown in run.log; the host relay picks the socket
       ENV_VARIABLES_PATH: /home/ubuntu/env.sh
       ADMIN_USERNAMES: "${ADMIN_USERNAMES:-admin}"
     volumes:
@@ -33,22 +33,11 @@ services:
         source: /home/ubuntu/env.sh
         target: /home/ubuntu/env.sh
         read_only: true
-      # Host task-spooler: client binary, the NVML lib it links against, and the socket.
-      # create_host_path: false makes compose fail rather than create a directory
-      # where the socket should be.
+      # Host ts relay (docker/ts_relay.py). The container's `ts` forwards job submissions
+      # through this socket so jobs run on the host, not in this container.
       - type: bind
-        source: /usr/local/bin/ts
-        target: /usr/local/bin/ts
-        read_only: true
-        bind: { create_host_path: false }
-      - type: bind
-        source: /usr/lib/x86_64-linux-gnu/libnvidia-ml.so.1
-        target: /usr/lib/x86_64-linux-gnu/libnvidia-ml.so.1
-        read_only: true
-        bind: { create_host_path: false }
-      - type: bind
-        source: /tmp/shared_gpu_queue
-        target: /tmp/shared_gpu_queue
+        source: /home/ubuntu/.autollm_ts_relay
+        target: /home/ubuntu/.autollm_ts_relay
         bind: { create_host_path: false }
       # Keep Reflex's bun/node download between restarts.
       - reflex-data:/home/ubuntu/.local/share/reflex

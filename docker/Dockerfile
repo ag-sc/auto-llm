@@ -1,9 +1,8 @@
 # Image for the AutoLLM Reflex UI only.
 # The repo itself is bind-mounted at runtime (same path as on the host), so this image
-# only holds the Python environment. Training/eval jobs still run on the host through
-# the host's task-spooler queue.
+# only holds the Python environment. Training/eval jobs run on the host: the container's
+# `ts` hands them to docker/ts_relay.py running there.
 
-# Same Ubuntu as the host, so the host's `ts` binary (mounted in) finds a compatible glibc.
 FROM ubuntu:26.04
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -37,7 +36,7 @@ RUN curl -fsSL https://bun.sh/install | bash -s "bun-v1.3.6" \
     && bun --version
 
 # Run as the same uid/gid as the host user so files in the mounted repo/cache stay owned
-# by them and the host ts server accepts the socket connection.
+# by them and they can use the host's ts relay socket.
 ARG UID=1000
 ARG GID=1000
 RUN (getent group ${GID} || groupadd -g ${GID} ubuntu) \
@@ -47,7 +46,10 @@ RUN (getent group ${GID} || groupadd -g ${GID} ubuntu) \
 ENV HOME=/home/ubuntu
 
 COPY docker/entrypoint.sh /usr/local/bin/autollm-ui-entrypoint
-RUN chmod +x /usr/local/bin/autollm-ui-entrypoint
+# `ts` in the container forwards to the host relay (docker/ts_relay.py), so queued jobs
+# run on the host with its GPUs and venv instead of inside this container.
+COPY docker/ts_client.py /usr/local/bin/ts
+RUN chmod +x /usr/local/bin/autollm-ui-entrypoint /usr/local/bin/ts
 
 USER ${UID}:${GID}
 ENTRYPOINT ["autollm-ui-entrypoint"]

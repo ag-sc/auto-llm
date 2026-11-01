@@ -7,16 +7,12 @@ MODE="${1:-prod}"
 REPO_DIR="${AUTOLLM_REPO_DIR:-/home/ubuntu/auto-llm}"
 ENV_VARIABLES_PATH="${ENV_VARIABLES_PATH:-/home/ubuntu/env.sh}"
 
-# The UI queues GPU jobs on the host's task-spooler server. If the socket is missing,
-# `ts` would quietly start its own server inside this container (no GPUs, wrong env),
-# so refuse to start instead.
-if [ ! -S "${TS_SOCKET:-}" ]; then
-    echo "ERROR: task-spooler socket '${TS_SOCKET:-<unset>}' not found." >&2
-    echo "Start the ts server on the host first, then restart this container." >&2
-    exit 1
-fi
-if ! command -v ts >/dev/null; then
-    echo "ERROR: 'ts' binary not mounted into the container." >&2
+# The UI queues GPU jobs through the host ts relay (docker/ts_relay.py), which runs `ts`
+# on the host so the jobs run there. Without it, job submission would fail.
+RELAY_SOCKET="${TS_RELAY_DIR:-/home/ubuntu/.autollm_ts_relay}/relay.sock"
+if [ ! -S "$RELAY_SOCKET" ]; then
+    echo "ERROR: host ts relay socket $RELAY_SOCKET not found." >&2
+    echo "Run scripts/start_ts_queue.sh on the host first, then restart this container." >&2
     exit 1
 fi
 

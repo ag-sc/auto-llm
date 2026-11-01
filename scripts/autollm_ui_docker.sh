@@ -7,11 +7,8 @@ cd "$(dirname "$0")/.."
 export AUTOLLM_UI_MODE="${1:-prod}"
 export UID GID="$(id -g)"
 
-TS_SOCKET_PATH=/tmp/shared_gpu_queue
-if [ ! -S "$TS_SOCKET_PATH" ]; then
-    echo "task-spooler socket $TS_SOCKET_PATH not found. Start the ts server on the host first." >&2
-    exit 1
-fi
+# The queue and the host relay must be up before the UI starts (it refuses to start otherwise).
+scripts/start_ts_queue.sh
 
 # Free the ports if the non-docker UI is still running (same as the old scripts).
 fuser -k 3000/tcp 8000/tcp 2>/dev/null || true
